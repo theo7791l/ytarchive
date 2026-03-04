@@ -10,8 +10,10 @@
 - ⏰ **Background scheduler** — checks channels every hour
 - 🎨 **Beautiful, animated UI** — dark theme, smooth transitions
 - 🗃️ **No database** — everything stored in JSON files
-- 🎥 **Built-in video player** — watch directly in the browser
-- 🔍 **Smart organization** — search, filter, and sort your library
+- 🎥 **Advanced video player** — keyboard shortcuts, speed control, fullscreen
+- 🔍 **Smart organization** — search, filter by channel, sort by date/views/duration
+- 📊 **Library stats** — total videos, channels, watch time
+- 🎛️ **Grid/List views** — switch between layouts
 
 ## 🚀 Quick Start
 
@@ -50,9 +52,23 @@ Open http://localhost:8000 and login!
 4. Choose quality and enable auto-download
 5. Scheduler will check for new videos every hour
 
-### Manual Channel Check
-- Click 🔄 **Check** button on any channel card
-- Instant check for new uploads
+### Video Player Features
+- **Keyboard shortcuts**:
+  - `Space` / `K` = Play/Pause
+  - `←` / `→` = Skip ±5 seconds
+  - `↑` / `↓` = Volume control
+  - `F` = Fullscreen
+  - `M` = Mute
+- **Speed control**: 0.5x to 2x playback
+- **Quick skip**: -10s / +10s buttons
+- **Fullscreen mode**
+
+### Library Organization
+- **Search**: Find videos by title or channel
+- **Filter by channel**: Show videos from specific channel
+- **Sort options**: Date, Title, Views, Duration
+- **View modes**: Grid or List layout
+- **Statistics**: Total videos, channels, watch time
 
 ## 📦 Deploy on SkyBots
 
@@ -94,8 +110,8 @@ Open http://localhost:8000 and login!
 - [x] Step 1: Auth system + Beautiful login
 - [x] Step 2: Video downloader with yt-dlp
 - [x] Step 3: Channel auto-tracking + scheduler
-- [ ] Step 4: Advanced library UI (filters, sorting)
-- [ ] Step 5: Enhanced video player
+- [x] Step 4: Advanced library UI (filters, sorting)
+- [x] Step 5: Enhanced video player (shortcuts, speed)
 - [ ] Step 6: Channel statistics & management
 - [ ] Step 7: Full deployment guide
 

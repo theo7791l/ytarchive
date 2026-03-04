@@ -136,14 +136,8 @@ body {
     transition: all 0.3s ease;
 }
 
-.filter-group select:hover {
-    border-color: rgba(102, 126, 234, 0.5);
-}
-
-.filter-group select:focus {
-    outline: none;
-    border-color: #667eea;
-}
+.filter-group select:hover { border-color: rgba(102, 126, 234, 0.5); }
+.filter-group select:focus { outline: none; border-color: #667eea; }
 
 .view-toggle {
     display: flex;
@@ -354,10 +348,7 @@ body {
     color: #667eea;
 }
 
-.list-actions {
-    display: flex;
-    gap: 10px;
-}
+.list-actions { display: flex; gap: 10px; }
 
 .btn-play-small, .btn-delete-small {
     padding: 10px 20px;
@@ -609,7 +600,7 @@ body {
 
 .form-group.checkbox input { width: auto; }
 
-/* Video Modal */
+/* Video Player Modal */
 .video-modal {
     position: fixed;
     top: 0;
@@ -622,32 +613,141 @@ body {
     justify-content: center;
     z-index: 1000;
     animation: fadeIn 0.3s ease;
+    overflow-y: auto;
 }
 
 .video-modal-content {
-    max-width: 90%;
-    max-height: 90%;
+    max-width: 1100px;
+    width: 95%;
     background: #1a1a2e;
     border-radius: 15px;
     padding: 30px;
     position: relative;
+    margin: 20px;
 }
 
-.video-modal-content h2 { margin-bottom: 20px; font-size: 24px; }
+.player-title {
+    margin-bottom: 20px;
+    font-size: 24px;
+    font-weight: 600;
+}
 
-.video-modal-content video {
-    width: 100%;
-    max-height: 60vh;
+.video-player-wrapper {
+    position: relative;
+    background: #000;
     border-radius: 10px;
+    overflow: hidden;
     margin-bottom: 20px;
 }
 
-.video-details { color: #aaa; line-height: 1.6; }
-.video-details p { margin-bottom: 10px; }
+#main-player {
+    width: 100%;
+    max-height: 70vh;
+    display: block;
+}
+
+.player-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.3);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.overlay-icon {
+    font-size: 80px;
+    filter: drop-shadow(0 0 10px rgba(0,0,0,0.8));
+}
+
+.player-controls-advanced {
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+.control-group {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.control-group label {
+    font-weight: 600;
+    margin-right: 8px;
+    color: #aaa;
+}
+
+.speed-btn, .control-btn {
+    padding: 8px 16px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    color: white;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.speed-btn:hover, .control-btn:hover {
+    background: rgba(102, 126, 234, 0.2);
+    border-color: rgba(102, 126, 234, 0.5);
+}
+
+.speed-btn.active {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-color: #667eea;
+}
+
+.keyboard-shortcuts {
+    background: rgba(255, 255, 255, 0.03);
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    align-items: center;
+    font-size: 13px;
+}
+
+.keyboard-shortcuts strong {
+    color: #667eea;
+}
+
+.keyboard-shortcuts span {
+    color: #aaa;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
+.video-details {
+    color: #aaa;
+    line-height: 1.8;
+}
+
+.video-details p {
+    margin-bottom: 10px;
+}
+
+.video-details strong {
+    color: #fff;
+}
 
 .video-description {
     margin-top: 15px;
     padding-top: 15px;
     border-top: 1px solid rgba(255, 255, 255, 0.1);
     font-size: 14px;
+    line-height: 1.6;
 }

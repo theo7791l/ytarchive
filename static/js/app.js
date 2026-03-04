@@ -144,7 +144,6 @@ function updateChannelFilter() {
 function getFilteredAndSorted() {
     let filtered = [...libraryCache];
     
-    // Apply search
     if (currentSearch) {
         const query = currentSearch.toLowerCase();
         filtered = filtered.filter(v => 
@@ -153,12 +152,10 @@ function getFilteredAndSorted() {
         );
     }
     
-    // Apply channel filter
     if (currentFilter !== 'all') {
         filtered = filtered.filter(v => v.channel_id === currentFilter);
     }
     
-    // Apply sorting
     const [field, order] = currentSort.split('-');
     filtered.sort((a, b) => {
         let aVal, bVal;
@@ -284,20 +281,62 @@ document.getElementById('list-view').addEventListener('click', () => {
     renderLibrary();
 });
 
-// Play Video
+// Advanced Video Player
+let currentPlayer = null;
+
 function playVideo(videoId) {
     const video = libraryCache.find(v => v.id === videoId);
     if (!video) return;
+    
+    // Close existing player if any
+    if (currentPlayer) {
+        currentPlayer.remove();
+    }
     
     const modal = document.createElement('div');
     modal.className = 'video-modal';
     modal.innerHTML = `
         <div class="video-modal-content">
-            <button class="modal-close" onclick="this.parentElement.parentElement.remove()">&times;</button>
-            <h2>${video.title}</h2>
-            <video controls autoplay>
-                <source src="/videos/${video.video_file}" type="video/mp4">
-            </video>
+            <button class="modal-close" onclick="closePlayer()">&times;</button>
+            <h2 class="player-title">${video.title}</h2>
+            
+            <div class="video-player-wrapper">
+                <video id="main-player" controls autoplay>
+                    <source src="/videos/${video.video_file}" type="video/mp4">
+                </video>
+                
+                <div class="player-overlay" id="player-overlay">
+                    <div class="overlay-icon">⏸️</div>
+                </div>
+            </div>
+            
+            <div class="player-controls-advanced">
+                <div class="control-group">
+                    <label>Speed:</label>
+                    <button class="speed-btn" data-speed="0.5">0.5x</button>
+                    <button class="speed-btn" data-speed="0.75">0.75x</button>
+                    <button class="speed-btn active" data-speed="1">1x</button>
+                    <button class="speed-btn" data-speed="1.25">1.25x</button>
+                    <button class="speed-btn" data-speed="1.5">1.5x</button>
+                    <button class="speed-btn" data-speed="2">2x</button>
+                </div>
+                
+                <div class="control-group">
+                    <button class="control-btn" onclick="skipTime(-10)">⏪ -10s</button>
+                    <button class="control-btn" onclick="skipTime(10)">+10s ⏩</button>
+                    <button class="control-btn" onclick="toggleFullscreen()">🖵 Fullscreen</button>
+                </div>
+            </div>
+            
+            <div class="keyboard-shortcuts">
+                <strong>⌨️ Shortcuts:</strong>
+                <span>Space = Play/Pause</span>
+                <span>← → = ±5s</span>
+                <span>↑ ↓ = Volume</span>
+                <span>F = Fullscreen</span>
+                <span>M = Mute</span>
+            </div>
+            
             <div class="video-details">
                 <p><strong>Channel:</strong> ${video.channel}</p>
                 <p><strong>Uploaded:</strong> ${formatDate(video.upload_date)}</p>
@@ -307,7 +346,112 @@ function playVideo(videoId) {
             </div>
         </div>
     `;
+    
     document.body.appendChild(modal);
+    currentPlayer = modal;
+    
+    const player = document.getElementById('main-player');
+    const overlay = document.getElementById('player-overlay');
+    const overlayIcon = overlay.querySelector('.overlay-icon');
+    
+    // Speed controls
+    document.querySelectorAll('.speed-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const speed = parseFloat(btn.dataset.speed);
+            player.playbackRate = speed;
+            document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+        });
+    });
+    
+    // Play/Pause overlay
+    let overlayTimeout;
+    player.addEventListener('play', () => {
+        overlayIcon.textContent = '▶️';
+        overlay.style.opacity = '1';
+        clearTimeout(overlayTimeout);
+        overlayTimeout = setTimeout(() => {
+            overlay.style.opacity = '0';
+        }, 500);
+    });
+    
+    player.addEventListener('pause', () => {
+        overlayIcon.textContent = '⏸️';
+        overlay.style.opacity = '1';
+    });
+    
+    // Keyboard shortcuts
+    const handleKeyboard = (e) => {
+        if (e.target.tagName === 'INPUT') return;
+        
+        switch(e.key) {
+            case ' ':
+            case 'k':
+                e.preventDefault();
+                player.paused ? player.play() : player.pause();
+                break;
+            case 'ArrowLeft':
+                e.preventDefault();
+                player.currentTime = Math.max(0, player.currentTime - 5);
+                break;
+            case 'ArrowRight':
+                e.preventDefault();
+                player.currentTime = Math.min(player.duration, player.currentTime + 5);
+                break;
+            case 'ArrowUp':
+                e.preventDefault();
+                player.volume = Math.min(1, player.volume + 0.1);
+                break;
+            case 'ArrowDown':
+                e.preventDefault();
+                player.volume = Math.max(0, player.volume - 0.1);
+                break;
+            case 'f':
+            case 'F':
+                e.preventDefault();
+                toggleFullscreen();
+                break;
+            case 'm':
+            case 'M':
+                e.preventDefault();
+                player.muted = !player.muted;
+                break;
+        }
+    };
+    
+    document.addEventListener('keydown', handleKeyboard);
+    
+    // Cleanup on close
+    modal.addEventListener('remove', () => {
+        document.removeEventListener('keydown', handleKeyboard);
+    });
+}
+
+function closePlayer() {
+    if (currentPlayer) {
+        currentPlayer.remove();
+        currentPlayer = null;
+    }
+}
+
+function skipTime(seconds) {
+    const player = document.getElementById('main-player');
+    if (player) {
+        player.currentTime = Math.max(0, Math.min(player.duration, player.currentTime + seconds));
+    }
+}
+
+function toggleFullscreen() {
+    const player = document.getElementById('main-player');
+    if (!player) return;
+    
+    if (document.fullscreenElement) {
+        document.exitFullscreen();
+    } else {
+        player.requestFullscreen().catch(err => {
+            console.log('Fullscreen error:', err);
+        });
+    }
 }
 
 // Delete Video
