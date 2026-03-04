@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>YTArchive - Library</title>
     <link rel="stylesheet" href="/static/css/app.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <nav class="navbar">
@@ -127,6 +128,14 @@
                 </div>
                 <button type="submit" class="btn-primary">Add Channel</button>
             </form>
+        </div>
+    </div>
+    
+    <!-- Channel Stats Modal -->
+    <div id="channel-stats-modal" class="modal" style="display: none;">
+        <div class="modal-content stats-modal">
+            <button class="modal-close" onclick="closeStatsModal()">&times;</button>
+            <div id="stats-content"></div>
         </div>
     </div>
     

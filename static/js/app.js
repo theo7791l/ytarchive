@@ -288,7 +288,6 @@ function playVideo(videoId) {
     const video = libraryCache.find(v => v.id === videoId);
     if (!video) return;
     
-    // Close existing player if any
     if (currentPlayer) {
         currentPlayer.remove();
     }
@@ -354,7 +353,6 @@ function playVideo(videoId) {
     const overlay = document.getElementById('player-overlay');
     const overlayIcon = overlay.querySelector('.overlay-icon');
     
-    // Speed controls
     document.querySelectorAll('.speed-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             const speed = parseFloat(btn.dataset.speed);
@@ -364,7 +362,6 @@ function playVideo(videoId) {
         });
     });
     
-    // Play/Pause overlay
     let overlayTimeout;
     player.addEventListener('play', () => {
         overlayIcon.textContent = '▶️';
@@ -380,7 +377,6 @@ function playVideo(videoId) {
         overlay.style.opacity = '1';
     });
     
-    // Keyboard shortcuts
     const handleKeyboard = (e) => {
         if (e.target.tagName === 'INPUT') return;
         
@@ -421,7 +417,6 @@ function playVideo(videoId) {
     
     document.addEventListener('keydown', handleKeyboard);
     
-    // Cleanup on close
     modal.addEventListener('remove', () => {
         document.removeEventListener('keydown', handleKeyboard);
     });
@@ -541,6 +536,7 @@ async function loadChannels() {
                                onchange="toggleAutoDownload('${ch.id}', this.checked)">
                         <span>Auto-DL</span>
                     </label>
+                    <button class="btn-stats" onclick="showChannelStats('${ch.id}')">📊 Stats</button>
                     <button class="btn-check" onclick="checkChannelNow('${ch.id}')">🔄 Check</button>
                     <button class="btn-delete-channel" onclick="deleteChannel('${ch.id}')">🗑️</button>
                 </div>
@@ -595,6 +591,126 @@ async function deleteChannel(channelId) {
     if (!confirm('Remove this channel?')) return;
     await apiCall(`/api/channels/${channelId}`, { method: 'DELETE' });
     loadChannels();
+}
+
+// Channel Stats
+async function showChannelStats(channelId) {
+    const stats = await apiCall(`/api/channels/${channelId}/stats`);
+    const modal = document.getElementById('channel-stats-modal');
+    const content = document.getElementById('stats-content');
+    
+    content.innerHTML = `
+        <div class="stats-header">
+            ${stats.channel.thumbnail ? `<img src="${stats.channel.thumbnail}" class="stats-channel-thumb">` : '<div class="stats-channel-thumb-placeholder">📺</div>'}
+            <div>
+                <h2>${stats.channel.name}</h2>
+                <p class="stats-subtitle">${stats.total_videos} videos archived</p>
+            </div>
+        </div>
+        
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon">👁️</div>
+                <div class="stat-value">${formatNumber(stats.total_views)}</div>
+                <div class="stat-label">Total Views</div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon">⏱️</div>
+                <div class="stat-value">${formatTotalDuration(stats.total_duration)}</div>
+                <div class="stat-label">Watch Time</div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon">📈</div>
+                <div class="stat-value">${formatNumber(stats.avg_views)}</div>
+                <div class="stat-label">Avg Views</div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon">🎬</div>
+                <div class="stat-value">${formatDuration(stats.avg_duration)}</div>
+                <div class="stat-label">Avg Duration</div>
+            </div>
+        </div>
+        
+        <div class="stats-section">
+            <h3>📊 Upload History</h3>
+            <canvas id="upload-chart"></canvas>
+        </div>
+        
+        <div class="stats-highlights">
+            <div class="highlight-card">
+                <h4>🏆 Most Viewed</h4>
+                <p class="highlight-title">${stats.most_viewed.title}</p>
+                <p class="highlight-value">${formatNumber(stats.most_viewed.views)} views</p>
+            </div>
+            
+            <div class="highlight-card">
+                <h4>⏳ Longest Video</h4>
+                <p class="highlight-title">${stats.longest_video.title}</p>
+                <p class="highlight-value">${formatDuration(stats.longest_video.duration)}</p>
+            </div>
+        </div>
+        
+        <div class="stats-timeline">
+            <p><strong>First download:</strong> ${stats.first_download || 'N/A'}</p>
+            <p><strong>Latest download:</strong> ${stats.last_download || 'N/A'}</p>
+        </div>
+    `;
+    
+    modal.style.display = 'flex';
+    
+    // Render chart
+    setTimeout(() => {
+        const ctx = document.getElementById('upload-chart').getContext('2d');
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: stats.upload_history.map(h => h.month),
+                datasets: [{
+                    label: 'Videos',
+                    data: stats.upload_history.map(h => h.count),
+                    backgroundColor: 'rgba(102, 126, 234, 0.6)',
+                    borderColor: 'rgba(102, 126, 234, 1)',
+                    borderWidth: 2,
+                    borderRadius: 8
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        padding: 12,
+                        cornerRadius: 8
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { 
+                            color: '#aaa',
+                            stepSize: 1
+                        },
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.1)'
+                        }
+                    },
+                    x: {
+                        ticks: { color: '#aaa' },
+                        grid: { display: false }
+                    }
+                }
+            }
+        });
+    }, 100);
+}
+
+function closeStatsModal() {
+    document.getElementById('channel-stats-modal').style.display = 'none';
 }
 
 // Initial load
