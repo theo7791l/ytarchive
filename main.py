@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Depends, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Depends, WebSocket, WebSocketDisconnect, Query
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -121,33 +121,41 @@ async def delete_video(video_id: str, user: dict = Depends(verify_token)):
     return {"message": "Video deleted"}
 
 @app.websocket("/api/ws/download")
-async def websocket_download(websocket: WebSocket):
+async def websocket_download(websocket: WebSocket, token: str = Query(...)):
     await websocket.accept()
     
+    ws_open = True
+    
     try:
+        # Verify token from query param
+        try:
+            jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        except Exception as e:
+            await websocket.send_json({"status": "error", "message": "Invalid token"})
+            await websocket.close()
+            ws_open = False
+            return
+        
+        # Receive download request
         data = await websocket.receive_json()
         url = data['url']
         quality = data.get('quality', 'best')
-        token = data.get('token')
-        
-        # Verify token
-        try:
-            jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
-        except:
-            await websocket.send_json({"status": "error", "message": "Invalid token"})
-            await websocket.close()
-            return
         
         # Download with progress updates
         async def progress_callback(status, message, percent=None, speed=None, eta=None):
-            payload = {"status": status, "message": message}
-            if percent:
-                payload['percent'] = percent
-            if speed:
-                payload['speed'] = speed
-            if eta:
-                payload['eta'] = eta
-            await websocket.send_json(payload)
+            if not ws_open:
+                return
+            try:
+                payload = {"status": status, "message": message}
+                if percent:
+                    payload['percent'] = percent
+                if speed:
+                    payload['speed'] = speed
+                if eta:
+                    payload['eta'] = eta
+                await websocket.send_json(payload)
+            except Exception:
+                pass
         
         success, video_info = await download_video(url, quality, progress_callback)
         
@@ -157,22 +165,32 @@ async def websocket_download(websocket: WebSocket):
             library.append(video_info)
             save_json(LIBRARY_FILE, library)
             
-            await websocket.send_json({
-                "status": "completed",
-                "message": "Download complete!"
-            })
+            if ws_open:
+                await websocket.send_json({
+                    "status": "completed",
+                    "message": "Download complete!"
+                })
         else:
-            await websocket.send_json({
-                "status": "error",
-                "message": video_info
-            })
+            if ws_open:
+                await websocket.send_json({
+                    "status": "error",
+                    "message": video_info
+                })
     
     except WebSocketDisconnect:
-        pass
+        ws_open = False
     except Exception as e:
-        await websocket.send_json({"status": "error", "message": str(e)})
+        if ws_open:
+            try:
+                await websocket.send_json({"status": "error", "message": str(e)})
+            except:
+                pass
     finally:
-        await websocket.close()
+        if ws_open:
+            try:
+                await websocket.close()
+            except:
+                pass
 
 @app.get("/api/channels")
 async def get_channels(user: dict = Depends(verify_token)):
