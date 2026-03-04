@@ -5,6 +5,24 @@ if (!token) {
     window.location.href = '/';
 }
 
+// Toast Notification System
+function showToast(message, type = 'success') {
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.textContent = message;
+    
+    document.body.appendChild(toast);
+    
+    // Trigger animation
+    setTimeout(() => toast.classList.add('show'), 10);
+    
+    // Remove after 3 seconds
+    setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+}
+
 // View switching
 const navLinks = document.querySelectorAll('.nav-link');
 const views = document.querySelectorAll('.view');
@@ -70,6 +88,11 @@ async function apiCall(endpoint, options = {}) {
         localStorage.removeItem('token');
         window.location.href = '/';
         return;
+    }
+    
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Request failed');
     }
     
     return response.json();
@@ -494,8 +517,14 @@ function toggleFullscreen() {
 // Delete Video
 async function deleteVideo(videoId) {
     if (!confirm('Delete this video?')) return;
-    await apiCall(`/api/library/${videoId}`, { method: 'DELETE' });
-    loadLibrary();
+    
+    try {
+        await apiCall(`/api/library/${videoId}`, { method: 'DELETE' });
+        showToast('Video deleted successfully', 'success');
+        loadLibrary();
+    } catch (error) {
+        showToast(error.message || 'Failed to delete video', 'error');
+    }
 }
 
 // Download
@@ -509,7 +538,10 @@ document.getElementById('download-btn').addEventListener('click', async () => {
     const progressText = document.querySelector('#download-progress p');
     const downloadBtn = document.getElementById('download-btn');
     
-    if (!url) return alert('Enter a YouTube URL');
+    if (!url) {
+        showToast('Please enter a YouTube URL', 'error');
+        return;
+    }
     
     progressDiv.style.display = 'block';
     downloadBtn.disabled = true;
@@ -539,6 +571,7 @@ document.getElementById('download-btn').addEventListener('click', async () => {
         } else if (data.status === 'completed') {
             progressText.textContent = data.message;
             progressFill.style.width = '100%';
+            showToast('Video downloaded successfully!', 'success');
             setTimeout(() => {
                 progressDiv.style.display = 'none';
                 downloadBtn.disabled = false;
@@ -548,6 +581,7 @@ document.getElementById('download-btn').addEventListener('click', async () => {
         } else if (data.status === 'error') {
             progressText.textContent = data.message;
             progressText.style.color = '#f44';
+            showToast(data.message, 'error');
             setTimeout(() => {
                 progressDiv.style.display = 'none';
                 downloadBtn.disabled = false;
@@ -560,6 +594,7 @@ document.getElementById('download-btn').addEventListener('click', async () => {
         console.error('WebSocket error:', error);
         progressText.textContent = 'Connection error';
         progressText.style.color = '#f44';
+        showToast('WebSocket connection error', 'error');
         setTimeout(() => {
             progressDiv.style.display = 'none';
             downloadBtn.disabled = false;
@@ -570,32 +605,36 @@ document.getElementById('download-btn').addEventListener('click', async () => {
 
 // Channels
 async function loadChannels() {
-    const channels = await apiCall('/api/channels');
-    const container = document.getElementById('channels-list');
-    
-    if (channels.length === 0) {
-        container.innerHTML = '<p class="empty-state">No channels yet.</p>';
-    } else {
-        container.innerHTML = channels.map((ch, i) => `
-            <div class="channel-card" style="--i: ${i}">
-                ${ch.thumbnail ? `<img src="${ch.thumbnail}" class="channel-thumb">` : '<div class="channel-thumb-placeholder">CH</div>'}
-                <div class="channel-info">
-                    <h3>${ch.name}</h3>
-                    <p>${ch.video_count} videos</p>
-                    <p class="channel-date">Added ${formatDate(ch.added_at)}</p>
+    try {
+        const channels = await apiCall('/api/channels');
+        const container = document.getElementById('channels-list');
+        
+        if (channels.length === 0) {
+            container.innerHTML = '<p class="empty-state">No channels yet.</p>';
+        } else {
+            container.innerHTML = channels.map((ch, i) => `
+                <div class="channel-card" style="--i: ${i}">
+                    ${ch.thumbnail ? `<img src="${ch.thumbnail}" class="channel-thumb">` : '<div class="channel-thumb-placeholder">CH</div>'}
+                    <div class="channel-info">
+                        <h3>${ch.name}</h3>
+                        <p>${ch.video_count} videos</p>
+                        <p class="channel-date">Added ${formatDate(ch.added_at)}</p>
+                    </div>
+                    <div class="channel-actions">
+                        <label class="toggle">
+                            <input type="checkbox" ${ch.auto_download ? 'checked' : ''} 
+                                   onchange="toggleAutoDownload('${ch.id}', this.checked)">
+                            <span>Auto-DL</span>
+                        </label>
+                        <button class="btn-stats" onclick="showChannelStats('${ch.id}')">Stats</button>
+                        <button class="btn-check" onclick="checkChannelNow('${ch.id}')">Check</button>
+                        <button class="btn-delete-channel" onclick="deleteChannel('${ch.id}')">Delete</button>
+                    </div>
                 </div>
-                <div class="channel-actions">
-                    <label class="toggle">
-                        <input type="checkbox" ${ch.auto_download ? 'checked' : ''} 
-                               onchange="toggleAutoDownload('${ch.id}', this.checked)">
-                        <span>Auto-DL</span>
-                    </label>
-                    <button class="btn-stats" onclick="showChannelStats('${ch.id}')">Stats</button>
-                    <button class="btn-check" onclick="checkChannelNow('${ch.id}')">Check</button>
-                    <button class="btn-delete-channel" onclick="deleteChannel('${ch.id}')">Delete</button>
-                </div>
-            </div>
-        `).join('');
+            `).join('');
+        }
+    } catch (error) {
+        showToast(error.message || 'Failed to load channels', 'error');
     }
 }
 
@@ -613,42 +652,67 @@ document.getElementById('add-channel-btn').addEventListener('click', openAddChan
 document.getElementById('add-channel-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const originalText = submitBtn.textContent;
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Adding...';
+    
     const url = document.getElementById('channel-url').value;
     const quality = document.getElementById('channel-quality').value;
     const autoDownload = document.getElementById('auto-download').checked;
     
     try {
-        await apiCall('/api/channels', {
+        const result = await apiCall('/api/channels', {
             method: 'POST',
             body: JSON.stringify({ channel_url: url, quality, auto_download: autoDownload })
         });
+        
+        showToast(`Channel "${result.name}" added successfully!`, 'success');
         closeAddChannelModal();
-        loadChannels();
-    } catch (e) {
-        alert('Failed to add channel');
+        await loadChannels();
+    } catch (error) {
+        showToast(error.message || 'Failed to add channel', 'error');
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
     }
 });
 
 async function toggleAutoDownload(channelId, enabled) {
-    await apiCall(`/api/channels/${channelId}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ auto_download: enabled })
-    });
+    try {
+        await apiCall(`/api/channels/${channelId}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ auto_download: enabled })
+        });
+        showToast(`Auto-download ${enabled ? 'enabled' : 'disabled'}`, 'success');
+    } catch (error) {
+        showToast(error.message || 'Failed to update channel', 'error');
+    }
 }
 
 async function checkChannelNow(channelId) {
-    await apiCall(`/api/channels/${channelId}/check`, { method: 'POST' });
-    alert('Checking for new videos...');
+    try {
+        await apiCall(`/api/channels/${channelId}/check`, { method: 'POST' });
+        showToast('Checking for new videos...', 'info');
+    } catch (error) {
+        showToast(error.message || 'Failed to check channel', 'error');
+    }
 }
 
 async function deleteChannel(channelId) {
     if (!confirm('Remove this channel?')) return;
-    await apiCall(`/api/channels/${channelId}`, { method: 'DELETE' });
-    loadChannels();
+    
+    try {
+        await apiCall(`/api/channels/${channelId}`, { method: 'DELETE' });
+        showToast('Channel removed successfully', 'success');
+        loadChannels();
+    } catch (error) {
+        showToast(error.message || 'Failed to delete channel', 'error');
+    }
 }
 
 async function showChannelStats(channelId) {
-    alert('Channel stats coming soon!');
+    showToast('Channel stats coming soon!', 'info');
 }
 
 function closeStatsModal() {
