@@ -70,7 +70,6 @@ body {
     overflow-x: hidden;
 }
 
-/* Animated background particles */
 body::before {
     content: '';
     position: fixed;
@@ -380,7 +379,7 @@ body::before {
 
 .nav-user { display: flex; align-items: center; gap: 20px; }
 
-/* Profile Link */
+/* Profile Link with Avatar */
 .profile-link {
     display: flex;
     align-items: center;
@@ -400,12 +399,28 @@ body::before {
     box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
 }
 
-#user-avatar {
-    width: 35px;
-    height: 35px;
+/* User Avatar with first letter */
+.user-avatar {
+    width: 40px;
+    height: 40px;
     border-radius: 50%;
-    object-fit: cover;
     border: 2px solid #667eea;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    overflow: hidden;
+    position: relative;
+}
+
+#avatar-letter {
+    font-size: 18px;
+    font-weight: 700;
+    color: white;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 #username-display {
@@ -662,6 +677,30 @@ body::before {
     font-weight: 700;
 }
 
+.no-thumbnail {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: 2px;
+}
+
+.b2-badge {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    background: rgba(102, 234, 171, 0.9);
+    color: #0f0f1e;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 700;
+}
+
 .video-info {
     padding: 20px;
     background: rgba(0, 0, 0, 0.2);
@@ -867,6 +906,16 @@ body::before {
     font-size: 14px;
     color: #ccc;
     line-height: 1.6;
+    padding-left: 25px;
+    position: relative;
+}
+
+.download-info li::before {
+    content: '•';
+    position: absolute;
+    left: 8px;
+    color: #667eea;
+    font-size: 18px;
 }
 
 .progress-container {
