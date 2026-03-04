@@ -1,383 +1,351 @@
-# 🎬 YTArchive
+# 🎥 YTArchive v2.0 + Backblaze B2
 
-**Self-hosted YouTube video archiver** — Download videos & follow channels with a beautiful web interface. No database required.
-
-![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
-![Python](https://img.shields.io/badge/python-3.9+-green.svg)
-![License](https://img.shields.io/badge/license-MIT-orange.svg)
-
-## ✨ Features
-
-- 🔐 **Secure authentication** with JWT tokens
-- 📥 **Download YouTube videos** in multiple qualities (best/1080p/720p/480p)
-- 📺 **Auto-follow channels** — automatically download new uploads
-- ⏰ **Background scheduler** — checks channels every hour
-- 🎨 **Beautiful, animated UI** — dark theme, smooth transitions
-- 🗃️ **No database** — everything stored in JSON files
-- 🎥 **Advanced video player** — keyboard shortcuts, speed control, fullscreen
-- 🔍 **Smart organization** — search, filter by channel, sort by date/views/duration
-- 📊 **Channel analytics** — statistics, upload history, charts
-- 📈 **Library stats** — total videos, channels, watch time
-- 🎛️ **Grid/List views** — switch between layouts
-- 🐳 **Docker ready** — easy deployment
-
-## 🚀 Quick Start
-
-### Local Installation
-
-```bash
-# Clone the repository
-git clone https://github.com/theo7791l/ytarchive.git
-cd ytarchive
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Install ffmpeg
-# Ubuntu/Debian:
-sudo apt install ffmpeg
-
-# macOS:
-brew install ffmpeg
-
-# Create your first user
-python create_user.py
-
-# Start the server
-python main.py
-```
-
-Open **http://localhost:8000** and login!
-
-### Docker Installation
-
-```bash
-# Clone repository
-git clone https://github.com/theo7791l/ytarchive.git
-cd ytarchive
-
-# Start with Docker Compose
-docker-compose up -d
-
-# Create user
-docker-compose exec ytarchive python create_user.py
-```
-
-Access at **http://localhost:8000**
-
-## 📖 Documentation
-
-- **[Complete Deployment Guide](DEPLOYMENT.md)** - VPS, Docker, SkyBots, SSL setup
-- **[API Documentation](#api-documentation)** - REST endpoints
-- **[Troubleshooting](#troubleshooting)** - Common issues
-
-## 📺 How to Use
-
-### Download Single Videos
-
-1. Go to **Download** tab
-2. Paste YouTube URL
-3. Select quality (best/1080p/720p/480p)
-4. Click **Download**
-5. Watch real-time progress via WebSocket
-
-### Follow Channels (Auto-Download)
-
-1. Go to **Channels** tab
-2. Click **+ Add Channel**
-3. Paste channel URL (e.g., `https://youtube.com/@channelname`)
-4. Choose quality and enable auto-download
-5. Scheduler checks for new videos every hour
-
-### Video Player Features
-
-**Keyboard shortcuts**:
-- `Space` / `K` = Play/Pause
-- `←` / `→` = Skip ±5 seconds
-- `↑` / `↓` = Volume control
-- `F` = Fullscreen
-- `M` = Mute
-
-**Controls**:
-- Speed control: 0.5x to 2x playback
-- Quick skip: -10s / +10s buttons
-- Fullscreen mode with native API
-
-### Library Organization
-
-- **Search**: Find videos by title or channel
-- **Filter by channel**: Show videos from specific channel
-- **Sort options**: Date, Title, Views, Duration (ascending/descending)
-- **View modes**: Grid or List layout
-- **Statistics**: Total videos, channels, watch time
-
-### Channel Analytics
-
-Click **📊 Stats** on any channel to see:
-- Total views, watch time, averages
-- Upload history chart (grouped by month)
-- Most viewed video
-- Longest video
-- Download timeline
-
-## 🛠️ Tech Stack
-
-- **Backend**: FastAPI + Python 3.9+
-- **Downloader**: yt-dlp
-- **Video processing**: ffmpeg
-- **Scheduler**: asyncio background tasks
-- **Auth**: JWT tokens + bcrypt
-- **Frontend**: Vanilla JavaScript + CSS
-- **Charts**: Chart.js
-- **Storage**: JSON files (no database!)
-- **WebSockets**: Real-time download progress
-
-## 📦 Deployment Options
-
-### 1. Local Development
-Perfect for personal use on your computer.
-
-### 2. Docker
-Recommended for quick deployment with automatic restarts.
-
-### 3. VPS (Ubuntu/Debian)
-Full control with systemd service + Nginx reverse proxy + SSL.
-
-### 4. SkyBots
-Easy Python bot hosting with web UI.
-
-See **[DEPLOYMENT.md](DEPLOYMENT.md)** for detailed guides.
-
-## 📊 API Documentation
-
-### Authentication
-
-```bash
-# Register user (disabled by default)
-POST /api/register
-{
-  "username": "admin",
-  "password": "secure-password"
-}
-
-# Login
-POST /api/login
-{
-  "username": "admin",
-  "password": "secure-password"
-}
-# Returns: {"token": "jwt-token", "username": "admin"}
-```
-
-### Library
-
-```bash
-# Get all videos
-GET /api/library
-Authorization: Bearer <token>
-
-# Delete video
-DELETE /api/library/{video_id}
-Authorization: Bearer <token>
-```
-
-### Channels
-
-```bash
-# List channels
-GET /api/channels
-Authorization: Bearer <token>
-
-# Add channel
-POST /api/channels
-Authorization: Bearer <token>
-{
-  "channel_url": "https://youtube.com/@channel",
-  "quality": "720p",
-  "auto_download": true
-}
-
-# Update channel
-PATCH /api/channels/{channel_id}
-Authorization: Bearer <token>
-{
-  "auto_download": false
-}
-
-# Delete channel
-DELETE /api/channels/{channel_id}
-Authorization: Bearer <token>
-
-# Manual check
-POST /api/channels/{channel_id}/check
-Authorization: Bearer <token>
-
-# Get statistics
-GET /api/channels/{channel_id}/stats
-Authorization: Bearer <token>
-```
-
-### Download
-
-```bash
-# WebSocket download
-WS /api/ws/download
-
-# Send:
-{
-  "url": "https://youtube.com/watch?v=...",
-  "quality": "720p",
-  "token": "jwt-token"
-}
-
-# Receive progress updates:
-{
-  "status": "downloading",
-  "percent": "45.2%",
-  "speed": "2.5MiB/s",
-  "eta": "00:30"
-}
-```
-
-## 🔧 Configuration
-
-Create `.env` file (or use `.env.example`):
-
-```bash
-# Security
-SECRET_KEY=your-super-secret-key
-
-# Storage limits
-MAX_DOWNLOAD_SIZE_GB=10
-MAX_VIDEO_AGE_DAYS=30
-
-# Scheduler
-SCHEDULER_INTERVAL_HOURS=1
-MAX_VIDEOS_PER_CHANNEL=10
-```
-
-## 🧹 Storage Management
-
-For limited storage (like SkyBots), use the cleanup script:
-
-```bash
-# Run manual cleanup
-python cleanup.py
-
-# Automatic cleanup (add to scheduler)
-# Edit scheduler.py and uncomment cleanup call
-```
-
-## 🐛 Troubleshooting
-
-### yt-dlp errors
-```bash
-# Update yt-dlp
-pip install --upgrade yt-dlp
-```
-
-### ffmpeg not found
-```bash
-# Ubuntu/Debian
-sudo apt install ffmpeg
-
-# macOS
-brew install ffmpeg
-
-# Verify
-ffmpeg -version
-```
-
-### WebSocket connection failed
-Check if you're using HTTPS. WebSockets require `wss://` protocol for HTTPS sites.
-
-### Disk space issues
-Run `python cleanup.py` to remove old videos.
-
-See **[DEPLOYMENT.md](DEPLOYMENT.md#troubleshooting)** for more.
-
-## 📝 Project Structure
-
-```
-ytarchive/
-├── main.py                 # FastAPI application
-├── downloader.py           # yt-dlp wrapper
-├── scheduler.py            # Background scheduler
-├── create_user.py          # User creation script
-├── cleanup.py              # Storage cleanup
-├── requirements.txt        # Python dependencies
-├── Dockerfile              # Docker image
-├── docker-compose.yml      # Docker Compose config
-├── static/
-│   ├── index.html         # Login page
-│   ├── app.html           # Main application
-│   ├── css/
-│   │   ├── style.css      # Login styles
-│   │   └── app.css        # App styles
-│   └── js/
-│       ├── script.js      # Login logic
-│       └── app.js         # Main app logic
-├── videos/                 # Downloaded videos
-├── library.json           # Video metadata
-├── channels.json          # Followed channels
-└── users.json             # User credentials
-```
-
-## 🔒 Security
-
-- JWT-based authentication with 7-day expiry
-- Bcrypt password hashing
-- HTTPS recommended for production
-- Rate limiting available (see DEPLOYMENT.md)
-- No registration endpoint by default
-
-## 📈 Roadmap
-
-- [x] Authentication system
-- [x] Video downloader with progress
-- [x] Channel auto-tracking
-- [x] Advanced library UI
-- [x] Video player with shortcuts
-- [x] Channel statistics & charts
-- [x] Deployment guides
-- [ ] Playlist support
-- [ ] Multi-user support
-- [ ] Video transcoding options
-- [ ] Mobile app (React Native)
-- [ ] Desktop app (Electron)
-
-## 🤝 Contributing
-
-Contributions are welcome! Please:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing`)
-5. Open a Pull Request
-
-## 📄 License
-
-MIT License - Free to use and modify!
-
-See [LICENSE](LICENSE) file for details.
-
-## 💖 Support
-
-- ⭐ Star this repository
-- 🐛 Report bugs via [GitHub Issues](https://github.com/theo7791l/ytarchive/issues)
-- 💡 Suggest features via [GitHub Discussions](https://github.com/theo7791l/ytarchive/discussions)
-- 📧 Contact: [Your Email]
-
-## 🙏 Acknowledgments
-
-- [yt-dlp](https://github.com/yt-dlp/yt-dlp) - YouTube downloader
-- [FastAPI](https://fastapi.tiangolo.com/) - Modern Python web framework
-- [Chart.js](https://www.chartjs.org/) - Beautiful charts
-- [SkyBots](https://skybots.tech/) - Easy bot hosting
+**YTArchive** est un gestionnaire d'archives vidéos YouTube personnel avec stockage cloud **Backblaze B2**. Téléchargez, organisez et regardez vos vidéos YouTube préférées avec un stockage illimité dans le cloud.
 
 ---
 
-**Made with ❤️ by [theo7791l](https://github.com/theo7791l)**
+## ✨ Fonctionnalités principales
 
-⭐ **Star this repo if you find it useful!**
+### 🚀 Téléchargement et Stockage
+- 📹 **Téléchargement YouTube** via yt-dlp
+- ☁️ **Stockage cloud Backblaze B2** automatique
+- 📊 Barre de progression en temps réel (YouTube → Local → B2)
+- 🎬 **Qualités multiples** : 480p, 720p, 1080p, best
+- 💾 **Nettoyage automatique** des fichiers locaux après upload
+
+### 📺 Player Avancé
+- 🎬 **Streaming direct depuis B2** (URLs signées)
+- ⏩ Contrôles de vitesse (0.5x → 2x)
+- ⏭️ Skip +/- 10 secondes
+- ⏸️ Raccourcis clavier complets
+- 🖼️ Mode plein écran
+- 🎵 Volume et mute rapides
+
+### 📁 Gestion Bibliothèque
+- 🔍 Recherche instantanée
+- 🏷️ Filtrage par chaîne
+- 📈 Tri multi-critères (date, vues, durée, titre)
+- 🖼️ Vue grille / liste
+- 👥 **Multi-utilisateurs** (chaque user = son propre bucket B2)
+
+### 📡 Suivi de Chaînes
+- ➕ Ajout de chaînes YouTube
+- 🤖 **Auto-download** des nouvelles vidéos
+- ⏰ Vérification planifiée (toutes les heures)
+- 📊 Statistiques par chaîne
+- 🎯 Contrôle manuel des mises à jour
+
+### 👤 Système Utilisateur
+- 🔐 Authentification JWT
+- 👥 Multi-utilisateurs avec rôles (admin/user)
+- 🖼️ Upload d'avatars personnalisés
+- ⚙️ Page de profil avec changement de mot de passe
+- 🔑 **Configuration B2 individuelle** par utilisateur
+
+---
+
+## 💻 Installation
+
+### Prérequis
+
+- Python 3.8+
+- Compte [Backblaze B2](https://www.backblaze.com/b2/sign-up.html) (10 GB gratuits)
+
+### Étape 1 : Cloner le repository
+
+```bash
+git clone https://github.com/theo7791l/ytarchive.git
+cd ytarchive
+```
+
+### Étape 2 : Installer les dépendances
+
+```bash
+pip install -r requirements.txt
+```
+
+### Étape 3 : Lancer le serveur
+
+```bash
+python main.py
+```
+
+Ou avec uvicorn :
+
+```bash
+uvicorn main:app --host 0.0.0.0 --port 8000
+```
+
+L'application sera accessible sur : **http://localhost:8000**
+
+---
+
+## ☁️ Configuration Backblaze B2
+
+### Étape 1 : Créer un compte B2
+
+1. Allez sur [backblaze.com/b2/sign-up.html](https://www.backblaze.com/b2/sign-up.html)
+2. Créez votre compte (gratuit jusqu'à 10 GB)
+3. Vérifiez votre email
+
+### Étape 2 : Créer un bucket
+
+1. Connectez-vous au dashboard B2
+2. Cliquez **"Create a Bucket"**
+3. Nom du bucket : `ytarchive-votre-username`
+4. Sélectionnez **"Private"**
+5. Cliquez **"Create Bucket"**
+
+### Étape 3 : Générer une Application Key
+
+1. Allez dans **App Keys**
+2. Cliquez **"Add a New Application Key"**
+3. Nom : `ytarchive-key`
+4. Sélectionnez votre bucket
+5. Permissions : **Read and Write**
+6. Cliquez **"Create New Key"**
+7. **IMPORTANT** : Notez immédiatement le `keyID` et l'`applicationKey`
+
+### Étape 4 : Configurer dans YTArchive
+
+1. Connectez-vous à YTArchive
+2. Allez dans **Profile** (en haut à droite)
+3. Section **"Backblaze B2 Storage"**
+4. Remplissez :
+   - **Application Key ID** : Votre `keyID`
+   - **Application Key** : Votre `applicationKey`
+   - **Bucket Name** : Le nom de votre bucket
+5. Cliquez **"Test & Save B2 Credentials"**
+6. ✅ Vous devriez voir le badge **"Configured"** en vert
+
+---
+
+## 🚀 Utilisation
+
+### 1️⃣ Première connexion
+
+**Compte admin par défaut :**
+- Username : `admin`
+- Password : `admin`
+
+⚠️ **Changez ce mot de passe immédiatement** dans **Profile** > **Change Password**
+
+### 2️⃣ Configurer Backblaze B2
+
+Suivez les étapes de la section **Configuration Backblaze B2** ci-dessus.
+
+### 3️⃣ Télécharger une vidéo
+
+1. Allez dans l'onglet **"Download"**
+2. Collez l'URL YouTube
+3. Sélectionnez la qualité
+4. Cliquez **"Download Video"**
+5. Suivez la progression :
+   - 📹 Téléchargement depuis YouTube
+   - ⏳ Traitement
+   - ☁️ Upload vers Backblaze B2
+   - ✅ Terminé !
+
+### 4️⃣ Regarder une vidéo
+
+1. Allez dans **"Library"**
+2. Cliquez sur **"Play"** sur n'importe quelle vidéo
+3. Le player se lance avec streaming depuis B2
+4. Utilisez les raccourcis clavier :
+   - **Space** : Play/Pause
+   - **← / →** : -5s / +5s
+   - **↑ / ↓** : Volume
+   - **F** : Plein écran
+   - **M** : Mute
+   - **Esc** : Fermer le player
+
+### 5️⃣ Ajouter une chaîne
+
+1. Allez dans **"Channels"**
+2. Cliquez **"Add Channel"**
+3. Collez l'URL de la chaîne YouTube
+4. Sélectionnez la qualité
+5. Activez **"Auto-download"** si désiré
+6. Cliquez **"Add Channel"**
+
+Les nouvelles vidéos seront automatiquement téléchargées toutes les heures !
+
+---
+
+## 📊 Coûts Backblaze B2
+
+### Tarification (2026)
+
+- **Stockage** : $0.005/GB/mois (~$5 pour 1TB/mois)
+- **Téléchargement** : $0.01/GB (3x gratuit)
+- **API** : Gratuit
+- **Gratuit** : 10 GB + 1 GB/jour de download
+
+### Exemple : 100 vidéos de 500 MB
+
+- Stockage : 50 GB = **$0.25/mois**
+- Visionnage : 10 GB/mois = **$0.10/mois** (après quota gratuit)
+- **Total : ~$0.35/mois** 💸
+
+**Conclusion** : B2 est **extrêmement abordable** pour stocker vos vidéos !
+
+---
+
+## 🛠️ Architecture Technique
+
+### Stack
+
+- **Backend** : FastAPI + Python
+- **Frontend** : HTML5 + CSS3 + JavaScript vanilla
+- **Download** : yt-dlp
+- **Storage** : Backblaze B2 (API native)
+- **Auth** : JWT tokens
+- **Database** : JSON (simple et efficace)
+
+### Structure
+
+```
+ytarchive/
+├── main.py                 # FastAPI app principale
+├── auth.py                 # Authentification + gestion users
+├── downloader.py           # Téléchargement + upload B2
+├── scheduler.py            # Planificateur chaînes
+├── b2_storage.py           # Module Backblaze B2
+├── static/
+│   ├── index.html          # Page de connexion
+│   ├── app.html            # Application principale
+│   ├── profile.html        # Page profil + config B2
+│   ├── admin.html          # Panel admin
+│   ├── css/
+│   │   └── app.css         # Styles globaux
+│   └── js/
+│       └── app.js          # Logique frontend
+├── data/
+│   ├── users.json          # Base utilisateurs
+│   ├── library.json        # Métadonnées vidéos
+│   └── channels.json       # Chaînes suivies
+├── avatars/                # Avatars utilisateurs
+├── requirements.txt
+├── B2_INTEGRATION.md      # Doc détaillée B2
+└── README.md
+```
+
+### Workflow de téléchargement
+
+1. User demande vidéo → WebSocket connect→ JWT verify
+2. `yt-dlp` télécharge depuis YouTube → `/videos/` local
+3. `B2Storage.authorize()` → connexion API B2
+4. `B2Storage.get_upload_url()` → récupère upload URL
+5. `B2Storage.upload_file()` → upload vidéo vers B2
+6. Suppression fichier local → libération espace
+7. Métadonnées stockées avec `file_id` B2
+
+### Workflow de streaming
+
+1. User clique "Play" → `GET /api/video/{id}/stream`
+2. Vérification ownership → user peut accéder ?
+3. `B2Storage.get_download_url()` → génère URL signée (1h)
+4. Player HTML5 stream depuis B2 avec URL
+5. URLs expirées après 1h (sécurité)
+
+---
+
+## 🔒 Sécurité
+
+- 🔑 **JWT tokens** pour auth
+- 🛡️ **Credentials B2** stockés localement (jamais exposés au client)
+- ⏰ **URLs signées** avec expiration (1h par défaut)
+- 👥 **Isolation utilisateurs** (chacun accède à son bucket uniquement)
+- 🔐 **Buckets privés** recommandés
+
+---
+
+## ❓ FAQ
+
+### Puis-je utiliser un autre provider que B2 ?
+
+Pour l'instant, seul Backblaze B2 est supporté. Le support S3-compatible (AWS, Cloudflare R2, etc.) pourrait être ajouté plus tard.
+
+### Que se passe-t-il si je supprime une vidéo ?
+
+La vidéo est supprimée de B2 **ET** de la base locale. C'est définitif.
+
+### Puis-je partager mes vidéos avec d'autres utilisateurs ?
+
+Pas pour l'instant. Chaque utilisateur a accès **uniquement** à ses propres vidéos.
+
+### Combien de stockage me faut-il ?
+
+- Vidéo 480p : ~200-400 MB
+- Vidéo 720p : ~500-800 MB
+- Vidéo 1080p : ~1-2 GB
+
+Le plan gratuit B2 (10 GB) = environ **20 vidéos 720p**.
+
+### Puis-je désactiver B2 et utiliser du stockage local ?
+
+Non, B2 est **obligatoire** dans cette version. Le stockage local est trop limité pour gérer beaucoup de vidéos.
+
+---
+
+## 🐛 Problèmes courants
+
+### ❌ "B2 not configured"
+
+➡️ Allez dans **Profile** et configurez vos credentials B2.
+
+### ❌ "Authorization failed"
+
+➡️ Vérifiez :
+- Key ID correct
+- Application Key correct
+- Bucket existe et est accessible
+- Permissions Read/Write sur la clé
+
+### ❌ "Failed to upload video to B2"
+
+➡️ Vérifiez :
+- Quota B2 non dépassé
+- Connexion internet stable
+- Fichier pas trop volumineux (< 5 GB recommandé)
+
+### ❌ "Cannot play video"
+
+➡️ Causes possibles :
+- URL expirée (après 1h) → Rafraîchissez la page
+- Fichier supprimé de B2
+- Credentials B2 invalides ou supprimés
+
+---
+
+## 🎉 Contribuer
+
+Les contributions sont les bienvenues ! Ouvrez une issue ou une pull request sur GitHub.
+
+---
+
+## 📝 Licence
+
+MIT License - Libre d'utilisation, modification et distribution.
+
+---
+
+## 👏 Crédits
+
+- **Créé par** : [theo7791l](https://github.com/theo7791l)
+- **Téléchargement** : [yt-dlp](https://github.com/yt-dlp/yt-dlp)
+- **Stockage** : [Backblaze B2](https://www.backblaze.com/b2/cloud-storage.html)
+- **Framework** : [FastAPI](https://fastapi.tiangolo.com/)
+
+---
+
+## 🔗 Liens utiles
+
+- [Documentation Backblaze B2](https://www.backblaze.com/b2/docs/)
+- [Guide détaillé B2](./B2_INTEGRATION.md)
+- [yt-dlp GitHub](https://github.com/yt-dlp/yt-dlp)
+- [FastAPI Docs](https://fastapi.tiangolo.com/)
+
+---
+
+🌟 **Si ce projet vous plaît, donnez-lui une ⭐ sur GitHub !**
