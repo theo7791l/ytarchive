@@ -62,6 +62,7 @@ def save_json(filename: str, data):
     with open(filename, 'w') as f:
         json.dump(data, f, indent=2)
 
+# HTML Pages
 @app.get("/")
 async def root():
     return FileResponse("static/index.html")
@@ -70,6 +71,15 @@ async def root():
 async def app_page():
     return FileResponse("static/app.html")
 
+@app.get("/profile")
+async def profile_page():
+    return FileResponse("static/profile.html")
+
+@app.get("/admin")
+async def admin_page():
+    return FileResponse("static/admin.html")
+
+# API Endpoints
 @app.get("/health")
 async def health_check():
     """Health check endpoint for monitoring"""
@@ -325,7 +335,7 @@ async def get_channel_stats(channel_id: str, user: dict = Depends(verify_token))
 @app.on_event("startup")
 async def startup_event():
     print("\n" + "="*60)
-    print("🚀 YTArchive Starting...")
+    print("🚀 YTArchive v2.0 Starting...")
     print("="*60)
     
     from auth import load_users
@@ -335,7 +345,19 @@ async def startup_event():
         print("\n📝 Default admin account is active")
         print("   Username: admin")
         print("   Password: admin")
-        print("\n⚠️  Change the password after first login!")
+        print("\n⚠️  IMPORTANT: Change the password after first login!")
+        print("   Go to: http://localhost:PORT/profile")
+    
+    print("\n👥 User Management:")
+    print(f"   Total users: {len(users)}")
+    admins = [u for u, d in users.items() if d.get('role') == 'admin']
+    print(f"   Admins: {', '.join(admins) if admins else 'None'}")
+    
+    print("\n🎯 Features:")
+    print("   - Multi-user support with roles")
+    print("   - Avatar upload system")
+    print("   - Admin panel at /admin")
+    print("   - User profiles at /profile")
     
     print("="*60 + "\n")
     
