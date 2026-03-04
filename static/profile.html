@@ -7,147 +7,40 @@
     <link rel="stylesheet" href="/static/css/app.css">
     <style>
         .profile-container {
-            max-width: 1000px;
-            margin: 40px auto;
-            padding: 0 40px;
-            animation: fadeIn 0.5s ease;
+            max-width: 900px;
+            margin: 0 auto;
         }
 
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .profile-header {
-            text-align: center;
-            margin-bottom: 50px;
-        }
-
-        .profile-header h1 {
-            font-size: 42px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            margin-bottom: 10px;
-        }
-
-        .profile-card {
+        .profile-section {
             background: rgba(255, 255, 255, 0.05);
             backdrop-filter: blur(10px);
             border-radius: 20px;
-            padding: 40px;
+            padding: 30px;
             margin-bottom: 30px;
-            border: 2px solid rgba(255, 255, 255, 0.1);
-            transition: all 0.3s ease;
+            border: 2px solid rgba(102, 126, 234, 0.2);
+            animation: slideInUp 0.6s ease;
         }
 
-        .profile-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 20px 40px rgba(102, 126, 234, 0.2);
-        }
-
-        .avatar-section {
-            display: flex;
-            align-items: center;
-            gap: 30px;
-            margin-bottom: 40px;
-            padding-bottom: 30px;
-            border-bottom: 2px solid rgba(255, 255, 255, 0.1);
-        }
-
-        .avatar-preview {
-            width: 120px;
-            height: 120px;
-            border-radius: 50%;
-            object-fit: cover;
-            border: 4px solid #667eea;
-            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
-            transition: all 0.3s ease;
-        }
-
-        .avatar-preview:hover {
-            transform: scale(1.05);
-        }
-
-        .avatar-placeholder {
-            width: 120px;
-            height: 120px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 48px;
-            font-weight: 600;
-            border: 4px solid #667eea;
-            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
-            transition: all 0.3s ease;
-            color: white;
-        }
-
-        .avatar-placeholder:hover {
-            transform: scale(1.05);
-        }
-
-        .avatar-controls h3 {
-            margin-bottom: 15px;
-            color: #667eea;
-            font-size: 20px;
-        }
-
-        .avatar-buttons {
-            display: flex;
-            gap: 15px;
-            margin-top: 15px;
-        }
-
-        .btn-upload, .btn-remove {
-            padding: 12px 24px;
-            border: none;
-            border-radius: 10px;
-            cursor: pointer;
-            font-weight: 600;
-            transition: all 0.3s ease;
-            font-size: 14px;
-        }
-
-        .btn-upload {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-        }
-
-        .btn-upload:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
-        }
-
-        .btn-remove {
-            background: rgba(255, 68, 68, 0.2);
-            color: #ff4444;
-            border: 2px solid rgba(255, 68, 68, 0.3);
-        }
-
-        .btn-remove:hover {
-            background: rgba(255, 68, 68, 0.3);
-            transform: translateY(-3px);
-        }
-
-        .form-section h3 {
+        .profile-section h3 {
+            font-size: 24px;
             margin-bottom: 25px;
             color: #667eea;
-            font-size: 24px;
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 12px;
+        }
+
+        .section-icon {
+            font-size: 28px;
         }
 
         .form-group {
-            margin-bottom: 25px;
+            margin-bottom: 20px;
         }
 
         .form-group label {
             display: block;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
             font-weight: 600;
             color: #aaa;
             font-size: 14px;
@@ -155,10 +48,10 @@
 
         .form-group input {
             width: 100%;
-            padding: 15px 20px;
+            padding: 14px 18px;
             background: rgba(255, 255, 255, 0.05);
             border: 2px solid rgba(255, 255, 255, 0.1);
-            border-radius: 10px;
+            border-radius: 12px;
             color: white;
             font-size: 15px;
             transition: all 0.3s ease;
@@ -167,161 +60,135 @@
         .form-group input:focus {
             outline: none;
             border-color: #667eea;
-            background: rgba(255, 255, 255, 0.08);
-            box-shadow: 0 0 20px rgba(102, 126, 234, 0.3);
+            box-shadow: 0 0 20px rgba(102, 126, 234, 0.4);
         }
 
-        .role-display {
-            padding: 10px 20px;
-            background: rgba(102, 126, 234, 0.2);
-            border-radius: 8px;
-            display: inline-block;
-            font-weight: 600;
-            color: #667eea;
+        .form-group input:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 15px;
+            margin-top: 25px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 14px 30px;
+            border: none;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
             text-transform: uppercase;
-            letter-spacing: 1px;
-            border: 2px solid rgba(102, 126, 234, 0.3);
+            letter-spacing: 0.5px;
         }
 
         .btn-save {
-            width: 100%;
-            padding: 16px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100());
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            border: none;
-            border-radius: 10px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
+            flex: 1;
         }
 
         .btn-save:hover {
             transform: translateY(-3px);
-            box-shadow: 0 15px 35px rgba(102, 126, 234, 0.5);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.5);
         }
 
-        .divider {
-            height: 2px;
-            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-            margin: 40px 0;
-        }
-
-        .danger-zone {
-            background: rgba(255, 68, 68, 0.1);
-            border: 2px solid rgba(255, 68, 68, 0.3);
-            border-radius: 15px;
-            padding: 30px;
-        }
-
-        .danger-zone h3 {
-            color: #ff4444;
-        }
-
-        .success-message, .error-message {
-            padding: 15px 20px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-            font-weight: 600;
-            display: none;
-        }
-
-        .success-message {
-            background: rgba(102, 234, 171, 0.2);
-            color: #66eaab;
-            border: 2px solid rgba(102, 234, 171, 0.3);
-        }
-
-        .error-message {
+        .btn-danger {
             background: rgba(255, 68, 68, 0.2);
             color: #ff4444;
             border: 2px solid rgba(255, 68, 68, 0.3);
         }
 
-        .user-profile-dropdown {
-            position: relative;
-            display: inline-block;
+        .btn-danger:hover {
+            background: rgba(255, 68, 68, 0.3);
+            transform: translateY(-3px);
         }
 
-        .user-profile-btn {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            background: rgba(255, 255, 255, 0.1);
+        .btn-back {
+            background: rgba(255, 255, 255, 0.05);
+            color: white;
             border: 2px solid rgba(255, 255, 255, 0.2);
-            padding: 8px 15px;
-            border-radius: 25px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            color: white;
+            padding: 12px 24px;
+            margin-bottom: 30px;
         }
 
-        .user-profile-btn:hover {
-            background: rgba(255, 255, 255, 0.15);
+        .btn-back:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateY(-2px);
         }
 
-        .user-avatar-small {
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            object-fit: cover;
-            border: 2px solid #667eea;
-        }
-
-        .user-avatar-placeholder-small {
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            display: flex;
+        .status-badge {
+            display: inline-flex;
             align-items: center;
-            justify-content: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .status-badge.configured {
+            background: rgba(102, 234, 171, 0.2);
+            color: #66eaab;
+            border: 2px solid rgba(102, 234, 171, 0.3);
+        }
+
+        .status-badge.not-configured {
+            background: rgba(255, 171, 68, 0.2);
+            color: #ffab44;
+            border: 2px solid rgba(255, 171, 68, 0.3);
+        }
+
+        .info-box {
+            background: rgba(102, 126, 234, 0.1);
+            border: 2px solid rgba(102, 126, 234, 0.3);
+            border-radius: 12px;
+            padding: 18px;
+            margin-bottom: 20px;
             font-size: 14px;
-            font-weight: 600;
-            border: 2px solid #667eea;
-            color: white;
+            line-height: 1.6;
+            color: #ccc;
         }
 
-        .dropdown-menu {
-            display: none;
-            position: absolute;
-            top: 110%;
-            right: 0;
-            background: #1a1a2e;
-            border: 2px solid rgba(255, 255, 255, 0.1);
-            border-radius: 10px;
-            min-width: 200px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-            z-index: 1000;
-        }
-
-        .dropdown-menu.active {
-            display: block;
-        }
-
-        .dropdown-item {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 12px 20px;
-            color: white;
-            text-decoration: none;
-            transition: all 0.2s ease;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-        }
-
-        .dropdown-item:hover {
-            background: rgba(102, 126, 234, 0.2);
-        }
-
-        .role-badge-small {
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-size: 10px;
-            font-weight: 600;
-            text-transform: uppercase;
-            background: rgba(102, 126, 234, 0.3);
+        .info-box strong {
             color: #667eea;
+            display: block;
+            margin-bottom: 8px;
+            font-size: 15px;
+        }
+
+        .info-box a {
+            color: #667eea;
+            text-decoration: underline;
+        }
+
+        .info-box a:hover {
+            color: #764ba2;
+        }
+
+        .help-text {
+            font-size: 12px;
+            color: #888;
+            margin-top: 5px;
+        }
+
+        @media (max-width: 767px) {
+            .profile-section {
+                padding: 20px;
+            }
+
+            .btn-group {
+                flex-direction: column;
+            }
+
+            .btn {
+                width: 100%;
+            }
         }
     </style>
 </head>
@@ -332,321 +199,287 @@
         </div>
         <div class="nav-menu">
             <a href="/app" class="nav-link">Library</a>
-            <a href="/app#channels" class="nav-link">Channels</a>
-            <a href="/app#download" class="nav-link">Download</a>
-        </div>
-        <div class="nav-user">
-            <div class="user-profile-dropdown">
-                <button class="user-profile-btn" onclick="toggleDropdown()">
-                    <div id="nav-avatar-container">
-                        <div class="user-avatar-placeholder-small">U</div>
-                    </div>
-                    <div style="display: flex; flex-direction: column; align-items: flex-start;">
-                        <span id="nav-username" style="font-weight: 600;"></span>
-                        <span id="nav-role" class="role-badge-small">member</span>
-                    </div>
-                </button>
-                <div class="dropdown-menu" id="dropdown-menu">
-                    <a href="/profile" class="dropdown-item" style="background: rgba(102, 126, 234, 0.1);">
-                        <span>Profile</span>
-                    </a>
-                    <a href="/admin" class="dropdown-item" id="nav-admin-link" style="display: none;">
-                        <span>Administration</span>
-                    </a>
-                    <hr style="margin: 0; border: none; border-top: 1px solid rgba(255, 255, 255, 0.1);">
-                    <a href="#" class="dropdown-item" onclick="logout(); return false;" style="color: #ff4444;">
-                        <span>Logout</span>
-                    </a>
-                </div>
-            </div>
         </div>
     </nav>
 
-    <div class="profile-container">
-        <div class="profile-header">
-            <h1>My Profile</h1>
-            <p style="color: #aaa; font-size: 18px;">Manage your personal information</p>
-        </div>
+    <main class="container">
+        <button class="btn btn-back" onclick="window.location.href='/app'">← Back to Library</button>
 
-        <div id="success-msg" class="success-message"></div>
-        <div id="error-msg" class="error-message"></div>
-
-        <div class="profile-card">
-            <!-- Avatar Section -->
-            <div class="avatar-section">
-                <div id="avatar-container">
-                    <div class="avatar-placeholder">U</div>
-                </div>
-                <div class="avatar-controls">
-                    <h3>Profile Picture</h3>
-                    <p style="color: #aaa; margin-bottom: 15px;">Recommended: 400x400px, max 2MB</p>
-                    <input type="file" id="avatar-input" accept="image/*" style="display: none;">
-                    <div class="avatar-buttons">
-                        <button class="btn-upload" onclick="document.getElementById('avatar-input').click()">Upload</button>
-                        <button class="btn-remove" id="remove-avatar-btn" onclick="removeAvatar()">Remove</button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Profile Info -->
-            <div class="form-section">
-                <h3>Personal Information</h3>
+        <div class="profile-container">
+            <!-- User Info Section -->
+            <div class="profile-section">
+                <h3>
+                    <span class="section-icon">👤</span>
+                    Profile Information
+                </h3>
                 <form id="profile-form">
                     <div class="form-group">
                         <label>Username</label>
-                        <input type="text" id="username-field" disabled>
+                        <input type="text" id="username" disabled>
                     </div>
                     <div class="form-group">
                         <label>Display Name</label>
-                        <input type="text" id="display-name" placeholder="Your full name">
+                        <input type="text" id="display-name" placeholder="Your display name">
                     </div>
                     <div class="form-group">
                         <label>Email</label>
-                        <input type="email" id="email" placeholder="your@email.com">
+                        <input type="email" id="email" placeholder="your.email@example.com">
                     </div>
-                    <div class="form-group">
-                        <label>Role</label>
-                        <span class="role-display" id="role-display">MEMBER</span>
+                    <div class="btn-group">
+                        <button type="submit" class="btn btn-save">Save Profile</button>
                     </div>
-                    <button type="submit" class="btn-save">Save Changes</button>
                 </form>
             </div>
 
-            <div class="divider"></div>
+            <!-- Backblaze B2 Configuration -->
+            <div class="profile-section">
+                <h3>
+                    <span class="section-icon">☁️</span>
+                    Backblaze B2 Storage
+                    <span id="b2-status" class="status-badge not-configured">
+                        <span>⚠️</span> Not Configured
+                    </span>
+                </h3>
 
-            <!-- Change Password -->
-            <div class="form-section danger-zone">
-                <h3>Change Password</h3>
+                <div class="info-box">
+                    <strong>💡 Why Backblaze B2?</strong>
+                    Due to limited local storage, all videos are stored in your personal Backblaze B2 bucket. 
+                    You need to configure your B2 credentials to download and watch videos.
+                    <br><br>
+                    <strong>How to get B2 credentials:</strong><br>
+                    1. Create a free account at <a href="https://www.backblaze.com/b2/sign-up.html" target="_blank">Backblaze B2</a><br>
+                    2. Create a bucket (private recommended)<br>
+                    3. Generate an Application Key with read/write access<br>
+                    4. Enter your credentials below
+                </div>
+
+                <form id="b2-form">
+                    <div class="form-group">
+                        <label>Application Key ID</label>
+                        <input type="text" id="b2-key-id" placeholder="Your B2 Key ID">
+                        <p class="help-text">Found in Backblaze B2 dashboard under "App Keys"</p>
+                    </div>
+                    <div class="form-group">
+                        <label>Application Key</label>
+                        <input type="password" id="b2-app-key" placeholder="Your B2 Application Key">
+                        <p class="help-text">Keep this secret! Only shown once when created</p>
+                    </div>
+                    <div class="form-group">
+                        <label>Bucket Name</label>
+                        <input type="text" id="b2-bucket-name" placeholder="your-bucket-name">
+                        <p class="help-text">The name of your B2 bucket (must already exist)</p>
+                    </div>
+                    <div class="btn-group">
+                        <button type="submit" class="btn btn-save">Test & Save B2 Credentials</button>
+                        <button type="button" class="btn btn-danger" id="delete-b2-btn" style="display: none;">Remove B2 Config</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Change Password Section -->
+            <div class="profile-section">
+                <h3>
+                    <span class="section-icon">🔐</span>
+                    Change Password
+                </h3>
                 <form id="password-form">
                     <div class="form-group">
                         <label>Current Password</label>
-                        <input type="password" id="old-password" required>
+                        <input type="password" id="old-password" placeholder="Your current password">
                     </div>
                     <div class="form-group">
                         <label>New Password</label>
-                        <input type="password" id="new-password" required minlength="6">
+                        <input type="password" id="new-password" placeholder="New password">
                     </div>
                     <div class="form-group">
                         <label>Confirm New Password</label>
-                        <input type="password" id="confirm-password" required minlength="6">
+                        <input type="password" id="confirm-password" placeholder="Confirm new password">
                     </div>
-                    <button type="submit" class="btn-save">Change Password</button>
+                    <div class="btn-group">
+                        <button type="submit" class="btn btn-save">Change Password</button>
+                    </div>
                 </form>
             </div>
         </div>
-    </div>
+    </main>
 
     <script>
+        const API_URL = '';
         const token = localStorage.getItem('token');
 
         if (!token) {
             window.location.href = '/';
         }
 
-        let currentUser = null;
+        const headers = {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        };
 
-        function toggleDropdown() {
-            document.getElementById('dropdown-menu').classList.toggle('active');
-        }
+        // Toast notification
+        function showToast(message, type = 'info') {
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type} show`;
+            toast.textContent = message;
+            document.body.appendChild(toast);
 
-        window.addEventListener('click', (e) => {
-            if (!e.target.closest('.user-profile-dropdown')) {
-                document.getElementById('dropdown-menu').classList.remove('active');
-            }
-        });
-
-        function logout() {
-            localStorage.removeItem('token');
-            localStorage.removeItem('username');
-            window.location.href = '/';
-        }
-
-        async function apiCall(endpoint, options = {}) {
-            const response = await fetch(endpoint, {
-                ...options,
-                headers: {
-                    ...options.headers,
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-            
-            if (response.status === 401) {
-                localStorage.removeItem('token');
-                window.location.href = '/';
-                return;
-            }
-            
-            return response;
-        }
-
-        function showMessage(message, isError = false) {
-            const successMsg = document.getElementById('success-msg');
-            const errorMsg = document.getElementById('error-msg');
-            
-            if (isError) {
-                errorMsg.textContent = message;
-                errorMsg.style.display = 'block';
-                successMsg.style.display = 'none';
-            } else {
-                successMsg.textContent = message;
-                successMsg.style.display = 'block';
-                errorMsg.style.display = 'none';
-            }
-            
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-            
             setTimeout(() => {
-                successMsg.style.display = 'none';
-                errorMsg.style.display = 'none';
-            }, 5000);
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
         }
 
+        // Load user profile
         async function loadProfile() {
-            const response = await apiCall('/api/auth/me');
-            currentUser = await response.json();
-            
-            const initial = (currentUser.display_name || currentUser.username).charAt(0).toUpperCase();
-            
-            // Update navbar
-            document.getElementById('nav-username').textContent = currentUser.display_name || currentUser.username;
-            document.getElementById('nav-role').textContent = currentUser.role;
-            
-            if (currentUser.role === 'admin') {
-                document.getElementById('nav-admin-link').style.display = 'flex';
-            }
-            
-            // Update navbar avatar
-            const navAvatarContainer = document.getElementById('nav-avatar-container');
-            if (currentUser.avatar) {
-                navAvatarContainer.innerHTML = `<img src="/avatars/${currentUser.avatar}" class="user-avatar-small" alt="Avatar">`;
-            } else {
-                navAvatarContainer.innerHTML = `<div class="user-avatar-placeholder-small">${initial}</div>`;
-            }
-            
-            // Update form fields
-            document.getElementById('username-field').value = currentUser.username;
-            document.getElementById('display-name').value = currentUser.display_name || '';
-            document.getElementById('email').value = currentUser.email || '';
-            document.getElementById('role-display').textContent = currentUser.role.toUpperCase();
-            
-            // Update main avatar
-            const avatarContainer = document.getElementById('avatar-container');
-            if (currentUser.avatar) {
-                avatarContainer.innerHTML = `<img src="/avatars/${currentUser.avatar}" class="avatar-preview" alt="Avatar">`;
-                document.getElementById('remove-avatar-btn').style.display = 'block';
-            } else {
-                avatarContainer.innerHTML = `<div class="avatar-placeholder">${initial}</div>`;
-                document.getElementById('remove-avatar-btn').style.display = 'none';
-            }
-        }
+            try {
+                const response = await fetch(`${API_URL}/api/auth/me`, { headers });
+                if (response.ok) {
+                    const user = await response.json();
+                    document.getElementById('username').value = user.username;
+                    document.getElementById('display-name').value = user.display_name || '';
+                    document.getElementById('email').value = user.email || '';
 
-        // Upload avatar
-        document.getElementById('avatar-input').addEventListener('change', async (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            
-            if (file.size > 2 * 1024 * 1024) {
-                showMessage('Image too large (max 2MB)', true);
-                return;
-            }
-            
-            const formData = new FormData();
-            formData.append('file', file);
-            
-            const response = await fetch('/api/auth/me/avatar', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                },
-                body: formData
-            });
-            
-            if (response.ok) {
-                showMessage('Avatar updated successfully!');
-                loadProfile();
-            } else {
-                showMessage('Error uploading avatar', true);
-            }
-        });
-
-        // Remove avatar
-        async function removeAvatar() {
-            if (!confirm('Remove your avatar?')) return;
-            
-            const response = await apiCall('/api/auth/me/avatar', {
-                method: 'DELETE'
-            });
-            
-            if (response.ok) {
-                showMessage('Avatar removed');
-                loadProfile();
+                    // Update B2 status
+                    if (user.has_b2_configured) {
+                        document.getElementById('b2-status').className = 'status-badge configured';
+                        document.getElementById('b2-status').innerHTML = '<span>✔️</span> Configured';
+                        document.getElementById('delete-b2-btn').style.display = 'block';
+                        document.getElementById('b2-bucket-name').value = user.b2_bucket_name || '';
+                    }
+                } else if (response.status === 401) {
+                    window.location.href = '/';
+                }
+            } catch (error) {
+                showToast('Error loading profile', 'error');
             }
         }
 
         // Update profile
         document.getElementById('profile-form').addEventListener('submit', async (e) => {
             e.preventDefault();
-            
             const displayName = document.getElementById('display-name').value;
             const email = document.getElementById('email').value;
-            
-            const response = await apiCall('/api/auth/me', {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    display_name: displayName || null,
-                    email: email || null
-                })
-            });
-            
-            if (response.ok) {
-                showMessage('Profile updated successfully!');
-                loadProfile();
-            } else {
-                showMessage('Error updating profile', true);
+
+            try {
+                const response = await fetch(`${API_URL}/api/auth/me`, {
+                    method: 'PUT',
+                    headers,
+                    body: JSON.stringify({ display_name: displayName, email })
+                });
+
+                if (response.ok) {
+                    showToast('Profile updated successfully!', 'success');
+                } else {
+                    showToast('Failed to update profile', 'error');
+                }
+            } catch (error) {
+                showToast('Error updating profile', 'error');
+            }
+        });
+
+        // Configure B2
+        document.getElementById('b2-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const keyId = document.getElementById('b2-key-id').value.trim();
+            const appKey = document.getElementById('b2-app-key').value.trim();
+            const bucketName = document.getElementById('b2-bucket-name').value.trim();
+
+            if (!keyId || !appKey || !bucketName) {
+                showToast('All B2 fields are required', 'error');
+                return;
+            }
+
+            try {
+                showToast('Testing B2 credentials...', 'info');
+                const response = await fetch(`${API_URL}/api/auth/me/b2-credentials`, {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({
+                        key_id: keyId,
+                        application_key: appKey,
+                        bucket_name: bucketName
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showToast('B2 credentials configured successfully!', 'success');
+                    setTimeout(() => loadProfile(), 1000);
+                } else {
+                    showToast(data.detail || 'Failed to configure B2', 'error');
+                }
+            } catch (error) {
+                showToast('Error configuring B2: ' + error.message, 'error');
+            }
+        });
+
+        // Delete B2 credentials
+        document.getElementById('delete-b2-btn').addEventListener('click', async () => {
+            if (!confirm('Are you sure you want to remove your B2 configuration? You will not be able to download or watch videos until you reconfigure it.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_URL}/api/auth/me/b2-credentials`, {
+                    method: 'DELETE',
+                    headers
+                });
+
+                if (response.ok) {
+                    showToast('B2 credentials removed', 'success');
+                    document.getElementById('b2-key-id').value = '';
+                    document.getElementById('b2-app-key').value = '';
+                    document.getElementById('b2-bucket-name').value = '';
+                    setTimeout(() => loadProfile(), 1000);
+                } else {
+                    showToast('Failed to remove B2 credentials', 'error');
+                }
+            } catch (error) {
+                showToast('Error removing B2 credentials', 'error');
             }
         });
 
         // Change password
         document.getElementById('password-form').addEventListener('submit', async (e) => {
             e.preventDefault();
-            
             const oldPassword = document.getElementById('old-password').value;
             const newPassword = document.getElementById('new-password').value;
             const confirmPassword = document.getElementById('confirm-password').value;
-            
+
             if (newPassword !== confirmPassword) {
-                showMessage('Passwords do not match', true);
+                showToast('Passwords do not match', 'error');
                 return;
             }
-            
+
             if (newPassword.length < 6) {
-                showMessage('Password must be at least 6 characters', true);
+                showToast('Password must be at least 6 characters', 'error');
                 return;
             }
-            
-            const response = await apiCall('/api/auth/me/change-password', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    old_password: oldPassword,
-                    new_password: newPassword
-                })
-            });
-            
-            if (response.ok) {
-                showMessage('Password changed successfully!');
-                document.getElementById('password-form').reset();
-            } else {
-                const error = await response.json();
-                showMessage(error.detail || 'Error changing password', true);
+
+            try {
+                const response = await fetch(`${API_URL}/api/auth/me/change-password`, {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({
+                        old_password: oldPassword,
+                        new_password: newPassword
+                    })
+                });
+
+                if (response.ok) {
+                    showToast('Password changed successfully!', 'success');
+                    document.getElementById('password-form').reset();
+                } else {
+                    const data = await response.json();
+                    showToast(data.detail || 'Failed to change password', 'error');
+                }
+            } catch (error) {
+                showToast('Error changing password', 'error');
             }
         });
 
+        // Load profile on page load
         loadProfile();
     </script>
 </body>
