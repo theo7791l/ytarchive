@@ -3,6 +3,7 @@ import asyncio
 from datetime import datetime
 from typing import Optional, Callable
 import yt_dlp
+import traceback
 
 VIDEOS_DIR = "videos"
 
@@ -67,6 +68,22 @@ async def download_video(url: str, quality: str = "best", progress_callback: Opt
     video_file_path = None
     thumbnail_file_path = None
     
+    def cleanup_local_files():
+        """Clean up local files"""
+        try:
+            if video_file_path and os.path.exists(video_file_path):
+                os.remove(video_file_path)
+                print(f"Cleaned up: {video_file_path}")
+        except Exception as e:
+            print(f"Failed to cleanup video file: {e}")
+        
+        try:
+            if thumbnail_file_path and os.path.exists(thumbnail_file_path):
+                os.remove(thumbnail_file_path)
+                print(f"Cleaned up: {thumbnail_file_path}")
+        except Exception as e:
+            print(f"Failed to cleanup thumbnail file: {e}")
+    
     try:
         loop = asyncio.get_event_loop()
         
@@ -114,6 +131,7 @@ async def download_video(url: str, quality: str = "best", progress_callback: Opt
                 break
         
         if not video_file:
+            cleanup_local_files()
             return (False, "Video file not found after download")
         
         # ========================================
@@ -122,104 +140,101 @@ async def download_video(url: str, quality: str = "best", progress_callback: Opt
         if progress_callback:
             await progress_callback('uploading', 'Uploading to Backblaze B2...')
         
-        from b2_storage import B2Storage
-        
-        b2 = B2Storage(
-            b2_creds["key_id"],
-            b2_creds["application_key"],
-            b2_creds["bucket_name"]
-        )
-        
-        # Authorize B2
-        if not await b2.authorize():
-            # Cleanup local files
-            if os.path.exists(video_file):
-                os.remove(video_file)
-            if thumbnail_file and os.path.exists(thumbnail_file):
-                os.remove(thumbnail_file)
-            return (False, "Failed to authorize with Backblaze B2. Check your credentials.")
-        
-        # Get upload URL
-        if not await b2.get_upload_url():
-            # Cleanup local files
-            if os.path.exists(video_file):
-                os.remove(video_file)
-            if thumbnail_file and os.path.exists(thumbnail_file):
-                os.remove(thumbnail_file)
-            return (False, "Failed to get B2 upload URL")
-        
-        # Upload video file
-        video_ext = os.path.splitext(video_file)[1]
-        b2_video_filename = f"videos/{username}/{video_id}{video_ext}"
-        
-        success, video_file_id = await b2.upload_file(video_file, b2_video_filename, progress_callback)
-        
-        if not success:
-            # Cleanup local files
-            if os.path.exists(video_file):
-                os.remove(video_file)
-            if thumbnail_file and os.path.exists(thumbnail_file):
-                os.remove(thumbnail_file)
-            return (False, "Failed to upload video to B2")
-        
-        # Upload thumbnail if exists
-        thumbnail_file_id = None
-        b2_thumbnail_filename = None
-        if thumbnail_file:
-            thumb_ext = os.path.splitext(thumbnail_file)[1]
-            b2_thumbnail_filename = f"thumbnails/{username}/{video_id}{thumb_ext}"
+        try:
+            from b2_storage import B2Storage
             
-            # Get new upload URL for thumbnail
-            await b2.get_upload_url()
-            success_thumb, thumbnail_file_id = await b2.upload_file(thumbnail_file, b2_thumbnail_filename, progress_callback)
+            b2 = B2Storage(
+                b2_creds["key_id"],
+                b2_creds["application_key"],
+                b2_creds["bucket_name"]
+            )
             
-            if not success_thumb:
-                print(f"Warning: Failed to upload thumbnail for {video_id}")
+            # Authorize B2
+            if not await b2.authorize():
+                cleanup_local_files()
+                return (False, "Failed to authorize with Backblaze B2. Check your credentials.")
+            
+            # Get upload URL
+            if not await b2.get_upload_url():
+                cleanup_local_files()
+                return (False, "Failed to get B2 upload URL")
+            
+            # Upload video file
+            video_ext = os.path.splitext(video_file)[1]
+            b2_video_filename = f"videos/{username}/{video_id}{video_ext}"
+            
+            print(f"Uploading video to B2: {b2_video_filename}")
+            success, video_file_id = await b2.upload_file(video_file, b2_video_filename, progress_callback)
+            
+            if not success or not video_file_id:
+                cleanup_local_files()
+                error_msg = "Failed to upload video to Backblaze B2. The video was not saved."
+                print(error_msg)
+                return (False, error_msg)
+            
+            print(f"Video uploaded successfully. File ID: {video_file_id}")
+            
+            # Upload thumbnail if exists
+            thumbnail_file_id = None
+            b2_thumbnail_filename = None
+            if thumbnail_file:
+                thumb_ext = os.path.splitext(thumbnail_file)[1]
+                b2_thumbnail_filename = f"thumbnails/{username}/{video_id}{thumb_ext}"
+                
+                # Get new upload URL for thumbnail
+                await b2.get_upload_url()
+                print(f"Uploading thumbnail to B2: {b2_thumbnail_filename}")
+                success_thumb, thumbnail_file_id = await b2.upload_file(thumbnail_file, b2_thumbnail_filename, progress_callback)
+                
+                if not success_thumb:
+                    print(f"Warning: Failed to upload thumbnail for {video_id}")
+            
+            # Delete local files after successful upload
+            cleanup_local_files()
+            
+            if progress_callback:
+                await progress_callback('completed', f'Upload complete: {title}')
+            
+            # Return video entry with B2 info
+            video_entry = {
+                'id': video_id,
+                'title': title,
+                'channel': channel,
+                'channel_id': channel_id,
+                'duration': duration,
+                'upload_date': upload_date,
+                'description': description[:500] if description else '',
+                'view_count': view_count,
+                'video_file': b2_video_filename,
+                'thumbnail_file': b2_thumbnail_filename,
+                'b2_video_file_id': video_file_id,
+                'b2_thumbnail_file_id': thumbnail_file_id,
+                'quality': quality,
+                'downloaded_at': datetime.now().isoformat(),
+                'url': url,
+                'storage': 'b2',
+                'owner': username
+            }
+            
+            return (True, video_entry)
         
-        # Delete local files after successful upload
-        if os.path.exists(video_file):
-            os.remove(video_file)
-        if thumbnail_file and os.path.exists(thumbnail_file):
-            os.remove(thumbnail_file)
-        
-        if progress_callback:
-            await progress_callback('completed', f'Upload complete: {title}')
-        
-        # Return video entry with B2 info
-        video_entry = {
-            'id': video_id,
-            'title': title,
-            'channel': channel,
-            'channel_id': channel_id,
-            'duration': duration,
-            'upload_date': upload_date,
-            'description': description[:500] if description else '',
-            'view_count': view_count,
-            'video_file': b2_video_filename,  # B2 path instead of local
-            'thumbnail_file': b2_thumbnail_filename,
-            'b2_video_file_id': video_file_id,  # B2 file ID
-            'b2_thumbnail_file_id': thumbnail_file_id,
-            'quality': quality,
-            'downloaded_at': datetime.now().isoformat(),
-            'url': url,
-            'storage': 'b2',  # Mark as B2 storage
-            'owner': username  # Track who owns this video
-        }
-        
-        return (True, video_entry)
+        except Exception as b2_error:
+            print(f"B2 Upload Error: {b2_error}")
+            print(traceback.format_exc())
+            cleanup_local_files()
+            return (False, f"B2 upload failed: {str(b2_error)}. Video was not saved.")
         
     except Exception as e:
         error_msg = str(e)
+        print(f"Download Error: {error_msg}")
+        print(traceback.format_exc())
         
-        # Cleanup local files on error
-        try:
-            if video_file_path and os.path.exists(video_file_path):
-                os.remove(video_file_path)
-            if thumbnail_file_path and os.path.exists(thumbnail_file_path):
-                os.remove(thumbnail_file_path)
-        except:
-            pass
+        cleanup_local_files()
         
         if progress_callback:
-            await progress_callback('error', f'Error: {error_msg}')
-        return (False, error_msg)
+            try:
+                await progress_callback('error', f'Error: {error_msg}')
+            except:
+                pass
+        
+        return (False, f"Download failed: {error_msg}")
