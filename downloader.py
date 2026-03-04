@@ -20,11 +20,12 @@ async def download_video(url: str, quality: str = "best", progress_callback: Opt
     if not b2_creds:
         return (False, "Backblaze B2 not configured. Please configure B2 credentials in your profile.")
     
+    # QUALITÉ FIXÉE - Format correct pour forcer la qualité demandée
     quality_map = {
-        "best": "best",
-        "1080p": "bestvideo[height<=1080]+bestaudio/best[height<=1080]/best",
-        "720p": "bestvideo[height<=720]+bestaudio/best[height<=720]/best",
-        "480p": "bestvideo[height<=480]+bestaudio/best[height<=480]/best"
+        "best": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+        "1080p": "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]/best",
+        "720p": "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best",
+        "480p": "bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best[height<=480][ext=mp4]/best"
     }
     
     def progress_hook(d):
@@ -54,13 +55,18 @@ async def download_video(url: str, quality: str = "best", progress_callback: Opt
             print(f"Progress hook error: {e}")
     
     ydl_opts = {
-        'format': quality_map.get(quality, "best"),
+        'format': quality_map.get(quality, "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best"),
         'outtmpl': os.path.join(VIDEOS_DIR, '%(id)s.%(ext)s'),
         'writethumbnail': True,
         'writesubtitles': False,
         'quiet': False,
         'no_warnings': False,
         'progress_hooks': [progress_hook],
+        'merge_output_format': 'mp4',  # Force MP4 output
+        'postprocessors': [{
+            'key': 'FFmpegVideoConvertor',
+            'preferedformat': 'mp4',
+        }],
         'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'extractor_args': {'youtube': {'player_client': ['android', 'web']}},
     }
@@ -177,6 +183,8 @@ async def download_video(url: str, quality: str = "best", progress_callback: Opt
             # Upload thumbnail if exists
             thumbnail_file_id = None
             b2_thumbnail_filename = None
+            thumbnail_url = None
+            
             if thumbnail_file:
                 thumb_ext = os.path.splitext(thumbnail_file)[1]
                 b2_thumbnail_filename = f"thumbnails/{username}/{video_id}{thumb_ext}"
@@ -186,7 +194,11 @@ async def download_video(url: str, quality: str = "best", progress_callback: Opt
                 print(f"Uploading thumbnail to B2: {b2_thumbnail_filename}")
                 success_thumb, thumbnail_file_id = await b2.upload_file(thumbnail_file, b2_thumbnail_filename, progress_callback)
                 
-                if not success_thumb:
+                if success_thumb:
+                    # Générer URL signée pour la miniature (durée 7 jours)
+                    thumbnail_url = await b2.get_download_url(b2_thumbnail_filename, duration_seconds=604800)
+                    print(f"Thumbnail uploaded. Signed URL: {thumbnail_url}")
+                else:
                     print(f"Warning: Failed to upload thumbnail for {video_id}")
             
             # Delete local files after successful upload
@@ -207,6 +219,7 @@ async def download_video(url: str, quality: str = "best", progress_callback: Opt
                 'view_count': view_count,
                 'video_file': b2_video_filename,
                 'thumbnail_file': b2_thumbnail_filename,
+                'thumbnail_url': thumbnail_url,  # URL signée de la miniature
                 'b2_video_file_id': video_file_id,
                 'b2_thumbnail_file_id': thumbnail_file_id,
                 'quality': quality,
