@@ -116,7 +116,7 @@ function formatDuration(seconds) {
 }
 
 function formatDate(dateStr) {
-    if (!dateStr) return 'Unknown';
+    if (!dateStr) return 'Inconnue';
     try {
         const date = new Date(dateStr);
         return date.toLocaleDateString('fr-FR', { year: 'numeric', month: 'short', day: 'numeric' });
@@ -155,7 +155,7 @@ async function loadLibrary() {
         updateChannelFilter();
         renderLibrary();
     } catch (error) {
-        showToast('Failed to load library: ' + error.message, 'error');
+        showToast('Échec du chargement: ' + error.message, 'error');
     }
 }
 
@@ -165,8 +165,8 @@ function updateStats() {
     const uniqueChannels = new Set(libraryCache.map(v => v.channel_id)).size;
     const totalDuration = libraryCache.reduce((sum, v) => sum + (v.duration || 0), 0);
     
-    document.getElementById('total-videos').textContent = `${totalVideos} video${totalVideos !== 1 ? 's' : ''}`;
-    document.getElementById('total-channels').textContent = `${uniqueChannels} channel${uniqueChannels !== 1 ? 's' : ''}`;
+    document.getElementById('total-videos').textContent = `${totalVideos} vidéo${totalVideos !== 1 ? 's' : ''}`;
+    document.getElementById('total-channels').textContent = `${uniqueChannels} chaîne${uniqueChannels !== 1 ? 's' : ''}`;
     document.getElementById('total-duration').textContent = formatTotalDuration(totalDuration);
 }
 
@@ -180,7 +180,7 @@ function updateChannelFilter() {
     });
     
     const filterSelect = document.getElementById('channel-filter');
-    filterSelect.innerHTML = '<option value="all">All Channels</option>';
+    filterSelect.innerHTML = '<option value="all">Toutes les chaînes</option>';
     
     Object.entries(channels)
         .sort((a, b) => a[1].localeCompare(b[1]))
@@ -238,7 +238,7 @@ function getFilteredAndSorted() {
     return filtered;
 }
 
-// Render Library
+// Render Library with Clean Cards
 function renderLibrary() {
     const filtered = getFilteredAndSorted();
     const grid = document.getElementById('library-grid');
@@ -246,65 +246,196 @@ function renderLibrary() {
     grid.className = currentView === 'grid' ? 'video-grid' : 'video-list';
     
     if (filtered.length === 0) {
-        grid.innerHTML = '<p class="empty-state">No videos found.</p>';
+        grid.innerHTML = '<p class="empty-state">Aucune vidéo trouvée.</p>';
         return;
     }
     
     if (currentView === 'grid') {
-        grid.innerHTML = filtered.map((video, i) => `
-            <div class="video-card" data-id="${video.id}" style="--i: ${i}">
-                <div class="video-thumbnail">
-                    ${video.thumbnail_file ? 
-                        `<img src="/videos/${video.thumbnail_file}" alt="${video.title}" onerror="this.parentElement.innerHTML='<div class=\"no-thumbnail\">VIDEO</div>'">` :
-                        `<div class="no-thumbnail">VIDEO</div>`
-                    }
-                    <div class="video-duration">${formatDuration(video.duration)}</div>
-                    ${video.auto_downloaded ? '<div class="auto-badge">AUTO</div>' : ''}
-                    ${video.storage === 'b2' ? '<div class="b2-badge">☁️ B2</div>' : ''}
-                </div>
-                <div class="video-info">
-                    <h3 class="video-title">${video.title}</h3>
-                    <p class="video-channel">${video.channel}</p>
-                    <div class="video-meta">
-                        <span>${formatNumber(video.view_count)} views</span>
-                        <span>${formatDate(video.upload_date)}</span>
-                    </div>
-                </div>
-                <div class="video-actions">
-                    <button class="btn-play" onclick="playVideo('${video.id}')" title="Play">Play</button>
-                    <button class="btn-delete" onclick="deleteVideo('${video.id}')" title="Delete">Delete</button>
-                </div>
-            </div>
-        `).join('');
+        grid.innerHTML = '';
+        filtered.forEach((video, i) => {
+            const card = createVideoCard(video, i);
+            grid.appendChild(card);
+        });
     } else {
-        grid.innerHTML = filtered.map((video, i) => `
-            <div class="video-list-item" data-id="${video.id}" style="--i: ${i}">
-                <div class="list-thumbnail">
-                    ${video.thumbnail_file ? 
-                        `<img src="/videos/${video.thumbnail_file}" alt="${video.title}" onerror="this.parentElement.innerHTML='<div class=\"no-thumbnail-small\">VIDEO</div>'">` :
-                        `<div class="no-thumbnail-small">VIDEO</div>`
-                    }
-                    <div class="video-duration-small">${formatDuration(video.duration)}</div>
-                </div>
-                <div class="list-info">
-                    <h3 class="list-title">${video.title}</h3>
-                    <div class="list-meta">
-                        <span class="list-channel">${video.channel}</span>
-                        <span>•</span>
-                        <span>${formatNumber(video.view_count)} views</span>
-                        <span>•</span>
-                        <span>${formatDate(video.upload_date)}</span>
-                        ${video.auto_downloaded ? '<span class="auto-badge-small">AUTO</span>' : ''}
-                        ${video.storage === 'b2' ? '<span class="b2-badge-small">☁️ B2</span>' : ''}
-                    </div>
-                </div>
-                <div class="list-actions">
-                    <button class="btn-play-small" onclick="playVideo('${video.id}')" title="Play">Play</button>
-                    <button class="btn-delete-small" onclick="deleteVideo('${video.id}')" title="Delete">Delete</button>
-                </div>
-            </div>
-        `).join('');
+        grid.innerHTML = '';
+        filtered.forEach((video, i) => {
+            const item = createVideoListItem(video, i);
+            grid.appendChild(item);
+        });
     }
+}
+
+// Create Video Card (Grid View)
+function createVideoCard(video, index) {
+    const card = document.createElement('div');
+    card.className = 'video-card';
+    card.dataset.id = video.id;
+    card.style.setProperty('--i', index);
+    
+    // Thumbnail container
+    const thumbnail = document.createElement('div');
+    thumbnail.className = 'video-thumbnail';
+    
+    if (video.thumbnail_file) {
+        const img = document.createElement('img');
+        img.src = `/videos/${video.thumbnail_file}`;
+        img.alt = video.title;
+        img.onerror = function() {
+            this.style.display = 'none';
+            const fallback = document.createElement('div');
+            fallback.className = 'no-thumbnail';
+            fallback.textContent = video.title.substring(0, 3).toUpperCase();
+            thumbnail.insertBefore(fallback, this.nextSibling);
+        };
+        thumbnail.appendChild(img);
+    } else {
+        const fallback = document.createElement('div');
+        fallback.className = 'no-thumbnail';
+        fallback.textContent = video.title.substring(0, 3).toUpperCase();
+        thumbnail.appendChild(fallback);
+    }
+    
+    // Duration badge
+    const duration = document.createElement('div');
+    duration.className = 'video-duration';
+    duration.textContent = formatDuration(video.duration);
+    thumbnail.appendChild(duration);
+    
+    // B2 badge (only if stored in B2)
+    if (video.storage === 'b2') {
+        const b2Badge = document.createElement('div');
+        b2Badge.className = 'b2-badge';
+        b2Badge.textContent = 'B2';
+        thumbnail.appendChild(b2Badge);
+    }
+    
+    card.appendChild(thumbnail);
+    
+    // Video info
+    const info = document.createElement('div');
+    info.className = 'video-info';
+    
+    const title = document.createElement('h3');
+    title.className = 'video-title';
+    title.textContent = video.title;
+    info.appendChild(title);
+    
+    const channel = document.createElement('p');
+    channel.className = 'video-channel';
+    channel.textContent = video.channel;
+    info.appendChild(channel);
+    
+    const meta = document.createElement('div');
+    meta.className = 'video-meta';
+    meta.innerHTML = `
+        <span>${formatNumber(video.view_count)} vues</span>
+        <span>•</span>
+        <span>${formatDate(video.upload_date)}</span>
+    `;
+    info.appendChild(meta);
+    
+    card.appendChild(info);
+    
+    // Actions
+    const actions = document.createElement('div');
+    actions.className = 'video-actions';
+    
+    const playBtn = document.createElement('button');
+    playBtn.className = 'btn-play';
+    playBtn.textContent = 'Lire';
+    playBtn.onclick = () => playVideo(video.id);
+    actions.appendChild(playBtn);
+    
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'btn-delete';
+    deleteBtn.textContent = 'Supprimer';
+    deleteBtn.onclick = () => deleteVideo(video.id);
+    actions.appendChild(deleteBtn);
+    
+    card.appendChild(actions);
+    
+    return card;
+}
+
+// Create Video List Item (List View)
+function createVideoListItem(video, index) {
+    const item = document.createElement('div');
+    item.className = 'video-list-item';
+    item.dataset.id = video.id;
+    item.style.setProperty('--i', index);
+    
+    // Thumbnail
+    const thumbnail = document.createElement('div');
+    thumbnail.className = 'list-thumbnail';
+    
+    if (video.thumbnail_file) {
+        const img = document.createElement('img');
+        img.src = `/videos/${video.thumbnail_file}`;
+        img.alt = video.title;
+        img.onerror = function() {
+            this.style.display = 'none';
+            const fallback = document.createElement('div');
+            fallback.className = 'no-thumbnail-small';
+            fallback.textContent = 'VID';
+            thumbnail.appendChild(fallback);
+        };
+        thumbnail.appendChild(img);
+    } else {
+        const fallback = document.createElement('div');
+        fallback.className = 'no-thumbnail-small';
+        fallback.textContent = 'VID';
+        thumbnail.appendChild(fallback);
+    }
+    
+    const duration = document.createElement('div');
+    duration.className = 'video-duration-small';
+    duration.textContent = formatDuration(video.duration);
+    thumbnail.appendChild(duration);
+    
+    item.appendChild(thumbnail);
+    
+    // Info
+    const info = document.createElement('div');
+    info.className = 'list-info';
+    
+    const title = document.createElement('h3');
+    title.className = 'list-title';
+    title.textContent = video.title;
+    info.appendChild(title);
+    
+    const meta = document.createElement('div');
+    meta.className = 'list-meta';
+    meta.innerHTML = `
+        <span class="list-channel">${video.channel}</span>
+        <span>•</span>
+        <span>${formatNumber(video.view_count)} vues</span>
+        <span>•</span>
+        <span>${formatDate(video.upload_date)}</span>
+        ${video.storage === 'b2' ? '<span class="b2-badge-small">B2</span>' : ''}
+    `;
+    info.appendChild(meta);
+    
+    item.appendChild(info);
+    
+    // Actions
+    const actions = document.createElement('div');
+    actions.className = 'list-actions';
+    
+    const playBtn = document.createElement('button');
+    playBtn.className = 'btn-play-small';
+    playBtn.textContent = 'Lire';
+    playBtn.onclick = () => playVideo(video.id);
+    actions.appendChild(playBtn);
+    
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'btn-delete-small';
+    deleteBtn.textContent = 'Supprimer';
+    deleteBtn.onclick = () => deleteVideo(video.id);
+    actions.appendChild(deleteBtn);
+    
+    item.appendChild(actions);
+    
+    return item;
 }
 
 // Event Listeners for Filters
@@ -350,7 +481,7 @@ async function playVideo(videoId) {
         currentPlayer.remove();
     }
     
-    showToast('Loading video...', 'info');
+    showToast('Chargement de la vidéo...', 'info');
     
     let videoUrl = `/videos/${video.video_file}`;
     let thumbnailUrl = video.thumbnail_file ? `/videos/${video.thumbnail_file}` : null;
@@ -363,7 +494,7 @@ async function playVideo(videoId) {
                 thumbnailUrl = streamData.thumbnail_url;
             }
         } catch (error) {
-            showToast('Failed to load video from B2: ' + error.message, 'error');
+            showToast('Échec du chargement depuis B2: ' + error.message, 'error');
             return;
         }
     }
@@ -388,15 +519,15 @@ async function playVideo(videoId) {
                     <div class="player-video-meta">
                         <span class="player-channel">${video.channel}</span>
                         <span>•</span>
-                        <span>${formatNumber(video.view_count)} views</span>
+                        <span>${formatNumber(video.view_count)} vues</span>
                         <span>•</span>
                         <span>${formatDate(video.upload_date)}</span>
-                        ${video.storage === 'b2' ? '<span class="b2-streaming-badge">☁️ Streaming from B2</span>' : ''}
+                        ${video.storage === 'b2' ? '<span class="b2-streaming-badge">Streaming B2</span>' : ''}
                     </div>
                     
                     <div class="player-controls">
                         <div class="speed-controls">
-                            <span class="control-label">Speed:</span>
+                            <span class="control-label">Vitesse:</span>
                             <button class="speed-btn" data-speed="0.5">0.5x</button>
                             <button class="speed-btn" data-speed="0.75">0.75x</button>
                             <button class="speed-btn active" data-speed="1">1x</button>
@@ -407,17 +538,17 @@ async function playVideo(videoId) {
                         <div class="action-controls">
                             <button class="control-btn" onclick="skipTime(-10)">-10s</button>
                             <button class="control-btn" onclick="skipTime(10)">+10s</button>
-                            <button class="control-btn" onclick="toggleFullscreen()">Fullscreen</button>
+                            <button class="control-btn" onclick="toggleFullscreen()">Plein écran</button>
                         </div>
                     </div>
                     
                     <div class="player-shortcuts">
-                        <strong>Shortcuts:</strong>
-                        <span>Space = Play/Pause</span>
+                        <strong>Raccourcis:</strong>
+                        <span>Espace = Lecture/Pause</span>
                         <span>← → = ±5s</span>
                         <span>↑ ↓ = Volume</span>
-                        <span>F = Fullscreen</span>
-                        <span>M = Mute</span>
+                        <span>F = Plein écran</span>
+                        <span>M = Muet</span>
                     </div>
                     
                     ${video.description ? `
@@ -430,21 +561,21 @@ async function playVideo(videoId) {
             </div>
             
             <div class="player-sidebar">
-                <h3 class="sidebar-title">Other Videos</h3>
+                <h3 class="sidebar-title">Autres vidéos</h3>
                 <div class="sidebar-videos">
                     ${otherVideos.slice(0, 20).map(v => `
                         <div class="sidebar-video" onclick="playVideo('${v.id}')">
                             <div class="sidebar-thumbnail">
                                 ${v.thumbnail_file ? 
-                                    `<img src="/videos/${v.thumbnail_file}" alt="${v.title}" onerror="this.parentElement.innerHTML='<div class=\"sidebar-no-thumb\">VIDEO</div>'">` :
-                                    `<div class="sidebar-no-thumb">VIDEO</div>`
+                                    `<img src="/videos/${v.thumbnail_file}" alt="${v.title}" onerror="this.style.display='none';this.parentElement.innerHTML='<div class=\"sidebar-no-thumb\">VID</div>'">` :
+                                    `<div class="sidebar-no-thumb">VID</div>`
                                 }
                                 <span class="sidebar-duration">${formatDuration(v.duration)}</span>
                             </div>
                             <div class="sidebar-info">
                                 <h4 class="sidebar-video-title">${v.title}</h4>
                                 <p class="sidebar-channel">${v.channel}</p>
-                                <p class="sidebar-views">${formatNumber(v.view_count)} views</p>
+                                <p class="sidebar-views">${formatNumber(v.view_count)} vues</p>
                             </div>
                         </div>
                     `).join('')}
@@ -544,14 +675,14 @@ function toggleFullscreen() {
 }
 
 async function deleteVideo(videoId) {
-    if (!confirm('Delete this video? This will also remove it from B2 storage.')) return;
+    if (!confirm('Supprimer cette vidéo ? Elle sera aussi supprimée de B2.')) return;
     
     try {
         await apiCall(`/api/library/${videoId}`, { method: 'DELETE' });
-        showToast('Video deleted successfully', 'success');
+        showToast('Vidéo supprimée avec succès', 'success');
         loadLibrary();
     } catch (error) {
-        showToast(error.message || 'Failed to delete video', 'error');
+        showToast(error.message || 'Échec de la suppression', 'error');
     }
 }
 
@@ -567,13 +698,13 @@ document.getElementById('download-btn').addEventListener('click', async () => {
     const downloadBtn = document.getElementById('download-btn');
     
     if (!url) {
-        showToast('Please enter a YouTube URL', 'error');
+        showToast('Entrez une URL YouTube', 'error');
         return;
     }
     
     progressDiv.style.display = 'block';
     downloadBtn.disabled = true;
-    progressText.textContent = 'Connecting...';
+    progressText.textContent = 'Connexion...';
     
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${wsProtocol}//${window.location.host}/api/ws/download`;
@@ -602,7 +733,7 @@ document.getElementById('download-btn').addEventListener('click', async () => {
         } else if (data.status === 'completed') {
             progressText.textContent = data.message;
             progressFill.style.width = '100%';
-            showToast('Video downloaded and uploaded to B2!', 'success');
+            showToast('Vidéo téléchargée et uploadée sur B2!', 'success');
             setTimeout(() => {
                 progressDiv.style.display = 'none';
                 downloadBtn.disabled = false;
@@ -625,9 +756,9 @@ document.getElementById('download-btn').addEventListener('click', async () => {
     
     downloadWs.onerror = (error) => {
         console.error('WebSocket error:', error);
-        progressText.textContent = 'Connection error';
+        progressText.textContent = 'Erreur de connexion';
         progressText.style.color = '#f44';
-        showToast('WebSocket connection error', 'error');
+        showToast('Erreur WebSocket', 'error');
         setTimeout(() => {
             progressDiv.style.display = 'none';
             downloadBtn.disabled = false;
@@ -644,15 +775,15 @@ async function loadChannels() {
         const container = document.getElementById('channels-list');
         
         if (channels.length === 0) {
-            container.innerHTML = '<p class="empty-state">No channels yet.</p>';
+            container.innerHTML = '<p class="empty-state">Aucune chaîne pour le moment.</p>';
         } else {
             container.innerHTML = channels.map((ch, i) => `
                 <div class="channel-card" style="--i: ${i}">
                     ${ch.thumbnail ? `<img src="${ch.thumbnail}" class="channel-thumb">` : '<div class="channel-thumb-placeholder">CH</div>'}
                     <div class="channel-info">
                         <h3>${ch.name}</h3>
-                        <p>${ch.video_count} videos</p>
-                        <p class="channel-date">Added ${formatDate(ch.added_at)}</p>
+                        <p>${ch.video_count} vidéos</p>
+                        <p class="channel-date">Ajouté ${formatDate(ch.added_at)}</p>
                     </div>
                     <div class="channel-actions">
                         <label class="toggle">
@@ -661,14 +792,14 @@ async function loadChannels() {
                             <span>Auto-DL</span>
                         </label>
                         <button class="btn-stats" onclick="showChannelStats('${ch.id}')">Stats</button>
-                        <button class="btn-check" onclick="checkChannelNow('${ch.id}')">Check</button>
-                        <button class="btn-delete-channel" onclick="deleteChannel('${ch.id}')">Delete</button>
+                        <button class="btn-check" onclick="checkChannelNow('${ch.id}')">Vérifier</button>
+                        <button class="btn-delete-channel" onclick="deleteChannel('${ch.id}')">Supprimer</button>
                     </div>
                 </div>
             `).join('');
         }
     } catch (error) {
-        showToast(error.message || 'Failed to load channels', 'error');
+        showToast(error.message || 'Échec du chargement des chaînes', 'error');
     }
 }
 
@@ -689,7 +820,7 @@ document.getElementById('add-channel-form').addEventListener('submit', async (e)
     const submitBtn = e.target.querySelector('button[type="submit"]');
     const originalText = submitBtn.textContent;
     submitBtn.disabled = true;
-    submitBtn.textContent = 'Adding...';
+    submitBtn.textContent = 'Ajout en cours...';
     
     const url = document.getElementById('channel-url').value;
     const quality = document.getElementById('channel-quality').value;
@@ -701,11 +832,11 @@ document.getElementById('add-channel-form').addEventListener('submit', async (e)
             body: JSON.stringify({ channel_url: url, quality, auto_download: autoDownload })
         });
         
-        showToast(`Channel "${result.name}" added successfully!`, 'success');
+        showToast(`Chaîne "${result.name}" ajoutée avec succès!`, 'success');
         closeAddChannelModal();
         await loadChannels();
     } catch (error) {
-        showToast(error.message || 'Failed to add channel', 'error');
+        showToast(error.message || 'Échec de l\'ajout de la chaîne', 'error');
     } finally {
         submitBtn.disabled = false;
         submitBtn.textContent = originalText;
@@ -718,35 +849,35 @@ async function toggleAutoDownload(channelId, enabled) {
             method: 'PATCH',
             body: JSON.stringify({ auto_download: enabled })
         });
-        showToast(`Auto-download ${enabled ? 'enabled' : 'disabled'}`, 'success');
+        showToast(`Auto-téléchargement ${enabled ? 'activé' : 'désactivé'}`, 'success');
     } catch (error) {
-        showToast(error.message || 'Failed to update channel', 'error');
+        showToast(error.message || 'Échec de la mise à jour', 'error');
     }
 }
 
 async function checkChannelNow(channelId) {
     try {
         await apiCall(`/api/channels/${channelId}/check`, { method: 'POST' });
-        showToast('Checking for new videos...', 'info');
+        showToast('Vérification des nouvelles vidéos...', 'info');
     } catch (error) {
-        showToast(error.message || 'Failed to check channel', 'error');
+        showToast(error.message || 'Échec de la vérification', 'error');
     }
 }
 
 async function deleteChannel(channelId) {
-    if (!confirm('Remove this channel?')) return;
+    if (!confirm('Supprimer cette chaîne ?')) return;
     
     try {
         await apiCall(`/api/channels/${channelId}`, { method: 'DELETE' });
-        showToast('Channel removed successfully', 'success');
+        showToast('Chaîne supprimée avec succès', 'success');
         loadChannels();
     } catch (error) {
-        showToast(error.message || 'Failed to delete channel', 'error');
+        showToast(error.message || 'Échec de la suppression', 'error');
     }
 }
 
 async function showChannelStats(channelId) {
-    showToast('Channel stats coming soon!', 'info');
+    showToast('Statistiques à venir!', 'info');
 }
 
 function closeStatsModal() {
