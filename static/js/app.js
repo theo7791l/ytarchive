@@ -516,10 +516,11 @@ document.getElementById('download-btn').addEventListener('click', async () => {
     progressText.textContent = 'Connecting...';
     
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    downloadWs = new WebSocket(`${wsProtocol}//${window.location.host}/api/ws/download`);
+    const wsUrl = `${wsProtocol}//${window.location.host}/api/ws/download?token=${encodeURIComponent(token)}`;
+    downloadWs = new WebSocket(wsUrl);
     
     downloadWs.onopen = () => {
-        downloadWs.send(JSON.stringify({ url, quality, token }));
+        downloadWs.send(JSON.stringify({ url, quality }));
     };
     
     downloadWs.onmessage = (event) => {
@@ -553,6 +554,17 @@ document.getElementById('download-btn').addEventListener('click', async () => {
                 progressText.style.color = '';
             }, 3000);
         }
+    };
+    
+    downloadWs.onerror = (error) => {
+        console.error('WebSocket error:', error);
+        progressText.textContent = 'Connection error';
+        progressText.style.color = '#f44';
+        setTimeout(() => {
+            progressDiv.style.display = 'none';
+            downloadBtn.disabled = false;
+            progressText.style.color = '';
+        }, 3000);
     };
 });
 
