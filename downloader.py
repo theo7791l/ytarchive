@@ -6,9 +6,18 @@ import yt_dlp
 
 VIDEOS_DIR = "videos"
 
-async def download_video(url: str, quality: str = "best", progress_callback: Optional[Callable] = None):
-    """Download a video using yt-dlp"""
+async def download_video(url: str, quality: str = "best", progress_callback: Optional[Callable] = None, username: str = None):
+    """Download a video using yt-dlp and upload to Backblaze B2"""
     os.makedirs(VIDEOS_DIR, exist_ok=True)
+    
+    # Check if user has B2 configured
+    from auth import get_user_b2_credentials
+    b2_creds = None
+    if username:
+        b2_creds = get_user_b2_credentials(username)
+    
+    if not b2_creds:
+        return (False, "Backblaze B2 not configured. Please configure B2 credentials in your profile.")
     
     quality_map = {
         "best": "best",
@@ -30,7 +39,7 @@ async def download_video(url: str, quality: str = "best", progress_callback: Opt
                 
                 asyncio.create_task(progress_callback(
                     'downloading',
-                    f'Downloading... {percent}',
+                    f'Downloading from YouTube... {percent}',
                     percent=percent,
                     speed=speed,
                     eta=eta
@@ -54,6 +63,9 @@ async def download_video(url: str, quality: str = "best", progress_callback: Opt
         'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'extractor_args': {'youtube': {'player_client': ['android', 'web']}},
     }
+    
+    video_file_path = None
+    thumbnail_file_path = None
     
     try:
         loop = asyncio.get_event_loop()
@@ -91,17 +103,89 @@ async def download_video(url: str, quality: str = "best", progress_callback: Opt
             potential_file = os.path.join(VIDEOS_DIR, f"{video_id}.{ext}")
             if os.path.exists(potential_file):
                 video_file = potential_file
+                video_file_path = potential_file
                 break
         
         for ext in ['jpg', 'png', 'webp']:
             potential_thumb = os.path.join(VIDEOS_DIR, f"{video_id}.{ext}")
             if os.path.exists(potential_thumb):
                 thumbnail_file = potential_thumb
+                thumbnail_file_path = potential_thumb
                 break
         
         if not video_file:
             return (False, "Video file not found after download")
         
+        # ========================================
+        # UPLOAD TO BACKBLAZE B2
+        # ========================================
+        if progress_callback:
+            await progress_callback('uploading', 'Uploading to Backblaze B2...')
+        
+        from b2_storage import B2Storage
+        
+        b2 = B2Storage(
+            b2_creds["key_id"],
+            b2_creds["application_key"],
+            b2_creds["bucket_name"]
+        )
+        
+        # Authorize B2
+        if not await b2.authorize():
+            # Cleanup local files
+            if os.path.exists(video_file):
+                os.remove(video_file)
+            if thumbnail_file and os.path.exists(thumbnail_file):
+                os.remove(thumbnail_file)
+            return (False, "Failed to authorize with Backblaze B2. Check your credentials.")
+        
+        # Get upload URL
+        if not await b2.get_upload_url():
+            # Cleanup local files
+            if os.path.exists(video_file):
+                os.remove(video_file)
+            if thumbnail_file and os.path.exists(thumbnail_file):
+                os.remove(thumbnail_file)
+            return (False, "Failed to get B2 upload URL")
+        
+        # Upload video file
+        video_ext = os.path.splitext(video_file)[1]
+        b2_video_filename = f"videos/{username}/{video_id}{video_ext}"
+        
+        success, video_file_id = await b2.upload_file(video_file, b2_video_filename, progress_callback)
+        
+        if not success:
+            # Cleanup local files
+            if os.path.exists(video_file):
+                os.remove(video_file)
+            if thumbnail_file and os.path.exists(thumbnail_file):
+                os.remove(thumbnail_file)
+            return (False, "Failed to upload video to B2")
+        
+        # Upload thumbnail if exists
+        thumbnail_file_id = None
+        b2_thumbnail_filename = None
+        if thumbnail_file:
+            thumb_ext = os.path.splitext(thumbnail_file)[1]
+            b2_thumbnail_filename = f"thumbnails/{username}/{video_id}{thumb_ext}"
+            
+            # Get new upload URL for thumbnail
+            await b2.get_upload_url()
+            success_thumb, thumbnail_file_id = await b2.upload_file(thumbnail_file, b2_thumbnail_filename, progress_callback)
+            
+            if not success_thumb:
+                print(f"Warning: Failed to upload thumbnail for {video_id}")
+        
+        # Delete local files after successful upload
+        if os.path.exists(video_file):
+            os.remove(video_file)
+        if thumbnail_file and os.path.exists(thumbnail_file):
+            os.remove(thumbnail_file)
+        
+        if progress_callback:
+            await progress_callback('completed', f'Upload complete: {title}')
+        
+        # Return video entry with B2 info
         video_entry = {
             'id': video_id,
             'title': title,
@@ -111,20 +195,31 @@ async def download_video(url: str, quality: str = "best", progress_callback: Opt
             'upload_date': upload_date,
             'description': description[:500] if description else '',
             'view_count': view_count,
-            'video_file': os.path.basename(video_file),
-            'thumbnail_file': os.path.basename(thumbnail_file) if thumbnail_file else None,
+            'video_file': b2_video_filename,  # B2 path instead of local
+            'thumbnail_file': b2_thumbnail_filename,
+            'b2_video_file_id': video_file_id,  # B2 file ID
+            'b2_thumbnail_file_id': thumbnail_file_id,
             'quality': quality,
             'downloaded_at': datetime.now().isoformat(),
-            'url': url
+            'url': url,
+            'storage': 'b2',  # Mark as B2 storage
+            'owner': username  # Track who owns this video
         }
-        
-        if progress_callback:
-            await progress_callback('completed', f'Downloaded: {title}')
         
         return (True, video_entry)
         
     except Exception as e:
         error_msg = str(e)
+        
+        # Cleanup local files on error
+        try:
+            if video_file_path and os.path.exists(video_file_path):
+                os.remove(video_file_path)
+            if thumbnail_file_path and os.path.exists(thumbnail_file_path):
+                os.remove(thumbnail_file_path)
+        except:
+            pass
+        
         if progress_callback:
             await progress_callback('error', f'Error: {error_msg}')
         return (False, error_msg)
