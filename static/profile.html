@@ -3,52 +3,154 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>YTArchive - Profile</title>
+    <title>YTArchive - Profil</title>
     <link rel="stylesheet" href="/static/css/app.css">
     <style>
         .profile-container {
-            max-width: 900px;
+            max-width: 1000px;
             margin: 0 auto;
+            padding: 20px;
         }
 
         .profile-section {
             background: rgba(255, 255, 255, 0.05);
             backdrop-filter: blur(10px);
             border-radius: 20px;
-            padding: 30px;
+            padding: 35px;
             margin-bottom: 30px;
             border: 2px solid rgba(102, 126, 234, 0.2);
             animation: slideInUp 0.6s ease;
         }
 
         .profile-section h3 {
-            font-size: 24px;
-            margin-bottom: 25px;
+            font-size: 26px;
+            margin-bottom: 30px;
             color: #667eea;
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 15px;
+            font-weight: 700;
         }
 
         .section-icon {
-            font-size: 28px;
+            font-size: 32px;
+        }
+
+        /* Avatar Section */
+        .avatar-section {
+            display: flex;
+            align-items: center;
+            gap: 30px;
+            margin-bottom: 30px;
+            padding: 25px;
+            background: rgba(102, 126, 234, 0.08);
+            border-radius: 15px;
+            border: 2px solid rgba(102, 126, 234, 0.2);
+        }
+
+        .avatar-preview {
+            position: relative;
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 48px;
+            font-weight: 700;
+            color: white;
+            overflow: hidden;
+            border: 4px solid rgba(102, 126, 234, 0.5);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .avatar-preview img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .avatar-controls {
+            flex: 1;
+        }
+
+        .avatar-controls h4 {
+            font-size: 18px;
+            margin-bottom: 15px;
+            color: #ccc;
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            display: inline-block;
+        }
+
+        .file-input-wrapper input[type="file"] {
+            position: absolute;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+
+        .btn-upload {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-upload:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.5);
+        }
+
+        .btn-remove-avatar {
+            margin-left: 10px;
+            padding: 12px 24px;
+            background: rgba(255, 68, 68, 0.2);
+            color: #ff4444;
+            border: 2px solid rgba(255, 68, 68, 0.3);
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-remove-avatar:hover {
+            background: rgba(255, 68, 68, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .avatar-hint {
+            font-size: 13px;
+            color: #888;
+            margin-top: 10px;
         }
 
         .form-group {
-            margin-bottom: 20px;
+            margin-bottom: 25px;
         }
 
         .form-group label {
             display: block;
-            margin-bottom: 8px;
+            margin-bottom: 10px;
             font-weight: 600;
             color: #aaa;
-            font-size: 14px;
+            font-size: 15px;
         }
 
-        .form-group input {
+        .form-group input, .form-group select {
             width: 100%;
-            padding: 14px 18px;
+            padding: 15px 20px;
             background: rgba(255, 255, 255, 0.05);
             border: 2px solid rgba(255, 255, 255, 0.1);
             border-radius: 12px;
@@ -57,7 +159,7 @@
             transition: all 0.3s ease;
         }
 
-        .form-group input:focus {
+        .form-group input:focus, .form-group select:focus {
             outline: none;
             border-color: #667eea;
             box-shadow: 0 0 20px rgba(102, 126, 234, 0.4);
@@ -71,15 +173,15 @@
         .btn-group {
             display: flex;
             gap: 15px;
-            margin-top: 25px;
+            margin-top: 30px;
             flex-wrap: wrap;
         }
 
         .btn {
-            padding: 14px 30px;
+            padding: 15px 35px;
             border: none;
             border-radius: 12px;
-            font-size: 15px;
+            font-size: 16px;
             font-weight: 700;
             cursor: pointer;
             transition: all 0.3s ease;
@@ -115,6 +217,10 @@
             border: 2px solid rgba(255, 255, 255, 0.2);
             padding: 12px 24px;
             margin-bottom: 30px;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
         }
 
         .btn-back:hover {
@@ -126,9 +232,9 @@
             display: inline-flex;
             align-items: center;
             gap: 8px;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-size: 13px;
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-size: 14px;
             font-weight: 600;
         }
 
@@ -148,18 +254,18 @@
             background: rgba(102, 126, 234, 0.1);
             border: 2px solid rgba(102, 126, 234, 0.3);
             border-radius: 12px;
-            padding: 18px;
-            margin-bottom: 20px;
+            padding: 20px;
+            margin-bottom: 25px;
             font-size: 14px;
-            line-height: 1.6;
+            line-height: 1.7;
             color: #ccc;
         }
 
         .info-box strong {
             color: #667eea;
             display: block;
-            margin-bottom: 8px;
-            font-size: 15px;
+            margin-bottom: 10px;
+            font-size: 16px;
         }
 
         .info-box a {
@@ -172,12 +278,17 @@
         }
 
         .help-text {
-            font-size: 12px;
+            font-size: 13px;
             color: #888;
-            margin-top: 5px;
+            margin-top: 6px;
         }
 
         @media (max-width: 767px) {
+            .avatar-section {
+                flex-direction: column;
+                text-align: center;
+            }
+
             .profile-section {
                 padding: 20px;
             }
@@ -198,35 +309,56 @@
             <h1>YTArchive</h1>
         </div>
         <div class="nav-menu">
-            <a href="/app" class="nav-link">Library</a>
+            <a href="/app" class="nav-link">Bibliothèque</a>
         </div>
     </nav>
 
     <main class="container">
-        <button class="btn btn-back" onclick="window.location.href='/app'">← Back to Library</button>
+        <button class="btn-back" onclick="window.location.href='/app'">← Retour à la bibliothèque</button>
 
         <div class="profile-container">
             <!-- User Info Section -->
             <div class="profile-section">
                 <h3>
                     <span class="section-icon">👤</span>
-                    Profile Information
+                    Informations du profil
                 </h3>
+
+                <!-- Avatar Upload -->
+                <div class="avatar-section">
+                    <div class="avatar-preview" id="avatar-preview">
+                        <span id="avatar-letter">U</span>
+                    </div>
+                    <div class="avatar-controls">
+                        <h4>Photo de profil</h4>
+                        <div class="file-input-wrapper">
+                            <button class="btn-upload">
+                                📷 Choisir une image
+                            </button>
+                            <input type="file" id="avatar-input" accept="image/*">
+                        </div>
+                        <button class="btn-remove-avatar" id="remove-avatar-btn" style="display: none;">
+                            ❌ Supprimer
+                        </button>
+                        <p class="avatar-hint">PNG, JPG ou GIF - Max 2 MB</p>
+                    </div>
+                </div>
+
                 <form id="profile-form">
                     <div class="form-group">
-                        <label>Username</label>
+                        <label>Nom d'utilisateur</label>
                         <input type="text" id="username" disabled>
                     </div>
                     <div class="form-group">
-                        <label>Display Name</label>
-                        <input type="text" id="display-name" placeholder="Your display name">
+                        <label>Nom d'affichage</label>
+                        <input type="text" id="display-name" placeholder="Votre nom d'affichage">
                     </div>
                     <div class="form-group">
                         <label>Email</label>
-                        <input type="email" id="email" placeholder="your.email@example.com">
+                        <input type="email" id="email" placeholder="votre.email@example.com">
                     </div>
                     <div class="btn-group">
-                        <button type="submit" class="btn btn-save">Save Profile</button>
+                        <button type="submit" class="btn btn-save">Enregistrer le profil</button>
                     </div>
                 </form>
             </div>
@@ -235,43 +367,43 @@
             <div class="profile-section">
                 <h3>
                     <span class="section-icon">☁️</span>
-                    Backblaze B2 Storage
+                    Stockage Backblaze B2
                     <span id="b2-status" class="status-badge not-configured">
-                        <span>⚠️</span> Not Configured
+                        <span>⚠️</span> Non configuré
                     </span>
                 </h3>
 
                 <div class="info-box">
-                    <strong>💡 Why Backblaze B2?</strong>
-                    Due to limited local storage, all videos are stored in your personal Backblaze B2 bucket. 
-                    You need to configure your B2 credentials to download and watch videos.
+                    <strong>💡 Pourquoi Backblaze B2 ?</strong>
+                    En raison d'un espace disque local limité, toutes les vidéos sont stockées dans votre bucket B2 personnel. 
+                    Vous devez configurer vos identifiants B2 pour télécharger et regarder des vidéos.
                     <br><br>
-                    <strong>How to get B2 credentials:</strong><br>
-                    1. Create a free account at <a href="https://www.backblaze.com/b2/sign-up.html" target="_blank">Backblaze B2</a><br>
-                    2. Create a bucket (private recommended)<br>
-                    3. Generate an Application Key with read/write access<br>
-                    4. Enter your credentials below
+                    <strong>Comment obtenir les identifiants B2 :</strong><br>
+                    1. Créez un compte gratuit sur <a href="https://www.backblaze.com/b2/sign-up.html" target="_blank">Backblaze B2</a><br>
+                    2. Créez un bucket (privé recommandé)<br>
+                    3. Générez une clé d'application avec accès lecture/écriture<br>
+                    4. Entrez vos identifiants ci-dessous
                 </div>
 
                 <form id="b2-form">
                     <div class="form-group">
-                        <label>Application Key ID</label>
-                        <input type="text" id="b2-key-id" placeholder="Your B2 Key ID">
-                        <p class="help-text">Found in Backblaze B2 dashboard under "App Keys"</p>
+                        <label>ID de clé d'application</label>
+                        <input type="text" id="b2-key-id" placeholder="Votre ID de clé B2">
+                        <p class="help-text">Trouvé dans le tableau de bord B2 sous "App Keys"</p>
                     </div>
                     <div class="form-group">
-                        <label>Application Key</label>
-                        <input type="password" id="b2-app-key" placeholder="Your B2 Application Key">
-                        <p class="help-text">Keep this secret! Only shown once when created</p>
+                        <label>Clé d'application</label>
+                        <input type="password" id="b2-app-key" placeholder="Votre clé d'application B2">
+                        <p class="help-text">Gardez-la secrète ! Affichée une seule fois à la création</p>
                     </div>
                     <div class="form-group">
-                        <label>Bucket Name</label>
-                        <input type="text" id="b2-bucket-name" placeholder="your-bucket-name">
-                        <p class="help-text">The name of your B2 bucket (must already exist)</p>
+                        <label>Nom du bucket</label>
+                        <input type="text" id="b2-bucket-name" placeholder="nom-de-votre-bucket">
+                        <p class="help-text">Le nom de votre bucket B2 (doit déjà exister)</p>
                     </div>
                     <div class="btn-group">
-                        <button type="submit" class="btn btn-save">Test & Save B2 Credentials</button>
-                        <button type="button" class="btn btn-danger" id="delete-b2-btn" style="display: none;">Remove B2 Config</button>
+                        <button type="submit" class="btn btn-save">Tester et enregistrer B2</button>
+                        <button type="button" class="btn btn-danger" id="delete-b2-btn" style="display: none;">Supprimer config B2</button>
                     </div>
                 </form>
             </div>
@@ -280,23 +412,23 @@
             <div class="profile-section">
                 <h3>
                     <span class="section-icon">🔐</span>
-                    Change Password
+                    Changer le mot de passe
                 </h3>
                 <form id="password-form">
                     <div class="form-group">
-                        <label>Current Password</label>
-                        <input type="password" id="old-password" placeholder="Your current password">
+                        <label>Mot de passe actuel</label>
+                        <input type="password" id="old-password" placeholder="Votre mot de passe actuel">
                     </div>
                     <div class="form-group">
-                        <label>New Password</label>
-                        <input type="password" id="new-password" placeholder="New password">
+                        <label>Nouveau mot de passe</label>
+                        <input type="password" id="new-password" placeholder="Nouveau mot de passe">
                     </div>
                     <div class="form-group">
-                        <label>Confirm New Password</label>
-                        <input type="password" id="confirm-password" placeholder="Confirm new password">
+                        <label>Confirmer le nouveau mot de passe</label>
+                        <input type="password" id="confirm-password" placeholder="Confirmer le mot de passe">
                     </div>
                     <div class="btn-group">
-                        <button type="submit" class="btn btn-save">Change Password</button>
+                        <button type="submit" class="btn btn-save">Changer le mot de passe</button>
                     </div>
                 </form>
             </div>
@@ -339,20 +471,91 @@
                     document.getElementById('display-name').value = user.display_name || '';
                     document.getElementById('email').value = user.email || '';
 
+                    // Update avatar
+                    const avatarPreview = document.getElementById('avatar-preview');
+                    const avatarLetter = document.getElementById('avatar-letter');
+                    const removeBtn = document.getElementById('remove-avatar-btn');
+
+                    if (user.avatar) {
+                        avatarPreview.style.backgroundImage = `url('/avatars/${user.avatar}')`;
+                        avatarPreview.style.backgroundSize = 'cover';
+                        avatarPreview.style.backgroundPosition = 'center';
+                        avatarLetter.style.display = 'none';
+                        removeBtn.style.display = 'inline-block';
+                    } else {
+                        const firstLetter = user.username.charAt(0).toUpperCase();
+                        avatarLetter.textContent = firstLetter;
+                        avatarLetter.style.display = 'flex';
+                        removeBtn.style.display = 'none';
+                    }
+
                     // Update B2 status
                     if (user.has_b2_configured) {
                         document.getElementById('b2-status').className = 'status-badge configured';
-                        document.getElementById('b2-status').innerHTML = '<span>✔️</span> Configured';
-                        document.getElementById('delete-b2-btn').style.display = 'block';
+                        document.getElementById('b2-status').innerHTML = '<span>✔️</span> Configuré';
+                        document.getElementById('delete-b2-btn').style.display = 'inline-block';
                         document.getElementById('b2-bucket-name').value = user.b2_bucket_name || '';
                     }
                 } else if (response.status === 401) {
                     window.location.href = '/';
                 }
             } catch (error) {
-                showToast('Error loading profile', 'error');
+                showToast('Erreur de chargement du profil', 'error');
             }
         }
+
+        // Avatar upload
+        document.getElementById('avatar-input').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            if (file.size > 2 * 1024 * 1024) {
+                showToast('Image trop grande (max 2 MB)', 'error');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('avatar', file);
+
+            try {
+                showToast('Upload en cours...', 'info');
+                const response = await fetch(`${API_URL}/api/auth/me/avatar`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` },
+                    body: formData
+                });
+
+                if (response.ok) {
+                    showToast('Avatar mis à jour !', 'success');
+                    setTimeout(() => loadProfile(), 500);
+                } else {
+                    showToast('Échec de l\'upload', 'error');
+                }
+            } catch (error) {
+                showToast('Erreur d\'upload', 'error');
+            }
+        });
+
+        // Remove avatar
+        document.getElementById('remove-avatar-btn').addEventListener('click', async () => {
+            if (!confirm('Supprimer votre photo de profil ?')) return;
+
+            try {
+                const response = await fetch(`${API_URL}/api/auth/me/avatar`, {
+                    method: 'DELETE',
+                    headers
+                });
+
+                if (response.ok) {
+                    showToast('Avatar supprimé', 'success');
+                    loadProfile();
+                } else {
+                    showToast('Échec de la suppression', 'error');
+                }
+            } catch (error) {
+                showToast('Erreur', 'error');
+            }
+        });
 
         // Update profile
         document.getElementById('profile-form').addEventListener('submit', async (e) => {
@@ -368,12 +571,12 @@
                 });
 
                 if (response.ok) {
-                    showToast('Profile updated successfully!', 'success');
+                    showToast('Profil mis à jour !', 'success');
                 } else {
-                    showToast('Failed to update profile', 'error');
+                    showToast('Échec de la mise à jour', 'error');
                 }
             } catch (error) {
-                showToast('Error updating profile', 'error');
+                showToast('Erreur de mise à jour', 'error');
             }
         });
 
@@ -385,12 +588,12 @@
             const bucketName = document.getElementById('b2-bucket-name').value.trim();
 
             if (!keyId || !appKey || !bucketName) {
-                showToast('All B2 fields are required', 'error');
+                showToast('Tous les champs B2 sont requis', 'error');
                 return;
             }
 
             try {
-                showToast('Testing B2 credentials...', 'info');
+                showToast('Test des identifiants B2...', 'info');
                 const response = await fetch(`${API_URL}/api/auth/me/b2-credentials`, {
                     method: 'POST',
                     headers,
@@ -404,19 +607,19 @@
                 const data = await response.json();
 
                 if (response.ok) {
-                    showToast('B2 credentials configured successfully!', 'success');
+                    showToast('B2 configuré avec succès !', 'success');
                     setTimeout(() => loadProfile(), 1000);
                 } else {
-                    showToast(data.detail || 'Failed to configure B2', 'error');
+                    showToast(data.detail || 'Échec de la configuration B2', 'error');
                 }
             } catch (error) {
-                showToast('Error configuring B2: ' + error.message, 'error');
+                showToast('Erreur de configuration B2', 'error');
             }
         });
 
         // Delete B2 credentials
         document.getElementById('delete-b2-btn').addEventListener('click', async () => {
-            if (!confirm('Are you sure you want to remove your B2 configuration? You will not be able to download or watch videos until you reconfigure it.')) {
+            if (!confirm('Supprimer la configuration B2 ? Vous ne pourrez plus télécharger ni regarder de vidéos.')) {
                 return;
             }
 
@@ -427,16 +630,16 @@
                 });
 
                 if (response.ok) {
-                    showToast('B2 credentials removed', 'success');
+                    showToast('Config B2 supprimée', 'success');
                     document.getElementById('b2-key-id').value = '';
                     document.getElementById('b2-app-key').value = '';
                     document.getElementById('b2-bucket-name').value = '';
                     setTimeout(() => loadProfile(), 1000);
                 } else {
-                    showToast('Failed to remove B2 credentials', 'error');
+                    showToast('Échec de la suppression', 'error');
                 }
             } catch (error) {
-                showToast('Error removing B2 credentials', 'error');
+                showToast('Erreur', 'error');
             }
         });
 
@@ -448,12 +651,12 @@
             const confirmPassword = document.getElementById('confirm-password').value;
 
             if (newPassword !== confirmPassword) {
-                showToast('Passwords do not match', 'error');
+                showToast('Les mots de passe ne correspondent pas', 'error');
                 return;
             }
 
             if (newPassword.length < 6) {
-                showToast('Password must be at least 6 characters', 'error');
+                showToast('Le mot de passe doit contenir au moins 6 caractères', 'error');
                 return;
             }
 
@@ -468,14 +671,14 @@
                 });
 
                 if (response.ok) {
-                    showToast('Password changed successfully!', 'success');
+                    showToast('Mot de passe changé !', 'success');
                     document.getElementById('password-form').reset();
                 } else {
                     const data = await response.json();
-                    showToast(data.detail || 'Failed to change password', 'error');
+                    showToast(data.detail || 'Échec du changement', 'error');
                 }
             } catch (error) {
-                showToast('Error changing password', 'error');
+                showToast('Erreur', 'error');
             }
         });
 
