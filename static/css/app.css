@@ -285,6 +285,8 @@ body::before {
     align-items: center;
     margin-bottom: 40px;
     animation: slideInUp 0.6s ease;
+    flex-wrap: wrap;
+    gap: 20px;
 }
 
 .view-header h2 { 
@@ -312,6 +314,7 @@ body::before {
     display: flex;
     gap: 20px;
     font-size: 14px;
+    flex-wrap: wrap;
 }
 
 .library-stats span {
@@ -388,6 +391,7 @@ body::before {
     display: flex;
     gap: 15px;
     align-items: center;
+    flex-wrap: wrap;
 }
 
 .filter-group select {
@@ -604,6 +608,7 @@ body::before {
     gap: 15px; 
     font-size: 12px; 
     color: #888;
+    flex-wrap: wrap;
 }
 
 .video-actions { 
@@ -740,6 +745,7 @@ body::before {
     gap: 12px;
     font-size: 13px;
     color: #aaa;
+    flex-wrap: wrap;
 }
 
 .list-channel { 
@@ -759,6 +765,7 @@ body::before {
 .list-actions { 
     display: flex; 
     gap: 12px;
+    flex-wrap: wrap;
 }
 
 .btn-play-small, .btn-delete-small {
@@ -814,10 +821,12 @@ body::before {
     gap: 15px; 
     margin-bottom: 30px;
     animation: slideInUp 0.6s ease;
+    flex-wrap: wrap;
 }
 
 .download-form input {
     flex: 1;
+    min-width: 250px;
     padding: 18px 24px;
     background: rgba(255, 255, 255, 0.05);
     backdrop-filter: blur(10px);
@@ -1088,6 +1097,7 @@ body::before {
     justify-content: center;
     z-index: 1000;
     animation: slideInUp 0.3s ease;
+    padding: 20px;
 }
 
 .modal-content {
@@ -1096,11 +1106,13 @@ body::before {
     border-radius: 20px;
     padding: 40px;
     max-width: 600px;
-    width: 90%;
+    width: 100%;
     position: relative;
     border: 2px solid rgba(102, 126, 234, 0.3);
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
     animation: pulse 0.5s ease;
+    max-height: 90vh;
+    overflow-y: auto;
 }
 
 .modal-close {
@@ -1220,12 +1232,6 @@ body::before {
     display: grid;
     grid-template-columns: 1fr 400px;
     gap: 30px;
-}
-
-@media (max-width: 1200px) {
-    .player-container {
-        grid-template-columns: 1fr;
-    }
 }
 
 .player-main {
@@ -1510,4 +1516,385 @@ body::before {
 .player-sidebar::-webkit-scrollbar-thumb:hover,
 ::-webkit-scrollbar-thumb:hover {
     background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+}
+
+/* ===================================================== */
+/* RESPONSIVE DESIGN - MOBILE FIRST */
+/* ===================================================== */
+
+/* MOBILE - Téléphones (< 768px) */
+@media (max-width: 767px) {
+    /* Navbar mobile */
+    .navbar {
+        padding: 15px 20px;
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    .nav-brand h1 {
+        font-size: 22px;
+    }
+    
+    .nav-menu {
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 8px;
+    }
+    
+    .nav-link {
+        padding: 10px 16px;
+        font-size: 13px;
+    }
+    
+    .nav-user {
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    
+    /* Container mobile */
+    .container {
+        margin: 20px auto;
+        padding: 0 15px;
+    }
+    
+    /* View header mobile */
+    .view-header {
+        flex-direction: column;
+        align-items: flex-start;
+        margin-bottom: 25px;
+    }
+    
+    .view-header h2 {
+        font-size: 28px;
+    }
+    
+    .library-stats {
+        width: 100%;
+        justify-content: space-between;
+        gap: 10px;
+    }
+    
+    .library-stats span {
+        padding: 10px 15px;
+        font-size: 12px;
+        flex: 1;
+        text-align: center;
+    }
+    
+    /* Library controls mobile */
+    .library-controls {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 15px;
+    }
+    
+    .search-bar {
+        width: 100%;
+        min-width: auto;
+    }
+    
+    .filter-group {
+        width: 100%;
+        justify-content: space-between;
+    }
+    
+    .filter-group select {
+        flex: 1;
+        padding: 12px 15px;
+        font-size: 13px;
+    }
+    
+    .view-toggle {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    /* Video grid mobile - 1 colonne */
+    .video-grid {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+    
+    /* Video card mobile */
+    .video-card:hover {
+        transform: translateY(-5px) scale(1.01);
+    }
+    
+    /* List view mobile */
+    .video-list-item {
+        flex-direction: column;
+        gap: 15px;
+        padding: 15px;
+    }
+    
+    .list-thumbnail {
+        width: 100%;
+        height: 200px;
+    }
+    
+    .list-actions {
+        width: 100%;
+        justify-content: space-between;
+    }
+    
+    .btn-play-small, .btn-delete-small {
+        flex: 1;
+        padding: 12px 15px;
+        font-size: 13px;
+    }
+    
+    /* Download form mobile */
+    .download-form {
+        flex-direction: column;
+        gap: 12px;
+    }
+    
+    .download-form input,
+    .download-form select {
+        width: 100%;
+        min-width: auto;
+    }
+    
+    .btn-primary {
+        width: 100%;
+        padding: 16px 30px;
+        font-size: 15px;
+    }
+    
+    /* Channels mobile */
+    .channels-container {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+    
+    .channel-card {
+        flex-direction: column;
+        text-align: center;
+        padding: 20px;
+    }
+    
+    .channel-thumb,
+    .channel-thumb-placeholder {
+        width: 80px;
+        height: 80px;
+    }
+    
+    .channel-actions {
+        width: 100%;
+    }
+    
+    .btn-stats, .btn-check, .btn-delete-channel {
+        width: 100%;
+    }
+    
+    /* Toast mobile */
+    .toast {
+        right: 10px;
+        left: 10px;
+        top: 80px;
+        min-width: auto;
+        max-width: calc(100% - 20px);
+        font-size: 14px;
+        padding: 15px 20px;
+    }
+    
+    /* Modal mobile */
+    .modal {
+        padding: 10px;
+    }
+    
+    .modal-content {
+        padding: 30px 20px;
+        width: 100%;
+    }
+    
+    .modal-content h2 {
+        font-size: 22px;
+    }
+    
+    .modal-close {
+        width: 40px;
+        height: 40px;
+        font-size: 28px;
+        top: 15px;
+        right: 15px;
+    }
+    
+    /* Player mobile */
+    .player-container {
+        grid-template-columns: 1fr;
+        padding: 15px;
+        gap: 20px;
+    }
+    
+    .player-close-btn {
+        width: 45px;
+        height: 45px;
+        font-size: 30px;
+        top: 15px;
+        right: 15px;
+    }
+    
+    .player-video-title {
+        font-size: 20px;
+    }
+    
+    .player-video-meta {
+        font-size: 13px;
+    }
+    
+    .player-info {
+        padding: 20px;
+    }
+    
+    .player-controls {
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    .speed-controls,
+    .action-controls {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .speed-btn, .control-btn {
+        padding: 10px 15px;
+        font-size: 12px;
+    }
+    
+    .player-shortcuts {
+        flex-direction: column;
+        text-align: center;
+        padding: 15px;
+    }
+    
+    .player-shortcuts strong {
+        width: 100%;
+        margin-bottom: 10px;
+    }
+    
+    .player-sidebar {
+        position: static;
+        max-height: none;
+    }
+    
+    .sidebar-thumbnail {
+        width: 120px;
+        height: 68px;
+    }
+    
+    .sidebar-video-title {
+        font-size: 13px;
+    }
+}
+
+/* TABLETTE - Tablettes (768px - 1024px) */
+@media (min-width: 768px) and (max-width: 1024px) {
+    /* Navbar tablette */
+    .navbar {
+        padding: 18px 30px;
+    }
+    
+    .nav-brand h1 {
+        font-size: 24px;
+    }
+    
+    .nav-link {
+        padding: 10px 18px;
+        font-size: 14px;
+    }
+    
+    /* Container tablette */
+    .container {
+        padding: 0 30px;
+        margin: 30px auto;
+    }
+    
+    /* View header tablette */
+    .view-header h2 {
+        font-size: 36px;
+    }
+    
+    /* Video grid tablette - 2 colonnes */
+    .video-grid {
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 25px;
+    }
+    
+    /* Channels tablette */
+    .channels-container {
+        grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+        gap: 20px;
+    }
+    
+    /* Player tablette */
+    .player-container {
+        grid-template-columns: 1fr 350px;
+        padding: 25px;
+    }
+    
+    .sidebar-thumbnail {
+        width: 140px;
+        height: 79px;
+    }
+}
+
+/* DESKTOP - Grands écrans (> 1400px) */
+@media (min-width: 1400px) {
+    .video-grid {
+        grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    }
+    
+    .channels-container {
+        grid-template-columns: repeat(auto-fill, minmax(500px, 1fr));
+    }
+}
+
+/* Orientation paysage mobile */
+@media (max-width: 767px) and (orientation: landscape) {
+    .navbar {
+        flex-direction: row;
+        padding: 10px 20px;
+    }
+    
+    .nav-menu {
+        flex-direction: row;
+    }
+    
+    .view-header {
+        flex-direction: row;
+        align-items: center;
+    }
+    
+    .library-stats {
+        width: auto;
+    }
+}
+
+/* Touch devices - Améliorer l'expérience tactile */
+@media (hover: none) and (pointer: coarse) {
+    /* Augmenter la taille des zones cliquables */
+    .nav-link,
+    .btn-play,
+    .btn-delete,
+    .btn-play-small,
+    .btn-delete-small,
+    .speed-btn,
+    .control-btn {
+        min-height: 44px;
+        min-width: 44px;
+    }
+    
+    /* Désactiver les effets hover sur mobile */
+    .video-card:hover,
+    .channel-card:hover,
+    .sidebar-video:hover {
+        transform: none;
+    }
+    
+    /* Activer les effets au tap */
+    .video-card:active {
+        transform: scale(0.98);
+    }
 }
