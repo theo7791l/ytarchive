@@ -1,0 +1,408 @@
+/* VIDEO PLAYER MODAL - Style YouTube */
+.video-player-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.98);
+    backdrop-filter: blur(10px);
+    z-index: 10000;
+    overflow-y: auto;
+    animation: slideInUp 0.3s ease;
+}
+
+.player-close-btn {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    width: 50px;
+    height: 50px;
+    background: rgba(255, 68, 68, 0.95);
+    border: 2px solid #ff4444;
+    border-radius: 50%;
+    color: white;
+    font-size: 32px;
+    font-weight: 700;
+    cursor: pointer;
+    z-index: 10001;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    box-shadow: 0 5px 20px rgba(255, 68, 68, 0.5);
+}
+
+.player-close-btn:hover {
+    transform: rotate(90deg) scale(1.15);
+    background: #ff4444;
+    box-shadow: 0 8px 30px rgba(255, 68, 68, 0.7);
+}
+
+/* Player Container */
+.player-container {
+    display: flex;
+    gap: 30px;
+    max-width: 1800px;
+    margin: 80px auto 40px;
+    padding: 0 40px;
+}
+
+/* Player Main */
+.player-main {
+    flex: 1;
+    min-width: 0;
+}
+
+.player-video-wrapper {
+    position: relative;
+    width: 100%;
+    background: #000;
+    border-radius: 15px;
+    overflow: hidden;
+    box-shadow: 0 10px 50px rgba(0, 0, 0, 0.8);
+    margin-bottom: 20px;
+}
+
+.player-video-wrapper video {
+    width: 100%;
+    height: auto;
+    display: block;
+    max-height: 75vh;
+}
+
+/* Player Info */
+.player-info {
+    background: rgba(26, 26, 46, 0.95);
+    backdrop-filter: blur(20px);
+    padding: 25px;
+    border-radius: 15px;
+    border: 2px solid rgba(102, 126, 234, 0.3);
+    box-shadow: 0 5px 25px rgba(0, 0, 0, 0.5);
+}
+
+.player-video-title {
+    font-size: 24px;
+    font-weight: 700;
+    color: white;
+    margin-bottom: 15px;
+    line-height: 1.4;
+}
+
+.player-video-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+    font-size: 14px;
+    color: rgba(170, 170, 170, 0.9);
+    margin-bottom: 20px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.player-channel {
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.b2-streaming-badge {
+    background: rgba(102, 234, 171, 0.95);
+    color: #0f0f1e;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    margin-left: 10px;
+}
+
+/* Player Controls */
+.player-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    margin-bottom: 20px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.speed-controls,
+.action-controls {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.control-label {
+    font-weight: 600;
+    color: #aaa;
+    margin-right: 5px;
+}
+
+.speed-btn,
+.control-btn {
+    padding: 10px 18px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 2px solid rgba(102, 126, 234, 0.3);
+    border-radius: 10px;
+    color: white;
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.speed-btn:hover,
+.control-btn:hover {
+    background: rgba(102, 126, 234, 0.15);
+    border-color: #667eea;
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+}
+
+.speed-btn.active {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-color: #667eea;
+    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+}
+
+/* Player Shortcuts */
+.player-shortcuts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 15px;
+    background: rgba(102, 126, 234, 0.1);
+    border-radius: 10px;
+    font-size: 13px;
+    margin-bottom: 20px;
+}
+
+.player-shortcuts strong {
+    width: 100%;
+    color: #667eea;
+    margin-bottom: 5px;
+}
+
+.player-shortcuts span {
+    padding: 5px 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 6px;
+    color: rgba(255, 255, 255, 0.8);
+    font-weight: 500;
+}
+
+/* Player Description */
+.player-description {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.player-description strong {
+    display: block;
+    margin-bottom: 10px;
+    color: #667eea;
+    font-size: 16px;
+}
+
+.player-description p {
+    color: rgba(255, 255, 255, 0.8);
+    line-height: 1.6;
+    white-space: pre-wrap;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+/* Player Sidebar */
+.player-sidebar {
+    width: 400px;
+    flex-shrink: 0;
+}
+
+.sidebar-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: white;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid rgba(102, 126, 234, 0.3);
+}
+
+.sidebar-videos {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    max-height: 80vh;
+    overflow-y: auto;
+    padding-right: 10px;
+}
+
+/* Scrollbar Styling */
+.sidebar-videos::-webkit-scrollbar {
+    width: 8px;
+}
+
+.sidebar-videos::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 10px;
+}
+
+.sidebar-videos::-webkit-scrollbar-thumb {
+    background: rgba(102, 126, 234, 0.5);
+    border-radius: 10px;
+}
+
+.sidebar-videos::-webkit-scrollbar-thumb:hover {
+    background: rgba(102, 126, 234, 0.7);
+}
+
+/* Sidebar Video Item */
+.sidebar-video {
+    display: flex;
+    gap: 12px;
+    background: rgba(26, 26, 46, 0.8);
+    backdrop-filter: blur(10px);
+    padding: 10px;
+    border-radius: 10px;
+    border: 2px solid rgba(102, 126, 234, 0.2);
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar-video:hover {
+    background: rgba(26, 26, 46, 0.95);
+    border-color: rgba(102, 126, 234, 0.5);
+    transform: translateX(5px);
+    box-shadow: 0 5px 20px rgba(102, 126, 234, 0.3);
+}
+
+.sidebar-thumbnail {
+    position: relative;
+    width: 120px;
+    height: 68px;
+    flex-shrink: 0;
+    border-radius: 8px;
+    overflow: hidden;
+    background: rgba(0, 0, 0, 0.5);
+}
+
+.sidebar-thumbnail img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.3s ease;
+}
+
+.sidebar-video:hover .sidebar-thumbnail img {
+    transform: scale(1.1);
+}
+
+.sidebar-no-thumb {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.3), rgba(118, 75, 162, 0.3));
+    font-size: 16px;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.sidebar-duration {
+    position: absolute;
+    bottom: 4px;
+    right: 4px;
+    background: rgba(0, 0, 0, 0.92);
+    padding: 2px 5px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    color: white;
+}
+
+.sidebar-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 0;
+}
+
+.sidebar-video-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.95);
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    line-height: 1.3;
+}
+
+.sidebar-video:hover .sidebar-video-title {
+    color: #667eea;
+}
+
+.sidebar-channel,
+.sidebar-views {
+    font-size: 11px;
+    color: rgba(170, 170, 170, 0.8);
+    margin: 0;
+}
+
+/* Responsive Player */
+@media (max-width: 1200px) {
+    .player-container {
+        flex-direction: column;
+    }
+    
+    .player-sidebar {
+        width: 100%;
+    }
+    
+    .sidebar-videos {
+        flex-direction: row;
+        overflow-x: auto;
+        overflow-y: hidden;
+        max-height: none;
+        padding-bottom: 10px;
+    }
+    
+    .sidebar-video {
+        min-width: 300px;
+    }
+}
+
+@media (max-width: 767px) {
+    .player-container {
+        padding: 0 15px;
+        margin-top: 60px;
+    }
+    
+    .player-close-btn {
+        width: 40px;
+        height: 40px;
+        font-size: 24px;
+        top: 15px;
+        right: 15px;
+    }
+    
+    .player-video-title {
+        font-size: 18px;
+    }
+    
+    .speed-controls,
+    .action-controls {
+        justify-content: center;
+    }
+    
+    .sidebar-video {
+        min-width: 250px;
+    }
+}
