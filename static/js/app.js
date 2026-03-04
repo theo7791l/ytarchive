@@ -13,10 +13,8 @@ function showToast(message, type = 'success') {
     
     document.body.appendChild(toast);
     
-    // Trigger animation
     setTimeout(() => toast.classList.add('show'), 10);
     
-    // Remove after 3 seconds
     setTimeout(() => {
         toast.classList.remove('show');
         setTimeout(() => toast.remove(), 300);
@@ -43,12 +41,11 @@ navLinks.forEach(link => {
     });
 });
 
-// Handle hash navigation (for /app#channels, /app#download)
+// Handle hash navigation
 function handleHashNavigation() {
-    const hash = window.location.hash.substring(1); // Remove #
+    const hash = window.location.hash.substring(1);
     
-    if (hash && (hash === 'channels' || hash === 'download' || hash === 'library')) {
-        // Activate the correct nav link
+    if (hash && (hash === 'channels' || hash === 'download')) {
         navLinks.forEach(l => {
             if (l.dataset.view === hash) {
                 l.classList.add('active');
@@ -57,20 +54,30 @@ function handleHashNavigation() {
             }
         });
         
-        // Show the correct view
         views.forEach(v => v.classList.remove('active'));
         const targetView = document.getElementById(`${hash}-view`);
         if (targetView) {
             targetView.classList.add('active');
-            
-            // Load data if needed
-            if (hash === 'library') loadLibrary();
             if (hash === 'channels') loadChannels();
+        }
+    } else {
+        // Default: show library
+        navLinks.forEach(l => {
+            if (l.dataset.view === 'library') {
+                l.classList.add('active');
+            } else {
+                l.classList.remove('active');
+            }
+        });
+        
+        views.forEach(v => v.classList.remove('active'));
+        const libraryView = document.getElementById('library-view');
+        if (libraryView) {
+            libraryView.classList.add('active');
         }
     }
 }
 
-// Listen for hash changes
 window.addEventListener('hashchange', handleHashNavigation);
 
 // API helper
@@ -140,13 +147,16 @@ let currentSearch = '';
 
 // Load Library
 async function loadLibrary() {
-    const library = await apiCall('/api/library');
-    libraryCache = library;
-    localStorage.setItem('library_cache', JSON.stringify(library));
-    
-    updateStats();
-    updateChannelFilter();
-    renderLibrary();
+    try {
+        const library = await apiCall('/api/library');
+        libraryCache = library;
+        
+        updateStats();
+        updateChannelFilter();
+        renderLibrary();
+    } catch (error) {
+        showToast('Failed to load library: ' + error.message, 'error');
+    }
 }
 
 // Update Stats
@@ -342,7 +352,6 @@ async function playVideo(videoId) {
     
     showToast('Loading video...', 'info');
     
-    // Get streaming URL from B2 if video is stored on B2
     let videoUrl = `/videos/${video.video_file}`;
     let thumbnailUrl = video.thumbnail_file ? `/videos/${video.thumbnail_file}` : null;
     
@@ -449,7 +458,6 @@ async function playVideo(videoId) {
     
     const player = document.getElementById('main-player');
     
-    // Speed buttons
     document.querySelectorAll('.speed-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             const speed = parseFloat(btn.dataset.speed);
@@ -459,7 +467,6 @@ async function playVideo(videoId) {
         });
     });
     
-    // Keyboard controls
     keyboardHandler = (e) => {
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
         
@@ -536,7 +543,6 @@ function toggleFullscreen() {
     }
 }
 
-// Delete Video
 async function deleteVideo(videoId) {
     if (!confirm('Delete this video? This will also remove it from B2 storage.')) return;
     
@@ -574,7 +580,6 @@ document.getElementById('download-btn').addEventListener('click', async () => {
     downloadWs = new WebSocket(wsUrl);
     
     downloadWs.onopen = () => {
-        // Send token with download request
         downloadWs.send(JSON.stringify({ url, quality, token }));
     };
     
@@ -602,6 +607,7 @@ document.getElementById('download-btn').addEventListener('click', async () => {
                 progressDiv.style.display = 'none';
                 downloadBtn.disabled = false;
                 document.getElementById('video-url').value = '';
+                progressFill.style.width = '0%';
                 loadLibrary();
             }, 2000);
         } else if (data.status === 'error') {
@@ -612,6 +618,7 @@ document.getElementById('download-btn').addEventListener('click', async () => {
                 progressDiv.style.display = 'none';
                 downloadBtn.disabled = false;
                 progressText.style.color = '';
+                progressFill.style.width = '0%';
             }, 3000);
         }
     };
@@ -625,6 +632,7 @@ document.getElementById('download-btn').addEventListener('click', async () => {
             progressDiv.style.display = 'none';
             downloadBtn.disabled = false;
             progressText.style.color = '';
+            progressFill.style.width = '0%';
         }, 3000);
     };
 });
@@ -746,7 +754,5 @@ function closeStatsModal() {
 }
 
 // Initial load
-loadLibrary();
-
-// Handle hash navigation on page load
 handleHashNavigation();
+loadLibrary();
