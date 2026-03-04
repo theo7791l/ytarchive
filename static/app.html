@@ -15,38 +15,42 @@
         .user-profile-btn {
             display: flex;
             align-items: center;
-            gap: 10px;
-            background: rgba(255, 255, 255, 0.1);
-            border: 2px solid rgba(255, 255, 255, 0.2);
-            padding: 8px 15px;
-            border-radius: 25px;
+            gap: 12px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid rgba(255, 255, 255, 0.15);
+            padding: 10px 18px;
+            border-radius: 30px;
             cursor: pointer;
             transition: all 0.3s ease;
+            color: white;
         }
 
         .user-profile-btn:hover {
-            background: rgba(255, 255, 255, 0.15);
-            border-color: rgba(255, 255, 255, 0.3);
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.25);
+            transform: translateY(-2px);
         }
 
         .user-avatar-small {
-            width: 32px;
-            height: 32px;
+            width: 36px;
+            height: 36px;
             border-radius: 50%;
             object-fit: cover;
             border: 2px solid #667eea;
         }
 
         .user-avatar-placeholder-small {
-            width: 32px;
-            height: 32px;
+            width: 36px;
+            height: 36px;
             border-radius: 50%;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 16px;
+            font-size: 14px;
+            font-weight: 600;
             border: 2px solid #667eea;
+            color: white;
         }
 
         .dropdown-menu {
@@ -55,10 +59,10 @@
             top: 110%;
             right: 0;
             background: #1a1a2e;
-            border: 2px solid rgba(255, 255, 255, 0.1);
-            border-radius: 10px;
-            min-width: 200px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            border: 2px solid rgba(255, 255, 255, 0.15);
+            border-radius: 12px;
+            min-width: 220px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
             z-index: 1000;
             overflow: hidden;
         }
@@ -82,12 +86,13 @@
         .dropdown-item {
             display: flex;
             align-items: center;
-            gap: 10px;
-            padding: 12px 20px;
+            gap: 12px;
+            padding: 14px 20px;
             color: white;
             text-decoration: none;
             transition: all 0.2s ease;
             border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            font-weight: 500;
         }
 
         .dropdown-item:last-child {
@@ -95,65 +100,78 @@
         }
 
         .dropdown-item:hover {
-            background: rgba(102, 126, 234, 0.2);
+            background: rgba(102, 126, 234, 0.15);
         }
 
         .dropdown-item.danger:hover {
-            background: rgba(255, 68, 68, 0.2);
+            background: rgba(255, 68, 68, 0.15);
             color: #ff4444;
+        }
+
+        .dropdown-icon {
+            width: 18px;
+            height: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .role-badge-small {
-            padding: 2px 8px;
-            border-radius: 4px;
+            padding: 3px 10px;
+            border-radius: 6px;
             font-size: 10px;
-            font-weight: 600;
+            font-weight: 700;
             text-transform: uppercase;
-            background: rgba(102, 126, 234, 0.3);
+            letter-spacing: 0.5px;
+            background: rgba(102, 126, 234, 0.2);
             color: #667eea;
+            border: 1px solid rgba(102, 126, 234, 0.3);
         }
 
         .role-badge-small.admin {
-            background: rgba(255, 68, 68, 0.3);
+            background: rgba(255, 68, 68, 0.2);
             color: #ff4444;
+            border: 1px solid rgba(255, 68, 68, 0.3);
         }
     </style>
 </head>
 <body>
     <nav class="navbar">
         <div class="nav-brand">
-            <h1>🎬 YTArchive</h1>
+            <h1>YTArchive</h1>
         </div>
         <div class="nav-menu">
-            <a href="#" class="nav-link active" data-view="library">📚 Library</a>
-            <a href="#" class="nav-link" data-view="channels">📺 Channels</a>
-            <a href="#" class="nav-link" data-view="download">⬇️ Download</a>
+            <a href="#" class="nav-link active" data-view="library">Library</a>
+            <a href="#" class="nav-link" data-view="channels">Channels</a>
+            <a href="#" class="nav-link" data-view="download">Download</a>
         </div>
         <div class="nav-user">
             <div class="user-profile-dropdown" id="user-dropdown">
                 <button class="user-profile-btn" onclick="toggleDropdown()">
                     <div id="user-avatar-container">
-                        <div class="user-avatar-placeholder-small">👤</div>
+                        <div class="user-avatar-placeholder-small">U</div>
                     </div>
-                    <div style="display: flex; flex-direction: column; align-items: flex-start;">
-                        <span id="username" style="font-weight: 600;"></span>
-                        <span id="user-role" class="role-badge-small">membre</span>
+                    <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 4px;">
+                        <span id="username" style="font-weight: 600; font-size: 14px;"></span>
+                        <span id="user-role" class="role-badge-small">member</span>
                     </div>
-                    <span style="font-size: 12px;">▼</span>
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" style="opacity: 0.6;">
+                        <path d="M6 9L1 4h10z"/>
+                    </svg>
                 </button>
                 <div class="dropdown-menu" id="dropdown-menu">
                     <a href="/profile" class="dropdown-item">
-                        <span>👤</span>
-                        <span>Mon Profil</span>
+                        <span class="dropdown-icon">&#x1F464;</span>
+                        <span>My Profile</span>
                     </a>
                     <a href="/admin" class="dropdown-item" id="admin-link" style="display: none;">
-                        <span>⚙️</span>
+                        <span class="dropdown-icon">&#x2699;</span>
                         <span>Administration</span>
                     </a>
                     <hr style="margin: 0; border: none; border-top: 1px solid rgba(255, 255, 255, 0.1);">
                     <a href="#" class="dropdown-item danger" onclick="logout(); return false;">
-                        <span>🚪</span>
-                        <span>Déconnexion</span>
+                        <span class="dropdown-icon">&#x1F6AA;</span>
+                        <span>Logout</span>
                     </a>
                 </div>
             </div>
@@ -174,7 +192,7 @@
             
             <div class="library-controls">
                 <div class="search-bar">
-                    <input type="text" id="search" placeholder="🔍 Search videos...">
+                    <input type="text" id="search" placeholder="Search videos...">
                 </div>
                 
                 <div class="filter-group">
@@ -194,8 +212,8 @@
                     </select>
                     
                     <div class="view-toggle">
-                        <button id="grid-view" class="view-btn active" title="Grid View">⊞</button>
-                        <button id="list-view" class="view-btn" title="List View">☰</button>
+                        <button id="grid-view" class="view-btn active" title="Grid View">Grid</button>
+                        <button id="list-view" class="view-btn" title="List View">List</button>
                     </div>
                 </div>
             </div>
@@ -209,7 +227,7 @@
         <section id="channels-view" class="view">
             <div class="view-header">
                 <h2>Followed Channels</h2>
-                <button id="add-channel-btn" class="btn-primary">+ Add Channel</button>
+                <button id="add-channel-btn" class="btn-primary">Add Channel</button>
             </div>
             <div id="channels-list" class="channels-container">
                 <p class="empty-state">No channels followed yet.</p>
@@ -327,6 +345,10 @@
                     const avatarContainer = document.getElementById('user-avatar-container');
                     if (user.avatar) {
                         avatarContainer.innerHTML = `<img src="/avatars/${user.avatar}" class="user-avatar-small" alt="Avatar">`;
+                    } else {
+                        // Use first letter of username
+                        const initial = (user.display_name || user.username).charAt(0).toUpperCase();
+                        avatarContainer.innerHTML = `<div class="user-avatar-placeholder-small">${initial}</div>`;
                     }
                 } else if (response.status === 401) {
                     window.location.href = '/';
