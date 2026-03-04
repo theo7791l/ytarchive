@@ -3,364 +3,235 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>YTArchive - Library</title>
+    <title>YTArchive - Your Library</title>
     <link rel="stylesheet" href="/static/css/app.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        .user-profile-dropdown {
-            position: relative;
-            display: inline-block;
-        }
-
-        .user-profile-btn {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            background: rgba(255, 255, 255, 0.05);
-            border: 2px solid rgba(255, 255, 255, 0.15);
-            padding: 10px 18px;
-            border-radius: 30px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            color: white;
-        }
-
-        .user-profile-btn:hover {
-            background: rgba(255, 255, 255, 0.1);
-            border-color: rgba(255, 255, 255, 0.25);
-            transform: translateY(-2px);
-        }
-
-        .user-avatar-small {
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            object-fit: cover;
-            border: 2px solid #667eea;
-        }
-
-        .user-avatar-placeholder-small {
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 14px;
-            font-weight: 600;
-            border: 2px solid #667eea;
-            color: white;
-        }
-
-        .dropdown-menu {
-            display: none;
-            position: absolute;
-            top: 110%;
-            right: 0;
-            background: #1a1a2e;
-            border: 2px solid rgba(255, 255, 255, 0.15);
-            border-radius: 12px;
-            min-width: 220px;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
-            z-index: 1000;
-            overflow: hidden;
-        }
-
-        .dropdown-menu.active {
-            display: block;
-            animation: fadeIn 0.3s ease;
-        }
-
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(-10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .dropdown-item {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 14px 20px;
-            color: white;
-            text-decoration: none;
-            transition: all 0.2s ease;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-            font-weight: 500;
-        }
-
-        .dropdown-item:last-child {
-            border-bottom: none;
-        }
-
-        .dropdown-item:hover {
-            background: rgba(102, 126, 234, 0.15);
-        }
-
-        .dropdown-item.danger:hover {
-            background: rgba(255, 68, 68, 0.15);
-            color: #ff4444;
-        }
-
-        .dropdown-icon {
-            width: 18px;
-            height: 18px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .role-badge-small {
-            padding: 3px 10px;
-            border-radius: 6px;
-            font-size: 10px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            background: rgba(102, 126, 234, 0.2);
-            color: #667eea;
-            border: 1px solid rgba(102, 126, 234, 0.3);
-        }
-
-        .role-badge-small.admin {
-            background: rgba(255, 68, 68, 0.2);
-            color: #ff4444;
-            border: 1px solid rgba(255, 68, 68, 0.3);
-        }
-    </style>
 </head>
 <body>
     <nav class="navbar">
         <div class="nav-brand">
-            <h1>YTArchive</h1>
+            <h1>🎥 YTArchive</h1>
         </div>
         <div class="nav-menu">
-            <a href="#" class="nav-link active" data-view="library">Library</a>
-            <a href="#" class="nav-link" data-view="channels">Channels</a>
-            <a href="#" class="nav-link" data-view="download">Download</a>
+            <a href="#" class="nav-link active" data-view="library">📚 Library</a>
+            <a href="#" class="nav-link" data-view="download">⬇️ Download</a>
+            <a href="#" class="nav-link" data-view="channels">📡 Channels</a>
         </div>
         <div class="nav-user">
-            <div class="user-profile-dropdown" id="user-dropdown">
-                <button class="user-profile-btn" onclick="toggleDropdown()">
-                    <div id="user-avatar-container">
-                        <div class="user-avatar-placeholder-small">U</div>
-                    </div>
-                    <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 4px;">
-                        <span id="username" style="font-weight: 600; font-size: 14px;"></span>
-                        <span id="user-role" class="role-badge-small">member</span>
-                    </div>
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" style="opacity: 0.6;">
-                        <path d="M6 9L1 4h10z"/>
-                    </svg>
-                </button>
-                <div class="dropdown-menu" id="dropdown-menu">
-                    <a href="/profile" class="dropdown-item">
-                        <span class="dropdown-icon">&#x1F464;</span>
-                        <span>My Profile</span>
-                    </a>
-                    <a href="/admin" class="dropdown-item" id="admin-link" style="display: none;">
-                        <span class="dropdown-icon">&#x2699;</span>
-                        <span>Administration</span>
-                    </a>
-                    <hr style="margin: 0; border: none; border-top: 1px solid rgba(255, 255, 255, 0.1);">
-                    <a href="#" class="dropdown-item danger" onclick="logout(); return false;">
-                        <span class="dropdown-icon">&#x1F6AA;</span>
-                        <span>Logout</span>
-                    </a>
-                </div>
-            </div>
+            <a href="/profile" class="profile-link">
+                <img src="/avatars/default.png" id="user-avatar" alt="Avatar">
+                <span id="username-display">User</span>
+            </a>
+            <button class="btn-logout" onclick="logout()">Logout</button>
         </div>
     </nav>
-    
-    <main class="container">
+
+    <!-- B2 Warning Banner -->
+    <div id="b2-warning" class="b2-warning" style="display: none;">
+        <div class="b2-warning-content">
+            <span class="b2-warning-icon">⚠️</span>
+            <div class="b2-warning-text">
+                <strong>Backblaze B2 Configuration Required</strong>
+                <p>You must configure your Backblaze B2 credentials to download videos. Click below to configure.</p>
+            </div>
+            <a href="/profile" class="btn-configure-b2">Configure B2 Now</a>
+            <button class="btn-close-warning" onclick="closeB2Warning()">✕</button>
+        </div>
+    </div>
+
+    <div class="container">
         <!-- Library View -->
-        <section id="library-view" class="view active">
+        <div id="library-view" class="view active">
             <div class="view-header">
-                <h2>Video Library</h2>
-                <div class="library-stats">
+                <h2>📚 Video Library</h2>
+                <div class="header-stats">
                     <span id="total-videos">0 videos</span>
+                    <span>•</span>
                     <span id="total-channels">0 channels</span>
+                    <span>•</span>
                     <span id="total-duration">0h 0m</span>
                 </div>
             </div>
-            
-            <div class="library-controls">
-                <div class="search-bar">
-                    <input type="text" id="search" placeholder="Search videos...">
-                </div>
+
+            <div class="controls">
+                <input type="text" id="search" placeholder="🔍 Search videos or channels...">
                 
-                <div class="filter-group">
-                    <select id="channel-filter">
-                        <option value="all">All Channels</option>
-                    </select>
-                    
-                    <select id="sort-by">
-                        <option value="date-desc">Newest First</option>
-                        <option value="date-asc">Oldest First</option>
-                        <option value="title-asc">Title A-Z</option>
-                        <option value="title-desc">Title Z-A</option>
-                        <option value="views-desc">Most Views</option>
-                        <option value="views-asc">Least Views</option>
-                        <option value="duration-desc">Longest</option>
-                        <option value="duration-asc">Shortest</option>
-                    </select>
-                    
-                    <div class="view-toggle">
-                        <button id="grid-view" class="view-btn active" title="Grid View">Grid</button>
-                        <button id="list-view" class="view-btn" title="List View">List</button>
-                    </div>
-                </div>
-            </div>
-            
-            <div id="library-grid" class="video-grid">
-                <p class="empty-state">No videos yet. Start downloading!</p>
-            </div>
-        </section>
-        
-        <!-- Channels View -->
-        <section id="channels-view" class="view">
-            <div class="view-header">
-                <h2>Followed Channels</h2>
-                <button id="add-channel-btn" class="btn-primary">Add Channel</button>
-            </div>
-            <div id="channels-list" class="channels-container">
-                <p class="empty-state">No channels followed yet.</p>
-            </div>
-        </section>
-        
-        <!-- Download View -->
-        <section id="download-view" class="view">
-            <div class="view-header">
-                <h2>Download Video</h2>
-            </div>
-            <div class="download-form">
-                <input type="text" id="video-url" placeholder="Paste YouTube URL here...">
-                <select id="quality">
-                    <option value="best">Best Quality</option>
-                    <option value="1080p">1080p</option>
-                    <option value="720p">720p</option>
-                    <option value="480p">480p</option>
+                <select id="channel-filter">
+                    <option value="all">All Channels</option>
                 </select>
-                <button id="download-btn" class="btn-primary">Download</button>
-            </div>
-            <div id="download-progress" style="display: none;">
-                <p>Downloading...</p>
-                <div class="progress-bar">
-                    <div class="progress-fill"></div>
+                
+                <select id="sort-by">
+                    <option value="date-desc">📅 Date (Newest)</option>
+                    <option value="date-asc">📅 Date (Oldest)</option>
+                    <option value="title-asc">🔤 Title (A-Z)</option>
+                    <option value="title-desc">🔤 Title (Z-A)</option>
+                    <option value="views-desc">👁️ Views (High)</option>
+                    <option value="views-asc">👁️ Views (Low)</option>
+                    <option value="duration-desc">⏱️ Duration (Long)</option>
+                    <option value="duration-asc">⏱️ Duration (Short)</option>
+                </select>
+                
+                <div class="view-toggle">
+                    <button id="grid-view" class="view-btn active" title="Grid View">▦</button>
+                    <button id="list-view" class="view-btn" title="List View">☰</button>
                 </div>
             </div>
-        </section>
-    </main>
-    
-    <!-- Add Channel Modal -->
-    <div id="add-channel-modal" class="modal" style="display: none;">
-        <div class="modal-content">
-            <button class="modal-close" onclick="closeAddChannelModal()">&times;</button>
-            <h2>Add Channel</h2>
-            <form id="add-channel-form">
-                <div class="form-group">
-                    <label>Channel URL</label>
-                    <input type="text" id="channel-url" placeholder="https://www.youtube.com/@channelname" required>
-                </div>
-                <div class="form-group">
-                    <label>Quality</label>
-                    <select id="channel-quality">
-                        <option value="best">Best Quality</option>
+
+            <div id="library-grid" class="video-grid"></div>
+        </div>
+
+        <!-- Download View -->
+        <div id="download-view" class="view">
+            <div class="view-header">
+                <h2>⬇️ Download Video</h2>
+                <p class="view-description">Download videos from YouTube and store them on Backblaze B2</p>
+            </div>
+
+            <div class="download-form">
+                <input 
+                    type="url" 
+                    id="video-url" 
+                    placeholder="https://www.youtube.com/watch?v=..."
+                    class="url-input">
+                
+                <div class="quality-selector">
+                    <label>Quality:</label>
+                    <select id="quality">
+                        <option value="best">Best Available</option>
                         <option value="1080p">1080p</option>
                         <option value="720p" selected>720p</option>
                         <option value="480p">480p</option>
                     </select>
                 </div>
-                <div class="form-group checkbox">
-                    <input type="checkbox" id="auto-download" checked>
-                    <label for="auto-download">Auto-download new videos</label>
+                
+                <button id="download-btn" class="btn-download">
+                    Download Video
+                </button>
+            </div>
+
+            <div id="download-progress" class="progress-container" style="display: none;">
+                <div class="progress-bar">
+                    <div class="progress-fill"></div>
                 </div>
-                <button type="submit" class="btn-primary">Add Channel</button>
+                <p>Initializing...</p>
+            </div>
+
+            <div class="download-info">
+                <h3>ℹ️ Information</h3>
+                <ul>
+                    <li>✅ All videos are automatically uploaded to your Backblaze B2 bucket</li>
+                    <li>✅ Local storage is only used temporarily during download</li>
+                    <li>✅ Videos are streamed directly from B2 when playing</li>
+                    <li>⚠️ You must configure Backblaze B2 in your profile first</li>
+                    <li>📊 Average video size: 480p ~300MB, 720p ~600MB, 1080p ~1.5GB</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Channels View -->
+        <div id="channels-view" class="view">
+            <div class="view-header">
+                <h2>📡 Channels</h2>
+                <button id="add-channel-btn" class="btn-add-channel">+ Add Channel</button>
+            </div>
+
+            <div id="channels-list" class="channels-grid"></div>
+        </div>
+    </div>
+
+    <!-- Add Channel Modal -->
+    <div id="add-channel-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Add YouTube Channel</h3>
+                <button class="modal-close" onclick="closeAddChannelModal()">×</button>
+            </div>
+            <form id="add-channel-form">
+                <div class="form-group">
+                    <label>Channel URL</label>
+                    <input type="url" id="channel-url" placeholder="https://www.youtube.com/@channel" required>
+                </div>
+                <div class="form-group">
+                    <label>Default Quality</label>
+                    <select id="channel-quality">
+                        <option value="best">Best Available</option>
+                        <option value="1080p">1080p</option>
+                        <option value="720p" selected>720p</option>
+                        <option value="480p">480p</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="auto-download" checked>
+                        <span>Auto-download new videos</span>
+                    </label>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary" onclick="closeAddChannelModal()">Cancel</button>
+                    <button type="submit" class="btn-primary">Add Channel</button>
+                </div>
             </form>
         </div>
     </div>
-    
+
     <!-- Channel Stats Modal -->
-    <div id="channel-stats-modal" class="modal" style="display: none;">
-        <div class="modal-content stats-modal">
-            <button class="modal-close" onclick="closeStatsModal()">&times;</button>
+    <div id="channel-stats-modal" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3>Channel Statistics</h3>
+                <button class="modal-close" onclick="closeStatsModal()">×</button>
+            </div>
             <div id="stats-content"></div>
         </div>
     </div>
-    
+
+    <script src="/static/js/app.js"></script>
     <script>
-        // Dropdown toggle
-        function toggleDropdown() {
-            document.getElementById('dropdown-menu').classList.toggle('active');
-        }
-
-        // Close dropdown when clicking outside
-        window.addEventListener('click', (e) => {
-            if (!e.target.closest('.user-profile-dropdown')) {
-                document.getElementById('dropdown-menu').classList.remove('active');
+        // Check B2 configuration on page load
+        async function checkB2Configuration() {
+            try {
+                const response = await fetch('/api/auth/me', {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+                
+                if (response.ok) {
+                    const user = await response.json();
+                    
+                    // Update username and avatar
+                    document.getElementById('username-display').textContent = user.username;
+                    if (user.avatar) {
+                        document.getElementById('user-avatar').src = `/avatars/${user.avatar}`;
+                    }
+                    
+                    // Check B2 configuration
+                    if (!user.has_b2_configured) {
+                        document.getElementById('b2-warning').style.display = 'block';
+                        
+                        // Disable download button
+                        const downloadBtn = document.getElementById('download-btn');
+                        downloadBtn.disabled = true;
+                        downloadBtn.title = 'Configure Backblaze B2 first';
+                        downloadBtn.textContent = '🔒 Configure B2 First';
+                    }
+                }
+            } catch (error) {
+                console.error('Error checking B2 config:', error);
             }
-        });
-
-        // Logout function
+        }
+        
+        function closeB2Warning() {
+            document.getElementById('b2-warning').style.display = 'none';
+        }
+        
         function logout() {
             localStorage.removeItem('token');
             localStorage.removeItem('username');
             window.location.href = '/';
         }
-
-        // Load user profile
-        async function loadUserProfile() {
-            const token = localStorage.getItem('token');
-            if (!token) {
-                window.location.href = '/';
-                return;
-            }
-
-            try {
-                const response = await fetch('/api/auth/me', {
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
-                });
-
-                if (response.ok) {
-                    const user = await response.json();
-                    document.getElementById('username').textContent = user.display_name || user.username;
-                    
-                    // Update role badge
-                    const roleBadge = document.getElementById('user-role');
-                    roleBadge.textContent = user.role;
-                    if (user.role === 'admin') {
-                        roleBadge.classList.add('admin');
-                        document.getElementById('admin-link').style.display = 'flex';
-                    }
-
-                    // Update avatar
-                    const avatarContainer = document.getElementById('user-avatar-container');
-                    if (user.avatar) {
-                        avatarContainer.innerHTML = `<img src="/avatars/${user.avatar}" class="user-avatar-small" alt="Avatar">`;
-                    } else {
-                        // Use first letter of username
-                        const initial = (user.display_name || user.username).charAt(0).toUpperCase();
-                        avatarContainer.innerHTML = `<div class="user-avatar-placeholder-small">${initial}</div>`;
-                    }
-                } else if (response.status === 401) {
-                    window.location.href = '/';
-                }
-            } catch (error) {
-                console.error('Error loading user profile:', error);
-            }
-        }
-
-        // Load profile on page load
-        loadUserProfile();
+        
+        // Check B2 on load
+        checkB2Configuration();
     </script>
-    <script src="/static/js/app.js"></script>
 </body>
 </html>
