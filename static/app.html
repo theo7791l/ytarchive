@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>YTArchive - Your Library</title>
+    <title>YTArchive - Bibliothèque</title>
     <link rel="stylesheet" href="/static/css/app.css">
 </head>
 <body>
@@ -12,18 +12,31 @@
             <h1>YTArchive</h1>
         </div>
         <div class="nav-menu">
-            <a href="#" class="nav-link active" data-view="library">Library</a>
-            <a href="#" class="nav-link" data-view="download">Download</a>
-            <a href="#" class="nav-link" data-view="channels">Channels</a>
+            <a href="#" class="nav-link active" data-view="library">Bibliothèque</a>
+            <a href="#" class="nav-link" data-view="download">Télécharger</a>
+            <a href="#" class="nav-link" data-view="channels">Chaînes</a>
         </div>
         <div class="nav-user">
-            <a href="/profile" class="profile-link">
-                <div class="user-avatar" id="user-avatar">
-                    <span id="avatar-letter">U</span>
+            <div class="profile-dropdown">
+                <a href="#" class="profile-link" id="profile-btn">
+                    <div class="user-avatar" id="user-avatar">
+                        <span id="avatar-letter">U</span>
+                    </div>
+                    <span id="username-display">User</span>
+                </a>
+                <div class="profile-menu" id="profile-menu">
+                    <a href="/profile" class="menu-item">
+                        <span>👤</span> Profil
+                    </a>
+                    <a href="/admin" class="menu-item" id="admin-link" style="display: none;">
+                        <span>🔧</span> Administration
+                    </a>
+                    <div class="menu-divider"></div>
+                    <a href="#" class="menu-item logout-item" onclick="logout()">
+                        <span>🚪</span> Déconnexion
+                    </a>
                 </div>
-                <span id="username-display">User</span>
-            </a>
-            <button class="btn-logout" onclick="logout()">Logout</button>
+            </div>
         </div>
     </nav>
 
@@ -32,10 +45,10 @@
         <div class="b2-warning-content">
             <span class="b2-warning-icon">⚠️</span>
             <div class="b2-warning-text">
-                <strong>Backblaze B2 Configuration Required</strong>
-                <p>You must configure your Backblaze B2 credentials to download videos.</p>
+                <strong>Configuration Backblaze B2 requise</strong>
+                <p>Vous devez configurer vos identifiants Backblaze B2 pour télécharger des vidéos.</p>
             </div>
-            <a href="/profile" class="btn-configure-b2">Configure B2 Now</a>
+            <a href="/profile" class="btn-configure-b2">Configurer B2 maintenant</a>
             <button class="btn-close-warning" onclick="closeB2Warning()">✕</button>
         </div>
     </div>
@@ -44,37 +57,37 @@
         <!-- Library View -->
         <div id="library-view" class="view active">
             <div class="view-header">
-                <h2>Video Library</h2>
+                <h2>Bibliothèque Vidéo</h2>
                 <div class="header-stats">
-                    <span id="total-videos">0 videos</span>
+                    <span id="total-videos">0 vidéos</span>
                     <span>•</span>
-                    <span id="total-channels">0 channels</span>
+                    <span id="total-channels">0 chaînes</span>
                     <span>•</span>
                     <span id="total-duration">0h 0m</span>
                 </div>
             </div>
 
             <div class="controls">
-                <input type="text" id="search" placeholder="Search videos or channels...">
+                <input type="text" id="search" placeholder="Rechercher des vidéos ou chaînes...">
                 
                 <select id="channel-filter">
-                    <option value="all">All Channels</option>
+                    <option value="all">Toutes les chaînes</option>
                 </select>
                 
                 <select id="sort-by">
-                    <option value="date-desc">Date (Newest)</option>
-                    <option value="date-asc">Date (Oldest)</option>
-                    <option value="title-asc">Title (A-Z)</option>
-                    <option value="title-desc">Title (Z-A)</option>
-                    <option value="views-desc">Views (High)</option>
-                    <option value="views-asc">Views (Low)</option>
-                    <option value="duration-desc">Duration (Long)</option>
-                    <option value="duration-asc">Duration (Short)</option>
+                    <option value="date-desc">Date (Plus récent)</option>
+                    <option value="date-asc">Date (Plus ancien)</option>
+                    <option value="title-asc">Titre (A-Z)</option>
+                    <option value="title-desc">Titre (Z-A)</option>
+                    <option value="views-desc">Vues (Plus)</option>
+                    <option value="views-asc">Vues (Moins)</option>
+                    <option value="duration-desc">Durée (Plus longue)</option>
+                    <option value="duration-asc">Durée (Plus courte)</option>
                 </select>
                 
                 <div class="view-toggle">
-                    <button id="grid-view" class="view-btn active" title="Grid View">▦</button>
-                    <button id="list-view" class="view-btn" title="List View">☰</button>
+                    <button id="grid-view" class="view-btn active" title="Vue Grille">▦</button>
+                    <button id="list-view" class="view-btn" title="Vue Liste">☰</button>
                 </div>
             </div>
 
@@ -84,8 +97,8 @@
         <!-- Download View -->
         <div id="download-view" class="view">
             <div class="view-header">
-                <h2>Download Video</h2>
-                <p class="view-description">Download videos from YouTube and store them on Backblaze B2</p>
+                <h2>Télécharger une Vidéo</h2>
+                <p class="view-description">Téléchargez des vidéos depuis YouTube et stockez-les sur Backblaze B2</p>
             </div>
 
             <div class="download-form">
@@ -96,9 +109,9 @@
                     class="url-input">
                 
                 <div class="quality-selector">
-                    <label>Quality:</label>
+                    <label>Qualité :</label>
                     <select id="quality">
-                        <option value="best">Best Available</option>
+                        <option value="best">Meilleure disponible</option>
                         <option value="1080p">1080p</option>
                         <option value="720p" selected>720p</option>
                         <option value="480p">480p</option>
@@ -106,7 +119,7 @@
                 </div>
                 
                 <button id="download-btn" class="btn-download">
-                    Download Video
+                    Télécharger
                 </button>
             </div>
 
@@ -114,17 +127,17 @@
                 <div class="progress-bar">
                     <div class="progress-fill"></div>
                 </div>
-                <p>Initializing...</p>
+                <p>Initialisation...</p>
             </div>
 
             <div class="download-info">
-                <h3>Information</h3>
+                <h3>Informations</h3>
                 <ul>
-                    <li>All videos are automatically uploaded to your Backblaze B2 bucket</li>
-                    <li>Local storage is only used temporarily during download</li>
-                    <li>Videos are streamed directly from B2 when playing</li>
-                    <li>You must configure Backblaze B2 in your profile first</li>
-                    <li>Average video size: 480p ~300MB, 720p ~600MB, 1080p ~1.5GB</li>
+                    <li>Toutes les vidéos sont automatiquement uploadées sur votre bucket Backblaze B2</li>
+                    <li>Le stockage local n'est utilisé que temporairement pendant le téléchargement</li>
+                    <li>Les vidéos sont streamées directement depuis B2 lors de la lecture</li>
+                    <li>Vous devez configurer Backblaze B2 dans votre profil d'abord</li>
+                    <li>Taille moyenne des vidéos : 480p ~300MB, 720p ~600MB, 1080p ~1.5GB</li>
                 </ul>
             </div>
         </div>
@@ -132,8 +145,8 @@
         <!-- Channels View -->
         <div id="channels-view" class="view">
             <div class="view-header">
-                <h2>Channels</h2>
-                <button id="add-channel-btn" class="btn-add-channel">+ Add Channel</button>
+                <h2>Chaînes</h2>
+                <button id="add-channel-btn" class="btn-add-channel">+ Ajouter une chaîne</button>
             </div>
 
             <div id="channels-list" class="channels-grid"></div>
@@ -144,18 +157,18 @@
     <div id="add-channel-modal" class="modal" style="display: none;">
         <div class="modal-content">
             <div class="modal-header">
-                <h3>Add YouTube Channel</h3>
+                <h3>Ajouter une Chaîne YouTube</h3>
                 <button class="modal-close" onclick="closeAddChannelModal()">×</button>
             </div>
             <form id="add-channel-form">
                 <div class="form-group">
-                    <label>Channel URL</label>
-                    <input type="url" id="channel-url" placeholder="https://www.youtube.com/@channel" required>
+                    <label>URL de la chaîne</label>
+                    <input type="url" id="channel-url" placeholder="https://www.youtube.com/@chaine" required>
                 </div>
                 <div class="form-group">
-                    <label>Default Quality</label>
+                    <label>Qualité par défaut</label>
                     <select id="channel-quality">
-                        <option value="best">Best Available</option>
+                        <option value="best">Meilleure disponible</option>
                         <option value="1080p">1080p</option>
                         <option value="720p" selected>720p</option>
                         <option value="480p">480p</option>
@@ -164,12 +177,12 @@
                 <div class="form-group">
                     <label class="checkbox-label">
                         <input type="checkbox" id="auto-download" checked>
-                        <span>Auto-download new videos</span>
+                        <span>Télécharger automatiquement les nouvelles vidéos</span>
                     </label>
                 </div>
                 <div class="modal-actions">
-                    <button type="button" class="btn-secondary" onclick="closeAddChannelModal()">Cancel</button>
-                    <button type="submit" class="btn-primary">Add Channel</button>
+                    <button type="button" class="btn-secondary" onclick="closeAddChannelModal()">Annuler</button>
+                    <button type="submit" class="btn-primary">Ajouter</button>
                 </div>
             </form>
         </div>
@@ -179,7 +192,7 @@
     <div id="channel-stats-modal" class="modal" style="display: none;">
         <div class="modal-content modal-large">
             <div class="modal-header">
-                <h3>Channel Statistics</h3>
+                <h3>Statistiques de la Chaîne</h3>
                 <button class="modal-close" onclick="closeStatsModal()">×</button>
             </div>
             <div id="stats-content"></div>
@@ -220,6 +233,11 @@
                         avatarLetter.style.display = 'flex';
                     }
                     
+                    // Show admin link if user is admin
+                    if (user.role === 'admin') {
+                        document.getElementById('admin-link').style.display = 'flex';
+                    }
+                    
                     // Check B2 configuration
                     if (!user.has_b2_configured) {
                         document.getElementById('b2-warning').style.display = 'block';
@@ -227,8 +245,8 @@
                         // Disable download button
                         const downloadBtn = document.getElementById('download-btn');
                         downloadBtn.disabled = true;
-                        downloadBtn.title = 'Configure Backblaze B2 first';
-                        downloadBtn.textContent = 'Configure B2 First';
+                        downloadBtn.title = 'Configurez Backblaze B2 d\'abord';
+                        downloadBtn.textContent = 'Configurer B2 d\'abord';
                     }
                 }
             } catch (error) {
@@ -245,6 +263,22 @@
             localStorage.removeItem('username');
             window.location.href = '/';
         }
+        
+        // Profile dropdown toggle
+        document.getElementById('profile-btn').addEventListener('click', (e) => {
+            e.preventDefault();
+            const menu = document.getElementById('profile-menu');
+            menu.classList.toggle('show');
+        });
+        
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            const dropdown = document.querySelector('.profile-dropdown');
+            const menu = document.getElementById('profile-menu');
+            if (!dropdown.contains(e.target)) {
+                menu.classList.remove('show');
+            }
+        });
         
         // Check B2 on load
         checkB2Configuration();
