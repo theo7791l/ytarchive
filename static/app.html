@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YTArchive - Library</title>
+    <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">
+            <h1>🎬 YTArchive</h1>
+        </div>
+        <div class="nav-menu">
+            <a href="#" class="nav-link active" data-view="library">Library</a>
+            <a href="#" class="nav-link" data-view="channels">Channels</a>
+            <a href="#" class="nav-link" data-view="download">Download</a>
+        </div>
+        <div class="nav-user">
+            <span id="username"></span>
+            <button id="logout" class="btn-logout">Logout</button>
+        </div>
+    </nav>
+    
+    <main class="container">
+        <!-- Library View -->
+        <section id="library-view" class="view active">
+            <div class="view-header">
+                <h2>Video Library</h2>
+                <div class="search-bar">
+                    <input type="text" id="search" placeholder="Search videos...">
+                </div>
+            </div>
+            <div id="library-grid" class="video-grid">
+                <p class="empty-state">No videos yet. Start downloading!</p>
+            </div>
+        </section>
+        
+        <!-- Channels View -->
+        <section id="channels-view" class="view">
+            <div class="view-header">
+                <h2>Followed Channels</h2>
+            </div>
+            <div id="channels-list" class="channels-container">
+                <p class="empty-state">No channels followed yet.</p>
+            </div>
+        </section>
+        
+        <!-- Download View -->
+        <section id="download-view" class="view">
+            <div class="view-header">
+                <h2>Download Video</h2>
+            </div>
+            <div class="download-form">
+                <input type="text" id="video-url" placeholder="Paste YouTube URL here...">
+                <select id="quality">
+                    <option value="best">Best Quality</option>
+                    <option value="1080p">1080p</option>
+                    <option value="720p">720p</option>
+                    <option value="480p">480p</option>
+                </select>
+                <button id="download-btn" class="btn-primary">Download</button>
+            </div>
+            <div id="download-progress" style="display: none;">
+                <p>Downloading...</p>
+                <div class="progress-bar">
+                    <div class="progress-fill"></div>
+                </div>
+            </div>
+        </section>
+    </main>
+    
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
