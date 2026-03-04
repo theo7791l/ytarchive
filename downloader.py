@@ -11,10 +11,10 @@ async def download_video(url: str, quality: str = "best", progress_callback: Opt
     os.makedirs(VIDEOS_DIR, exist_ok=True)
     
     quality_map = {
-        "best": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
-        "1080p": "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]/best",
-        "720p": "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best",
-        "480p": "bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best[height<=480][ext=mp4]/best"
+        "best": "best[ext=mp4]/best",
+        "1080p": "bestvideo[height<=1080]+bestaudio/best[height<=1080]/best",
+        "720p": "bestvideo[height<=720]+bestaudio/best[height<=720]/best",
+        "480p": "bestvideo[height<=480]+bestaudio/best[height<=480]/best"
     }
     
     def progress_hook(d):
@@ -48,9 +48,10 @@ async def download_video(url: str, quality: str = "best", progress_callback: Opt
         'outtmpl': os.path.join(VIDEOS_DIR, '%(id)s.%(ext)s'),
         'writethumbnail': True,
         'writesubtitles': False,
-        'quiet': True,
-        'no_warnings': True,
+        'quiet': False,
+        'no_warnings': False,
         'progress_hooks': [progress_hook],
+        'merge_output_format': 'mp4',
     }
     
     try:
