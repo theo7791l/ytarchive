@@ -37,6 +37,28 @@
     50% { box-shadow: 0 0 40px rgba(102, 126, 234, 0.6); }
 }
 
+@keyframes slideInRight {
+    from {
+        transform: translateX(400px);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideOutRight {
+    from {
+        transform: translateX(0);
+        opacity: 1;
+    }
+    to {
+        transform: translateX(400px);
+        opacity: 0;
+    }
+}
+
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     background: linear-gradient(-45deg, #0f0f1e, #1a1a2e, #16213e, #0f0f1e);
@@ -63,6 +85,99 @@ body::before {
     animation: float 20s ease-in-out infinite;
     pointer-events: none;
     z-index: 0;
+}
+
+/* Toast Notifications */
+.toast {
+    position: fixed;
+    top: 100px;
+    right: 30px;
+    background: rgba(26, 26, 46, 0.98);
+    backdrop-filter: blur(20px);
+    padding: 20px 30px;
+    border-radius: 15px;
+    border: 2px solid;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+    z-index: 10000;
+    font-weight: 600;
+    font-size: 15px;
+    min-width: 300px;
+    max-width: 500px;
+    transform: translateX(400px);
+    opacity: 0;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.toast.show {
+    transform: translateX(0);
+    opacity: 1;
+    animation: slideInRight 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.toast-success {
+    border-color: rgba(102, 234, 171, 0.6);
+    background: rgba(102, 234, 171, 0.15);
+    color: #66eaab;
+}
+
+.toast-success::before {
+    content: '✓';
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    background: #66eaab;
+    color: #0f0f1e;
+    border-radius: 50%;
+    font-weight: 900;
+    font-size: 18px;
+    flex-shrink: 0;
+}
+
+.toast-error {
+    border-color: rgba(255, 68, 68, 0.6);
+    background: rgba(255, 68, 68, 0.15);
+    color: #ff4444;
+}
+
+.toast-error::before {
+    content: '×';
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    background: #ff4444;
+    color: white;
+    border-radius: 50%;
+    font-weight: 900;
+    font-size: 24px;
+    flex-shrink: 0;
+}
+
+.toast-info {
+    border-color: rgba(102, 126, 234, 0.6);
+    background: rgba(102, 126, 234, 0.15);
+    color: #667eea;
+}
+
+.toast-info::before {
+    content: 'i';
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    background: #667eea;
+    color: white;
+    border-radius: 50%;
+    font-weight: 900;
+    font-size: 18px;
+    flex-shrink: 0;
 }
 
 /* Navbar */
