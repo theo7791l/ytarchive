@@ -793,21 +793,34 @@ async function loadChannels() {
         } else {
             container.innerHTML = channels.map((ch, i) => `
                 <div class="channel-card" style="--i: ${i}">
-                    ${ch.thumbnail ? `<img src="${ch.thumbnail}" class="channel-thumb">` : '<div class="channel-thumb-placeholder">CH</div>'}
-                    <div class="channel-info">
-                        <h3>${ch.name}</h3>
-                        <p>${ch.video_count} vidéos</p>
-                        <p class="channel-date">Ajouté ${formatDate(ch.added_at)}</p>
+                    <div class="channel-header">
+                        ${ch.thumbnail ? `<img src="${ch.thumbnail}" class="channel-thumb" alt="${ch.name}">` : '<div class="channel-thumb-placeholder">CH</div>'}
+                        <div class="channel-info">
+                            <h3 class="channel-name">${ch.name}</h3>
+                            <p class="channel-stats">
+                                <span class="stat-badge">${ch.video_count} vidéo${ch.video_count !== 1 ? 's' : ''}</span>
+                                <span>•</span>
+                                <span class="channel-quality">${ch.quality}</span>
+                            </p>
+                            <p class="channel-date">Ajouté ${formatDate(ch.added_at)}</p>
+                        </div>
                     </div>
                     <div class="channel-actions">
-                        <label class="toggle">
+                        <label class="toggle-switch">
                             <input type="checkbox" ${ch.auto_download ? 'checked' : ''} 
                                    onchange="toggleAutoDownload('${ch.id}', this.checked)">
-                            <span>Auto-DL</span>
+                            <span class="toggle-slider"></span>
+                            <span class="toggle-label">Auto-DL</span>
                         </label>
-                        <button class="btn-stats" onclick="showChannelStats('${ch.id}')">Stats</button>
-                        <button class="btn-check" onclick="checkChannelNow('${ch.id}')">Vérifier</button>
-                        <button class="btn-delete-channel" onclick="deleteChannel('${ch.id}')">Supprimer</button>
+                        <button class="btn-channel-stats" onclick="showChannelStats('${ch.id}')" title="Voir les statistiques">
+                            📊 Stats
+                        </button>
+                        <button class="btn-channel-check" onclick="checkChannelNow('${ch.id}')" title="Vérifier les nouvelles vidéos">
+                            🔄 Vérifier
+                        </button>
+                        <button class="btn-channel-delete" onclick="deleteChannel('${ch.id}')" title="Supprimer">
+                            🗑️
+                        </button>
                     </div>
                 </div>
             `).join('');
@@ -890,8 +903,126 @@ async function deleteChannel(channelId) {
     }
 }
 
+// STATISTIQUES DE CHAÎNE - COMPLET
 async function showChannelStats(channelId) {
-    showToast('Statistiques à venir!', 'info');
+    try {
+        showToast('Chargement des statistiques...', 'info');
+        
+        const stats = await apiCall(`/api/channels/${channelId}/stats`);
+        const modal = document.getElementById('channel-stats-modal');
+        const content = document.getElementById('stats-content');
+        
+        content.innerHTML = `
+            <div class="stats-header">
+                <div class="stats-channel-info">
+                    ${stats.channel.thumbnail ? `<img src="${stats.channel.thumbnail}" class="stats-channel-thumb" alt="${stats.channel.name}">` : '<div class="stats-channel-thumb-placeholder">CH</div>'}
+                    <div>
+                        <h2>${stats.channel.name}</h2>
+                        <p class="stats-subtitle">Statistiques de la chaîne</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">📹</div>
+                    <div class="stat-info">
+                        <p class="stat-label">Total Vidéos</p>
+                        <h3 class="stat-value">${stats.total_videos}</h3>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon">👁️</div>
+                    <div class="stat-info">
+                        <p class="stat-label">Total Vues</p>
+                        <h3 class="stat-value">${formatNumber(stats.total_views)}</h3>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon">⏱️</div>
+                    <div class="stat-info">
+                        <p class="stat-label">Durée Totale</p>
+                        <h3 class="stat-value">${formatTotalDuration(stats.total_duration)}</h3>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon">📊</div>
+                    <div class="stat-info">
+                        <p class="stat-label">Vues Moyennes</p>
+                        <h3 class="stat-value">${formatNumber(stats.avg_views)}</h3>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon">⌛</div>
+                    <div class="stat-info">
+                        <p class="stat-label">Durée Moyenne</p>
+                        <h3 class="stat-value">${formatDuration(stats.avg_duration)}</h3>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon">🎯</div>
+                    <div class="stat-info">
+                        <p class="stat-label">Qualité</p>
+                        <h3 class="stat-value">${stats.channel.quality}</h3>
+                    </div>
+                </div>
+            </div>
+            
+            ${stats.most_viewed ? `
+            <div class="stats-section">
+                <h3 class="section-title">🏆 Vidéo la Plus Vue</h3>
+                <div class="highlight-video">
+                    <h4>${stats.most_viewed.title}</h4>
+                    <p>${formatNumber(stats.most_viewed.views)} vues</p>
+                    <button class="btn-watch" onclick="playVideo('${stats.most_viewed.id}'); closeStatsModal();">▶ Regarder</button>
+                </div>
+            </div>
+            ` : ''}
+            
+            ${stats.longest_video ? `
+            <div class="stats-section">
+                <h3 class="section-title">📏 Vidéo la Plus Longue</h3>
+                <div class="highlight-video">
+                    <h4>${stats.longest_video.title}</h4>
+                    <p>${formatDuration(stats.longest_video.duration)}</p>
+                    <button class="btn-watch" onclick="playVideo('${stats.longest_video.id}'); closeStatsModal();">▶ Regarder</button>
+                </div>
+            </div>
+            ` : ''}
+            
+            ${stats.upload_history && stats.upload_history.length > 0 ? `
+            <div class="stats-section">
+                <h3 class="section-title">📈 Historique des Publications</h3>
+                <div class="upload-history">
+                    ${stats.upload_history.slice(-12).reverse().map(h => `
+                        <div class="history-item">
+                            <span class="history-month">${h.month}</span>
+                            <div class="history-bar-container">
+                                <div class="history-bar" style="width: ${(h.count / Math.max(...stats.upload_history.map(x => x.count))) * 100}%"></div>
+                            </div>
+                            <span class="history-count">${h.count} vidéo${h.count !== 1 ? 's' : ''}</span>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+            ` : ''}
+            
+            <div class="stats-footer">
+                <p><strong>Première vidéo téléchargée :</strong> ${stats.first_download || 'N/A'}</p>
+                <p><strong>Dernière vidéo téléchargée :</strong> ${stats.last_download || 'N/A'}</p>
+                <p><strong>Chaîne ajoutée le :</strong> ${formatDate(stats.channel.added_at)}</p>
+            </div>
+        `;
+        
+        modal.style.display = 'flex';
+    } catch (error) {
+        showToast('Échec du chargement des statistiques: ' + error.message, 'error');
+    }
 }
 
 function closeStatsModal() {
