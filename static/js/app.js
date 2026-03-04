@@ -245,11 +245,12 @@ function renderLibrary() {
             <div class="video-card" data-id="${video.id}" style="--i: ${i}">
                 <div class="video-thumbnail">
                     ${video.thumbnail_file ? 
-                        `<img src="/videos/${video.thumbnail_file}" alt="${video.title}">` :
+                        `<img src="/videos/${video.thumbnail_file}" alt="${video.title}" onerror="this.parentElement.innerHTML='<div class=\"no-thumbnail\">VIDEO</div>'">` :
                         `<div class="no-thumbnail">VIDEO</div>`
                     }
                     <div class="video-duration">${formatDuration(video.duration)}</div>
                     ${video.auto_downloaded ? '<div class="auto-badge">AUTO</div>' : ''}
+                    ${video.storage === 'b2' ? '<div class="b2-badge">☁️ B2</div>' : ''}
                 </div>
                 <div class="video-info">
                     <h3 class="video-title">${video.title}</h3>
@@ -270,7 +271,7 @@ function renderLibrary() {
             <div class="video-list-item" data-id="${video.id}" style="--i: ${i}">
                 <div class="list-thumbnail">
                     ${video.thumbnail_file ? 
-                        `<img src="/videos/${video.thumbnail_file}" alt="${video.title}">` :
+                        `<img src="/videos/${video.thumbnail_file}" alt="${video.title}" onerror="this.parentElement.innerHTML='<div class=\"no-thumbnail-small\">VIDEO</div>'">` :
                         `<div class="no-thumbnail-small">VIDEO</div>`
                     }
                     <div class="video-duration-small">${formatDuration(video.duration)}</div>
@@ -284,6 +285,7 @@ function renderLibrary() {
                         <span>•</span>
                         <span>${formatDate(video.upload_date)}</span>
                         ${video.auto_downloaded ? '<span class="auto-badge-small">AUTO</span>' : ''}
+                        ${video.storage === 'b2' ? '<span class="b2-badge-small">☁️ B2</span>' : ''}
                     </div>
                 </div>
                 <div class="list-actions">
@@ -325,17 +327,36 @@ document.getElementById('list-view').addEventListener('click', () => {
     renderLibrary();
 });
 
-// Advanced Video Player
+// Advanced Video Player with B2 Streaming
 let currentPlayer = null;
 let keyboardHandler = null;
 
-function playVideo(videoId) {
+async function playVideo(videoId) {
     const video = libraryCache.find(v => v.id === videoId);
     if (!video) return;
     
     if (currentPlayer) {
         document.removeEventListener('keydown', keyboardHandler);
         currentPlayer.remove();
+    }
+    
+    showToast('Loading video...', 'info');
+    
+    // Get streaming URL from B2 if video is stored on B2
+    let videoUrl = `/videos/${video.video_file}`;
+    let thumbnailUrl = video.thumbnail_file ? `/videos/${video.thumbnail_file}` : null;
+    
+    if (video.storage === 'b2') {
+        try {
+            const streamData = await apiCall(`/api/video/${videoId}/stream`);
+            videoUrl = streamData.video_url;
+            if (streamData.thumbnail_url) {
+                thumbnailUrl = streamData.thumbnail_url;
+            }
+        } catch (error) {
+            showToast('Failed to load video from B2: ' + error.message, 'error');
+            return;
+        }
     }
     
     const otherVideos = libraryCache.filter(v => v.id !== videoId);
@@ -349,7 +370,7 @@ function playVideo(videoId) {
             <div class="player-main">
                 <div class="player-video-wrapper">
                     <video id="main-player" controls autoplay>
-                        <source src="/videos/${video.video_file}" type="video/mp4">
+                        <source src="${videoUrl}" type="video/mp4">
                     </video>
                 </div>
                 
@@ -361,6 +382,7 @@ function playVideo(videoId) {
                         <span>${formatNumber(video.view_count)} views</span>
                         <span>•</span>
                         <span>${formatDate(video.upload_date)}</span>
+                        ${video.storage === 'b2' ? '<span class="b2-streaming-badge">☁️ Streaming from B2</span>' : ''}
                     </div>
                     
                     <div class="player-controls">
@@ -405,7 +427,7 @@ function playVideo(videoId) {
                         <div class="sidebar-video" onclick="playVideo('${v.id}')">
                             <div class="sidebar-thumbnail">
                                 ${v.thumbnail_file ? 
-                                    `<img src="/videos/${v.thumbnail_file}" alt="${v.title}">` :
+                                    `<img src="/videos/${v.thumbnail_file}" alt="${v.title}" onerror="this.parentElement.innerHTML='<div class=\"sidebar-no-thumb\">VIDEO</div>'">` :
                                     `<div class="sidebar-no-thumb">VIDEO</div>`
                                 }
                                 <span class="sidebar-duration">${formatDuration(v.duration)}</span>
@@ -516,7 +538,7 @@ function toggleFullscreen() {
 
 // Delete Video
 async function deleteVideo(videoId) {
-    if (!confirm('Delete this video?')) return;
+    if (!confirm('Delete this video? This will also remove it from B2 storage.')) return;
     
     try {
         await apiCall(`/api/library/${videoId}`, { method: 'DELETE' });
@@ -552,7 +574,8 @@ document.getElementById('download-btn').addEventListener('click', async () => {
     downloadWs = new WebSocket(wsUrl);
     
     downloadWs.onopen = () => {
-        downloadWs.send(JSON.stringify({ url, quality }));
+        // Send token with download request
+        downloadWs.send(JSON.stringify({ url, quality, token }));
     };
     
     downloadWs.onmessage = (event) => {
@@ -564,14 +587,17 @@ document.getElementById('download-btn').addEventListener('click', async () => {
         } else if (data.status === 'downloading') {
             const percent = parseFloat(data.percent) || 0;
             progressText.textContent = `${data.percent} (${data.speed}) - ETA: ${data.eta}`;
-            progressFill.style.width = `${percent}%`;
-        } else if (data.status === 'finished') {
+            progressFill.style.width = `${Math.min(percent, 80)}%`;
+        } else if (data.status === 'processing') {
+            progressText.textContent = data.message;
+            progressFill.style.width = '85%';
+        } else if (data.status === 'uploading') {
             progressText.textContent = data.message;
             progressFill.style.width = '90%';
         } else if (data.status === 'completed') {
             progressText.textContent = data.message;
             progressFill.style.width = '100%';
-            showToast('Video downloaded successfully!', 'success');
+            showToast('Video downloaded and uploaded to B2!', 'success');
             setTimeout(() => {
                 progressDiv.style.display = 'none';
                 downloadBtn.disabled = false;
