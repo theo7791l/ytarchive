@@ -11,7 +11,7 @@ async def download_video(url: str, quality: str = "best", progress_callback: Opt
     os.makedirs(VIDEOS_DIR, exist_ok=True)
     
     quality_map = {
-        "best": "best[ext=mp4]/best",
+        "best": "best",
         "1080p": "bestvideo[height<=1080]+bestaudio/best[height<=1080]/best",
         "720p": "bestvideo[height<=720]+bestaudio/best[height<=720]/best",
         "480p": "bestvideo[height<=480]+bestaudio/best[height<=480]/best"
@@ -44,14 +44,15 @@ async def download_video(url: str, quality: str = "best", progress_callback: Opt
             print(f"Progress hook error: {e}")
     
     ydl_opts = {
-        'format': quality_map.get(quality, quality_map["best"]),
+        'format': quality_map.get(quality, "best"),
         'outtmpl': os.path.join(VIDEOS_DIR, '%(id)s.%(ext)s'),
         'writethumbnail': True,
         'writesubtitles': False,
         'quiet': False,
         'no_warnings': False,
         'progress_hooks': [progress_hook],
-        'merge_output_format': 'mp4',
+        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'extractor_args': {'youtube': {'player_client': ['android', 'web']}},
     }
     
     try:
