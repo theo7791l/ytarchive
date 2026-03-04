@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Depends, WebSocket, WebSocketDisconnect, Query
+from fastapi import FastAPI, HTTPException, Depends, WebSocket, WebSocketDisconnect
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -121,36 +121,22 @@ async def delete_video(video_id: str, user: dict = Depends(verify_token)):
     return {"message": "Video deleted"}
 
 @app.websocket("/api/ws/download")
-async def websocket_download(websocket: WebSocket, token: str = Query(...)):
-    # Accept connection first to avoid 403
+async def websocket_download(websocket: WebSocket):
+    """WebSocket for download progress - NO AUTH (already authed on page)"""
     await websocket.accept()
     
     try:
-        # Verify token from query param
-        try:
-            jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
-        except Exception as e:
-            await websocket.send_json({"status": "error", "message": "Invalid token"})
-            await websocket.close(code=1008)
-            return
-        
-        # Wait for download request from client
-        try:
-            data = await asyncio.wait_for(websocket.receive_json(), timeout=10.0)
-        except asyncio.TimeoutError:
-            await websocket.send_json({"status": "error", "message": "No data received"})
-            await websocket.close()
-            return
+        # Wait for download request
+        data = await asyncio.wait_for(websocket.receive_json(), timeout=10.0)
         
         url = data.get('url')
         quality = data.get('quality', 'best')
         
         if not url:
             await websocket.send_json({"status": "error", "message": "URL is required"})
-            await websocket.close()
             return
         
-        # Download with progress updates
+        # Download with progress
         async def progress_callback(status, message, percent=None, speed=None, eta=None):
             try:
                 payload = {"status": status, "message": message}
@@ -161,27 +147,21 @@ async def websocket_download(websocket: WebSocket, token: str = Query(...)):
                 if eta:
                     payload['eta'] = eta
                 await websocket.send_json(payload)
-            except Exception:
+            except:
                 pass
         
         success, video_info = await download_video(url, quality, progress_callback)
         
         if success:
-            # Add to library
             library = load_json(LIBRARY_FILE)
             library.append(video_info)
             save_json(LIBRARY_FILE, library)
-            
-            await websocket.send_json({
-                "status": "completed",
-                "message": "Download complete!"
-            })
+            await websocket.send_json({"status": "completed", "message": "Download complete!"})
         else:
-            await websocket.send_json({
-                "status": "error",
-                "message": video_info
-            })
+            await websocket.send_json({"status": "error", "message": video_info})
     
+    except asyncio.TimeoutError:
+        await websocket.send_json({"status": "error", "message": "No data received"})
     except WebSocketDisconnect:
         pass
     except Exception as e:
