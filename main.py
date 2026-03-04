@@ -122,24 +122,33 @@ async def delete_video(video_id: str, user: dict = Depends(verify_token)):
 
 @app.websocket("/api/ws/download")
 async def websocket_download(websocket: WebSocket, token: str = Query(...)):
-    await websocket.accept()
-    
-    ws_open = True
+    ws_open = False
     
     try:
-        # Verify token from query param
+        # Verify token from query param BEFORE accepting
         try:
             jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
         except Exception as e:
-            await websocket.send_json({"status": "error", "message": "Invalid token"})
-            await websocket.close()
-            ws_open = False
+            await websocket.close(code=1008, reason="Invalid token")
             return
         
-        # Receive download request
-        data = await websocket.receive_json()
-        url = data['url']
+        # Token is valid, accept connection
+        await websocket.accept()
+        ws_open = True
+        
+        # Wait for download request from client
+        try:
+            data = await asyncio.wait_for(websocket.receive_json(), timeout=10.0)
+        except asyncio.TimeoutError:
+            await websocket.send_json({"status": "error", "message": "No data received"})
+            return
+        
+        url = data.get('url')
         quality = data.get('quality', 'best')
+        
+        if not url:
+            await websocket.send_json({"status": "error", "message": "URL is required"})
+            return
         
         # Download with progress updates
         async def progress_callback(status, message, percent=None, speed=None, eta=None):
@@ -180,6 +189,7 @@ async def websocket_download(websocket: WebSocket, token: str = Query(...)):
     except WebSocketDisconnect:
         ws_open = False
     except Exception as e:
+        print(f"WebSocket error: {e}")
         if ws_open:
             try:
                 await websocket.send_json({"status": "error", "message": str(e)})
