@@ -5,7 +5,7 @@ import jwt
 import json
 import os
 from datetime import datetime, timedelta
-from passlib.hash import bcrypt
+import bcrypt
 from typing import Optional, List
 import shutil
 import uuid
@@ -54,12 +54,20 @@ class UserResponse(BaseModel):
     created_at: str
     last_login: Optional[str]
 
+def hash_password(password: str) -> str:
+    """Hash a password using bcrypt"""
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+def verify_password(password: str, hashed: str) -> bool:
+    """Verify a password against its hash"""
+    return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
+
 def load_users():
     if not os.path.exists(USERS_FILE):
         # Create default admin user
         default_users = {
             "admin": {
-                "password_hash": bcrypt.hash("admin"),
+                "password_hash": hash_password("admin"),
                 "role": "admin",
                 "email": None,
                 "display_name": "Administrator",
@@ -124,7 +132,7 @@ async def login(req: LoginRequest):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
     user = users[req.username]
-    if not bcrypt.verify(req.password, user["password_hash"]):
+    if not verify_password(req.password, user["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
     # Update last login
@@ -228,11 +236,11 @@ async def change_password(req: ChangePasswordRequest, user: dict = Depends(verif
     
     # Verify old password if provided
     if req.old_password:
-        if not bcrypt.verify(req.old_password, user_data["password_hash"]):
+        if not verify_password(req.old_password, user_data["password_hash"]):
             raise HTTPException(status_code=401, detail="Invalid old password")
     
     # Update password
-    user_data["password_hash"] = bcrypt.hash(req.new_password)
+    user_data["password_hash"] = hash_password(req.new_password)
     save_users(users)
     
     return {"status": "success", "message": "Password changed successfully"}
@@ -255,7 +263,7 @@ async def create_user(req: CreateUserRequest, admin: dict = Depends(verify_admin
         raise HTTPException(status_code=400, detail="Role must be 'admin' or 'member'")
     
     users[req.username] = {
-        "password_hash": bcrypt.hash(req.password),
+        "password_hash": hash_password(req.password),
         "role": req.role,
         "email": req.email,
         "display_name": req.display_name or req.username,
@@ -327,7 +335,7 @@ async def reset_user_password(username: str, req: ChangePasswordRequest, admin: 
     if username not in users:
         raise HTTPException(status_code=404, detail="User not found")
     
-    users[username]["password_hash"] = bcrypt.hash(req.new_password)
+    users[username]["password_hash"] = hash_password(req.new_password)
     save_users(users)
     
     return {"status": "success", "message": f"Password reset for {username}"}
