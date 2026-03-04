@@ -58,6 +58,25 @@ def save_json(filename: str, data):
     with open(filename, 'w') as f:
         json.dump(data, f, indent=2)
 
+def create_default_user():
+    """Create default admin user if no users exist"""
+    users = load_json(USERS_FILE, {})
+    if not users:
+        default_username = "admin"
+        default_password = "admin123"
+        hashed = bcrypt.hashpw(default_password.encode(), bcrypt.gensalt())
+        users[default_username] = hashed.decode()
+        save_json(USERS_FILE, users)
+        print("\n" + "="*60)
+        print("🔐 DEFAULT USER CREATED")
+        print("="*60)
+        print(f"Username: {default_username}")
+        print(f"Password: {default_password}")
+        print("\n⚠️  IMPORTANT: Change this password after first login!")
+        print("="*60 + "\n")
+        return True
+    return False
+
 def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
     try:
         token = credentials.credentials
@@ -77,16 +96,24 @@ async def app_page():
 @app.get("/health")
 async def health_check():
     """Health check endpoint for monitoring"""
+    users = load_json(USERS_FILE, {})
     return {
         "status": "healthy",
         "timestamp": datetime.now().isoformat(),
         "videos": len(load_json(LIBRARY_FILE)),
-        "channels": len(load_json(CHANNELS_FILE))
+        "channels": len(load_json(CHANNELS_FILE)),
+        "users": len(users),
+        "has_default_user": "admin" in users
     }
 
 @app.post("/api/register")
 async def register(user: User):
     users = load_json(USERS_FILE, {})
+    
+    # Only allow registration if no users exist (first user)
+    if users:
+        raise HTTPException(status_code=403, detail="Registration is disabled. Users already exist.")
+    
     if user.username in users:
         raise HTTPException(status_code=400, detail="User exists")
     
@@ -352,6 +379,9 @@ async def get_channel_stats(channel_id: str, username: str = Depends(verify_toke
 
 @app.on_event("startup")
 async def startup_event():
+    # Create default user if none exist
+    create_default_user()
+    
     # Start scheduler in background
     await start_scheduler(interval_hours=1)
 
