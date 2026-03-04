@@ -11,10 +11,10 @@ form.addEventListener('submit', async (e) => {
     
     errorDiv.style.display = 'none';
     loader.style.display = 'block';
-    submitBtn.textContent = 'Logging in...';
+    submitBtn.textContent = 'Connexion...';
     
     try {
-        const response = await fetch('/api/login', {
+        const response = await fetch('/api/auth/login', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -25,16 +25,16 @@ form.addEventListener('submit', async (e) => {
         const data = await response.json();
         
         if (response.ok) {
-            localStorage.setItem('token', data.token);
-            localStorage.setItem('username', data.username);
+            localStorage.setItem('token', data.access_token);
+            localStorage.setItem('username', username);
             window.location.href = '/app';
         } else {
-            throw new Error(data.detail || 'Login failed');
+            throw new Error(data.detail || 'Connexion échouée');
         }
     } catch (error) {
         errorDiv.textContent = error.message;
         errorDiv.style.display = 'block';
         loader.style.display = 'none';
-        submitBtn.textContent = 'Login';
+        submitBtn.textContent = 'Se connecter';
     }
 });
