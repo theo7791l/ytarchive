@@ -1,96 +1,121 @@
-"""Backblaze B2 Storage Manager"""
-import os
-import asyncio
-from typing import Optional, Tuple
 import aiohttp
-import base64
 import hashlib
+import os
+from typing import Optional, Tuple, Callable
 import json
-from datetime import datetime, timedelta
 
 class B2Storage:
-    """Manages Backblaze B2 storage operations"""
+    """Backblaze B2 Storage Manager for async operations"""
     
     def __init__(self, key_id: str, application_key: str, bucket_name: str):
         self.key_id = key_id
         self.application_key = application_key
         self.bucket_name = bucket_name
-        self.auth_token = None
+        
+        # B2 API endpoints
         self.api_url = None
+        self.authorization_token = None
         self.download_url = None
-        self.bucket_id = None
+        
+        # Upload URL caching
         self.upload_url = None
         self.upload_auth_token = None
         
+        # Bucket info
+        self.bucket_id = None
+    
     async def authorize(self) -> bool:
-        """Authorize with B2 API"""
+        """Authorize with Backblaze B2 API"""
         try:
-            auth_string = f"{self.key_id}:{self.application_key}"
-            basic_auth = base64.b64encode(auth_string.encode()).decode()
+            auth_url = "https://api.backblazeb2.com/b2api/v2/b2_authorize_account"
             
             async with aiohttp.ClientSession() as session:
                 async with session.get(
-                    'https://api.backblazeb2.com/b2api/v2/b2_authorize_account',
-                    headers={'Authorization': f'Basic {basic_auth}'}
+                    auth_url,
+                    auth=aiohttp.BasicAuth(self.key_id, self.application_key)
                 ) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        self.auth_token = data['authorizationToken']
-                        self.api_url = data['apiUrl']
-                        self.download_url = data['downloadUrl']
-                        
-                        # Get bucket ID
-                        await self._get_bucket_id()
-                        return True
-                    return False
+                    if response.status != 200:
+                        print(f"B2 Authorization failed: {response.status}")
+                        return False
+                    
+                    data = await response.json()
+                    
+                    self.authorization_token = data['authorizationToken']
+                    self.api_url = data['apiUrl']
+                    self.download_url = data['downloadUrl']
+                    
+                    # Get bucket ID
+                    bucket_info = await self._get_bucket_id()
+                    if not bucket_info:
+                        print(f"Bucket '{self.bucket_name}' not found")
+                        return False
+                    
+                    self.bucket_id = bucket_info['bucketId']
+                    return True
+        
         except Exception as e:
             print(f"B2 Authorization error: {e}")
             return False
     
-    async def _get_bucket_id(self):
-        """Get bucket ID from bucket name"""
+    async def _get_bucket_id(self) -> Optional[dict]:
+        """Get bucket ID by name"""
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.post(
-                    f'{self.api_url}/b2api/v2/b2_list_buckets',
-                    headers={'Authorization': self.auth_token},
-                    json={'accountId': self.key_id, 'bucketName': self.bucket_name}
+                    f"{self.api_url}/b2api/v2/b2_list_buckets",
+                    headers={
+                        'Authorization': self.authorization_token
+                    },
+                    json={
+                        'accountId': self.key_id.split(':')[0] if ':' in self.key_id else self.key_id[:12],
+                        'bucketName': self.bucket_name
+                    }
                 ) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        if data['buckets']:
-                            self.bucket_id = data['buckets'][0]['bucketId']
+                    if response.status != 200:
+                        return None
+                    
+                    data = await response.json()
+                    buckets = data.get('buckets', [])
+                    
+                    for bucket in buckets:
+                        if bucket['bucketName'] == self.bucket_name:
+                            return bucket
+                    
+                    return None
+        
         except Exception as e:
             print(f"Error getting bucket ID: {e}")
+            return None
     
     async def get_upload_url(self) -> bool:
         """Get upload URL and token"""
         try:
-            if not self.bucket_id:
-                await self._get_bucket_id()
-            
             async with aiohttp.ClientSession() as session:
                 async with session.post(
-                    f'{self.api_url}/b2api/v2/b2_get_upload_url',
-                    headers={'Authorization': self.auth_token},
-                    json={'bucketId': self.bucket_id}
+                    f"{self.api_url}/b2api/v2/b2_get_upload_url",
+                    headers={
+                        'Authorization': self.authorization_token
+                    },
+                    json={
+                        'bucketId': self.bucket_id
+                    }
                 ) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        self.upload_url = data['uploadUrl']
-                        self.upload_auth_token = data['authorizationToken']
-                        return True
-                    return False
+                    if response.status != 200:
+                        print(f"Failed to get upload URL: {response.status}")
+                        return False
+                    
+                    data = await response.json()
+                    self.upload_url = data['uploadUrl']
+                    self.upload_auth_token = data['authorizationToken']
+                    return True
+        
         except Exception as e:
             print(f"Error getting upload URL: {e}")
             return False
     
-    async def upload_file(self, file_path: str, b2_filename: str, progress_callback=None) -> Tuple[bool, Optional[str]]:
+    async def upload_file(self, file_path: str, b2_filename: str, progress_callback: Optional[Callable] = None) -> Tuple[bool, Optional[str]]:
         """Upload file to B2"""
         try:
-            if not self.upload_url:
-                await self.get_upload_url()
-            
             # Calculate SHA1
             sha1 = hashlib.sha1()
             file_size = os.path.getsize(file_path)
@@ -104,101 +129,136 @@ class B2Storage:
             
             sha1_hash = sha1.hexdigest()
             
-            # Upload file
+            # Read file content
+            with open(file_path, 'rb') as f:
+                file_content = f.read()
+            
+            # Determine content type
+            content_type = 'video/mp4'
+            if b2_filename.lower().endswith(('.jpg', '.jpeg')):
+                content_type = 'image/jpeg'
+            elif b2_filename.lower().endswith('.png'):
+                content_type = 'image/png'
+            elif b2_filename.lower().endswith('.webp'):
+                content_type = 'image/webp'
+            
+            # Upload to B2
             async with aiohttp.ClientSession() as session:
-                with open(file_path, 'rb') as f:
-                    headers = {
+                async with session.post(
+                    self.upload_url,
+                    headers={
                         'Authorization': self.upload_auth_token,
                         'X-Bz-File-Name': b2_filename,
-                        'Content-Type': 'application/octet-stream',
+                        'Content-Type': content_type,
                         'Content-Length': str(file_size),
                         'X-Bz-Content-Sha1': sha1_hash
-                    }
+                    },
+                    data=file_content
+                ) as response:
+                    if response.status not in [200, 201]:
+                        error_text = await response.text()
+                        print(f"B2 Upload failed: {response.status} - {error_text}")
+                        return (False, None)
                     
-                    async with session.post(
-                        self.upload_url,
-                        headers=headers,
-                        data=f
-                    ) as response:
-                        if response.status == 200:
-                            data = await response.json()
-                            file_id = data['fileId']
-                            
-                            if progress_callback:
-                                await progress_callback('uploaded', f'Uploaded to B2: {b2_filename}')
-                            
-                            return True, file_id
-                        else:
-                            error = await response.text()
-                            print(f"B2 Upload error: {error}")
-                            return False, None
+                    data = await response.json()
+                    file_id = data['fileId']
+                    
+                    return (True, file_id)
+        
         except Exception as e:
-            print(f"Upload error: {e}")
-            return False, None
+            print(f"B2 Upload error: {e}")
+            return (False, None)
     
     async def get_download_url(self, b2_filename: str, duration_seconds: int = 3600) -> Optional[str]:
-        """Get signed download URL for file"""
+        """Generate signed download URL"""
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.post(
-                    f'{self.api_url}/b2api/v2/b2_get_download_authorization',
-                    headers={'Authorization': self.auth_token},
+                    f"{self.api_url}/b2api/v2/b2_get_download_authorization",
+                    headers={
+                        'Authorization': self.authorization_token
+                    },
                     json={
                         'bucketId': self.bucket_id,
                         'fileNamePrefix': b2_filename,
                         'validDurationInSeconds': duration_seconds
                     }
                 ) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        auth_token = data['authorizationToken']
-                        return f"{self.download_url}/file/{self.bucket_name}/{b2_filename}?Authorization={auth_token}"
-                    return None
+                    if response.status != 200:
+                        print(f"Failed to get download authorization: {response.status}")
+                        return None
+                    
+                    data = await response.json()
+                    auth_token = data['authorizationToken']
+                    
+                    # Build download URL with authorization
+                    download_url = f"{self.download_url}/file/{self.bucket_name}/{b2_filename}?Authorization={auth_token}"
+                    return download_url
+        
         except Exception as e:
-            print(f"Error getting download URL: {e}")
+            print(f"Error generating download URL: {e}")
             return None
     
-    async def delete_file(self, file_id: str, b2_filename: str) -> bool:
+    async def delete_file(self, file_id: str, file_name: str) -> bool:
         """Delete file from B2"""
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.post(
-                    f'{self.api_url}/b2api/v2/b2_delete_file_version',
-                    headers={'Authorization': self.auth_token},
-                    json={'fileId': file_id, 'fileName': b2_filename}
+                    f"{self.api_url}/b2api/v2/b2_delete_file_version",
+                    headers={
+                        'Authorization': self.authorization_token
+                    },
+                    json={
+                        'fileId': file_id,
+                        'fileName': file_name
+                    }
                 ) as response:
                     return response.status == 200
+        
         except Exception as e:
             print(f"Error deleting file: {e}")
             return False
     
-    async def list_files(self, prefix: str = '') -> list:
+    async def list_files(self, prefix: str = "", max_files: int = 100) -> list:
         """List files in bucket"""
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.post(
-                    f'{self.api_url}/b2api/v2/b2_list_file_names',
-                    headers={'Authorization': self.auth_token},
+                    f"{self.api_url}/b2api/v2/b2_list_file_names",
+                    headers={
+                        'Authorization': self.authorization_token
+                    },
                     json={
                         'bucketId': self.bucket_id,
                         'prefix': prefix,
-                        'maxFileCount': 1000
+                        'maxFileCount': max_files
                     }
                 ) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        return data.get('files', [])
-                    return []
+                    if response.status != 200:
+                        return []
+                    
+                    data = await response.json()
+                    return data.get('files', [])
+        
         except Exception as e:
             print(f"Error listing files: {e}")
             return []
+
 
 async def test_b2_credentials(key_id: str, application_key: str, bucket_name: str) -> Tuple[bool, str]:
     """Test B2 credentials"""
     try:
         b2 = B2Storage(key_id, application_key, bucket_name)
-        if await b2.authorize():
-            return True, "Connection successful"
-        return False, "Authorization failed - check credentials"
+        
+        # Try to authorize
+        if not await b2.authorize():
+            return (False, "Authorization failed. Check your credentials and bucket name.")
+        
+        # Try to get upload URL
+        if not await b2.get_upload_url():
+            return (False, "Failed to get upload URL. Check bucket permissions.")
+        
+        return (True, "B2 credentials are valid!")
+    
     except Exception as e:
-        return False, str(e)
+        return (False, f"Error: {str(e)}")
