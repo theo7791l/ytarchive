@@ -7,9 +7,15 @@
     <link rel="stylesheet" href="/static/css/app.css">
     <style>
         .profile-container {
-            max-width: 800px;
+            max-width: 1000px;
             margin: 40px auto;
             padding: 0 40px;
+            animation: fadeIn 0.5s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
         .profile-header {
@@ -18,19 +24,38 @@
         }
 
         .profile-header h1 {
-            font-size: 36px;
+            font-size: 42px;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             margin-bottom: 10px;
+            animation: slideDown 0.6s ease;
+        }
+
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
         .profile-card {
             background: rgba(255, 255, 255, 0.05);
-            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            border-radius: 25px;
             padding: 40px;
             margin-bottom: 30px;
             border: 2px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+            animation: fadeInUp 0.7s ease;
+        }
+
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .profile-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(102, 126, 234, 0.2);
         }
 
         .avatar-section {
@@ -48,7 +73,12 @@
             border-radius: 50%;
             object-fit: cover;
             border: 4px solid #667eea;
-            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+            transition: all 0.3s ease;
+        }
+
+        .avatar-preview:hover {
+            transform: scale(1.05) rotate(5deg);
         }
 
         .avatar-placeholder {
@@ -61,16 +91,18 @@
             justify-content: center;
             font-size: 48px;
             border: 4px solid #667eea;
-            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+            transition: all 0.3s ease;
         }
 
-        .avatar-controls {
-            flex: 1;
+        .avatar-placeholder:hover {
+            transform: scale(1.05) rotate(-5deg);
         }
 
         .avatar-controls h3 {
             margin-bottom: 15px;
             color: #667eea;
+            font-size: 20px;
         }
 
         .avatar-buttons {
@@ -82,10 +114,11 @@
         .btn-upload, .btn-remove {
             padding: 12px 24px;
             border: none;
-            border-radius: 8px;
+            border-radius: 12px;
             cursor: pointer;
             font-weight: 600;
             transition: all 0.3s ease;
+            font-size: 14px;
         }
 
         .btn-upload {
@@ -94,7 +127,7 @@
         }
 
         .btn-upload:hover {
-            transform: translateY(-2px);
+            transform: translateY(-3px);
             box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
         }
 
@@ -106,16 +139,16 @@
 
         .btn-remove:hover {
             background: rgba(255, 68, 68, 0.3);
-        }
-
-        .form-section {
-            margin-bottom: 40px;
+            transform: translateY(-3px);
         }
 
         .form-section h3 {
             margin-bottom: 25px;
             color: #667eea;
-            font-size: 22px;
+            font-size: 24px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
 
         .form-group {
@@ -127,6 +160,7 @@
             margin-bottom: 10px;
             font-weight: 600;
             color: #aaa;
+            font-size: 14px;
         }
 
         .form-group input {
@@ -134,7 +168,7 @@
             padding: 15px 20px;
             background: rgba(255, 255, 255, 0.05);
             border: 2px solid rgba(255, 255, 255, 0.1);
-            border-radius: 10px;
+            border-radius: 12px;
             color: white;
             font-size: 15px;
             transition: all 0.3s ease;
@@ -144,30 +178,27 @@
             outline: none;
             border-color: #667eea;
             background: rgba(255, 255, 255, 0.08);
-        }
-
-        .form-group input:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
+            box-shadow: 0 0 20px rgba(102, 126, 234, 0.3);
         }
 
         .role-display {
             padding: 10px 20px;
             background: rgba(102, 126, 234, 0.2);
-            border-radius: 8px;
+            border-radius: 10px;
             display: inline-block;
             font-weight: 600;
             color: #667eea;
             text-transform: uppercase;
+            border: 2px solid rgba(102, 126, 234, 0.3);
         }
 
         .btn-save {
             width: 100%;
-            padding: 15px;
+            padding: 16px;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             border: none;
-            border-radius: 10px;
+            border-radius: 12px;
             font-size: 16px;
             font-weight: 600;
             cursor: pointer;
@@ -175,34 +206,43 @@
         }
 
         .btn-save:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+            transform: translateY(-3px);
+            box-shadow: 0 15px 35px rgba(102, 126, 234, 0.5);
+        }
+
+        .btn-save:active {
+            transform: translateY(-1px);
         }
 
         .divider {
             height: 2px;
-            background: rgba(255, 255, 255, 0.1);
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
             margin: 40px 0;
         }
 
         .danger-zone {
             background: rgba(255, 68, 68, 0.1);
             border: 2px solid rgba(255, 68, 68, 0.3);
-            border-radius: 15px;
+            border-radius: 20px;
             padding: 30px;
         }
 
         .danger-zone h3 {
             color: #ff4444;
-            margin-bottom: 15px;
         }
 
         .success-message, .error-message {
             padding: 15px 20px;
-            border-radius: 8px;
+            border-radius: 12px;
             margin-bottom: 20px;
             font-weight: 600;
             display: none;
+            animation: slideInDown 0.4s ease;
+        }
+
+        @keyframes slideInDown {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
         .success-message {
@@ -216,29 +256,142 @@
             color: #ff4444;
             border: 2px solid rgba(255, 68, 68, 0.3);
         }
+
+        .user-profile-dropdown {
+            position: relative;
+            display: inline-block;
+        }
+
+        .user-profile-btn {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            padding: 8px 15px;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .user-profile-btn:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .user-avatar-small {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid #667eea;
+        }
+
+        .user-avatar-placeholder-small {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            border: 2px solid #667eea;
+        }
+
+        .dropdown-menu {
+            display: none;
+            position: absolute;
+            top: 110%;
+            right: 0;
+            background: #1a1a2e;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            min-width: 200px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+        }
+
+        .dropdown-menu.active {
+            display: block;
+            animation: fadeInDropdown 0.3s ease;
+        }
+
+        @keyframes fadeInDropdown {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .dropdown-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 20px;
+            color: white;
+            text-decoration: none;
+            transition: all 0.2s ease;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .dropdown-item:hover {
+            background: rgba(102, 126, 234, 0.2);
+        }
+
+        .role-badge-small {
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            background: rgba(102, 126, 234, 0.3);
+            color: #667eea;
+        }
     </style>
 </head>
 <body>
     <nav class="navbar">
         <div class="nav-brand">
-            <h1>🎥 YTArchive</h1>
+            <h1>🎬 YTArchive</h1>
         </div>
         <div class="nav-menu">
             <a href="/app" class="nav-link">📚 Library</a>
             <a href="/app#channels" class="nav-link">📺 Channels</a>
-            <a href="/profile" class="nav-link active">👤 Profil</a>
-            <a href="/admin" class="nav-link" id="admin-link" style="display: none;">⚙️ Admin</a>
+            <a href="/app#download" class="nav-link">⬇️ Download</a>
         </div>
         <div class="nav-user">
-            <span id="username"></span>
-            <button class="btn-logout" id="logout">Déconnexion</button>
+            <div class="user-profile-dropdown">
+                <button class="user-profile-btn" onclick="toggleDropdown()">
+                    <div id="nav-avatar-container">
+                        <div class="user-avatar-placeholder-small">👤</div>
+                    </div>
+                    <div style="display: flex; flex-direction: column; align-items: flex-start;">
+                        <span id="nav-username" style="font-weight: 600;"></span>
+                        <span id="nav-role" class="role-badge-small">membre</span>
+                    </div>
+                    <span style="font-size: 12px;">▼</span>
+                </button>
+                <div class="dropdown-menu" id="dropdown-menu">
+                    <a href="/profile" class="dropdown-item" style="background: rgba(102, 126, 234, 0.1);">
+                        <span>👤</span>
+                        <span>Mon Profil</span>
+                    </a>
+                    <a href="/admin" class="dropdown-item" id="nav-admin-link" style="display: none;">
+                        <span>⚙️</span>
+                        <span>Administration</span>
+                    </a>
+                    <hr style="margin: 0; border: none; border-top: 1px solid rgba(255, 255, 255, 0.1);">
+                    <a href="#" class="dropdown-item" onclick="logout(); return false;" style="color: #ff4444;">
+                        <span>🚪</span>
+                        <span>Déconnexion</span>
+                    </a>
+                </div>
+            </div>
         </div>
     </nav>
 
     <div class="profile-container">
         <div class="profile-header">
             <h1>👤 Mon Profil</h1>
-            <p style="color: #aaa;">Gérez vos informations personnelles</p>
+            <p style="color: #aaa; font-size: 18px;">Gérez vos informations personnelles</p>
         </div>
 
         <div id="success-msg" class="success-message"></div>
@@ -251,7 +404,7 @@
                     <div class="avatar-placeholder">👤</div>
                 </div>
                 <div class="avatar-controls">
-                    <h3>Photo de profil</h3>
+                    <h3>📷 Photo de profil</h3>
                     <p style="color: #aaa; margin-bottom: 15px;">Image recommandée : 400x400px, max 2MB</p>
                     <input type="file" id="avatar-input" accept="image/*" style="display: none;">
                     <div class="avatar-buttons">
@@ -317,14 +470,23 @@
             window.location.href = '/';
         }
 
-        document.getElementById('username').textContent = username;
-        document.getElementById('logout').addEventListener('click', () => {
+        let currentUser = null;
+
+        function toggleDropdown() {
+            document.getElementById('dropdown-menu').classList.toggle('active');
+        }
+
+        window.addEventListener('click', (e) => {
+            if (!e.target.closest('.user-profile-dropdown')) {
+                document.getElementById('dropdown-menu').classList.remove('active');
+            }
+        });
+
+        function logout() {
             localStorage.removeItem('token');
             localStorage.removeItem('username');
             window.location.href = '/';
-        });
-
-        let currentUser = null;
+        }
 
         async function apiCall(endpoint, options = {}) {
             const response = await fetch(endpoint, {
@@ -358,6 +520,8 @@
                 errorMsg.style.display = 'none';
             }
             
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            
             setTimeout(() => {
                 successMsg.style.display = 'none';
                 errorMsg.style.display = 'none';
@@ -368,18 +532,27 @@
             const response = await apiCall('/api/auth/me');
             currentUser = await response.json();
             
-            // Show admin link if admin
+            // Update navbar
+            document.getElementById('nav-username').textContent = currentUser.display_name || currentUser.username;
+            document.getElementById('nav-role').textContent = currentUser.role;
+            
             if (currentUser.role === 'admin') {
-                document.getElementById('admin-link').style.display = 'block';
+                document.getElementById('nav-admin-link').style.display = 'flex';
             }
             
-            // Update fields
+            // Update navbar avatar
+            const navAvatarContainer = document.getElementById('nav-avatar-container');
+            if (currentUser.avatar) {
+                navAvatarContainer.innerHTML = `<img src="/avatars/${currentUser.avatar}" class="user-avatar-small" alt="Avatar">`;
+            }
+            
+            // Update form fields
             document.getElementById('username-field').value = currentUser.username;
             document.getElementById('display-name').value = currentUser.display_name || '';
             document.getElementById('email').value = currentUser.email || '';
             document.getElementById('role-display').textContent = currentUser.role.toUpperCase();
             
-            // Update avatar
+            // Update main avatar
             const avatarContainer = document.getElementById('avatar-container');
             if (currentUser.avatar) {
                 avatarContainer.innerHTML = `<img src="/avatars/${currentUser.avatar}" class="avatar-preview" alt="Avatar">`;
