@@ -218,8 +218,8 @@ function renderLibrary() {
     }
     
     if (currentView === 'grid') {
-        grid.innerHTML = filtered.map(video => `
-            <div class="video-card" data-id="${video.id}">
+        grid.innerHTML = filtered.map((video, i) => `
+            <div class="video-card" data-id="${video.id}" style="--i: ${i}">
                 <div class="video-thumbnail">
                     ${video.thumbnail_file ? 
                         `<img src="/videos/${video.thumbnail_file}" alt="${video.title}">` :
@@ -243,8 +243,8 @@ function renderLibrary() {
             </div>
         `).join('');
     } else {
-        grid.innerHTML = filtered.map(video => `
-            <div class="video-list-item" data-id="${video.id}">
+        grid.innerHTML = filtered.map((video, i) => `
+            <div class="video-list-item" data-id="${video.id}" style="--i: ${i}">
                 <div class="list-thumbnail">
                     ${video.thumbnail_file ? 
                         `<img src="/videos/${video.thumbnail_file}" alt="${video.title}">` :
@@ -576,8 +576,8 @@ async function loadChannels() {
     if (channels.length === 0) {
         container.innerHTML = '<p class="empty-state">No channels yet.</p>';
     } else {
-        container.innerHTML = channels.map(ch => `
-            <div class="channel-card">
+        container.innerHTML = channels.map((ch, i) => `
+            <div class="channel-card" style="--i: ${i}">
                 ${ch.thumbnail ? `<img src="${ch.thumbnail}" class="channel-thumb">` : '<div class="channel-thumb-placeholder">CH</div>'}
                 <div class="channel-info">
                     <h3>${ch.name}</h3>
