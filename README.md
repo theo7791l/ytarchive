@@ -7,6 +7,7 @@
 - 🔐 **Secure authentication** with JWT tokens
 - 📥 **Download YouTube videos** in multiple qualities
 - 📺 **Auto-follow channels** — automatically download new uploads
+- ⏰ **Background scheduler** — checks channels every hour
 - 🎨 **Beautiful, animated UI** — dark theme, smooth transitions
 - 🗃️ **No database** — everything stored in JSON files
 - 🎥 **Built-in video player** — watch directly in the browser
@@ -33,6 +34,26 @@ python main.py
 
 Open http://localhost:8000 and login!
 
+## 📺 How to Use
+
+### Download Single Videos
+1. Go to **Download** tab
+2. Paste YouTube URL
+3. Select quality (best/1080p/720p/480p)
+4. Click **Download**
+5. Watch real-time progress
+
+### Follow Channels (Auto-Download)
+1. Go to **Channels** tab
+2. Click **+ Add Channel**
+3. Paste channel URL (e.g., `https://youtube.com/@channelname`)
+4. Choose quality and enable auto-download
+5. Scheduler will check for new videos every hour
+
+### Manual Channel Check
+- Click 🔄 **Check** button on any channel card
+- Instant check for new uploads
+
 ## 📦 Deploy on SkyBots
 
 1. **Zip your project**:
@@ -57,10 +78,13 @@ Open http://localhost:8000 and login!
 
 5. **Start the server** and access via your SkyBots URL!
 
+⚠️ **Note**: SkyBots has shared storage limits. Monitor disk usage or configure auto-delete for old videos.
+
 ## 🛠️ Tech Stack
 
 - **Backend**: FastAPI + Python
 - **Downloader**: yt-dlp
+- **Scheduler**: asyncio background tasks
 - **Auth**: JWT tokens + bcrypt
 - **Frontend**: Vanilla JS/CSS/HTML
 - **Storage**: JSON files (no database!)
@@ -68,12 +92,20 @@ Open http://localhost:8000 and login!
 ## 📋 Roadmap
 
 - [x] Step 1: Auth system + Beautiful login
-- [ ] Step 2: Video downloader with yt-dlp
-- [ ] Step 3: Channel auto-tracking
-- [ ] Step 4: Advanced library UI
-- [ ] Step 5: Video player
-- [ ] Step 6: Channel management
+- [x] Step 2: Video downloader with yt-dlp
+- [x] Step 3: Channel auto-tracking + scheduler
+- [ ] Step 4: Advanced library UI (filters, sorting)
+- [ ] Step 5: Enhanced video player
+- [ ] Step 6: Channel statistics & management
 - [ ] Step 7: Full deployment guide
+
+## 🔧 Configuration
+
+### Scheduler Interval
+Edit `scheduler.py`, line with `scheduler_loop(interval_hours=1)` to change check frequency.
+
+### Video Quality
+Default qualities: `best`, `1080p`, `720p`, `480p`. Modify `quality_map` in `downloader.py` to add custom formats.
 
 ## 📝 License
 

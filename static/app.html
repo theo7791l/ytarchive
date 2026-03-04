@@ -40,6 +40,7 @@
         <section id="channels-view" class="view">
             <div class="view-header">
                 <h2>Followed Channels</h2>
+                <button id="add-channel-btn" class="btn-primary">+ Add Channel</button>
             </div>
             <div id="channels-list" class="channels-container">
                 <p class="empty-state">No channels followed yet.</p>
@@ -69,6 +70,34 @@
             </div>
         </section>
     </main>
+    
+    <!-- Add Channel Modal -->
+    <div id="add-channel-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <button class="modal-close" onclick="closeAddChannelModal()">&times;</button>
+            <h2>Add Channel</h2>
+            <form id="add-channel-form">
+                <div class="form-group">
+                    <label>Channel URL</label>
+                    <input type="text" id="channel-url" placeholder="https://www.youtube.com/@channelname" required>
+                </div>
+                <div class="form-group">
+                    <label>Quality</label>
+                    <select id="channel-quality">
+                        <option value="best">Best Quality</option>
+                        <option value="1080p">1080p</option>
+                        <option value="720p" selected>720p</option>
+                        <option value="480p">480p</option>
+                    </select>
+                </div>
+                <div class="form-group checkbox">
+                    <input type="checkbox" id="auto-download" checked>
+                    <label for="auto-download">Auto-download new videos</label>
+                </div>
+                <button type="submit" class="btn-primary">Add Channel</button>
+            </form>
+        </div>
+    </div>
     
     <script src="/static/js/app.js"></script>
 </body>

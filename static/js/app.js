@@ -29,7 +29,6 @@ navLinks.forEach(link => {
         views.forEach(v => v.classList.remove('active'));
         document.getElementById(`${viewName}-view`).classList.add('active');
         
-        // Load data when switching to views
         if (viewName === 'library') loadLibrary();
         if (viewName === 'channels') loadChannels();
     });
@@ -55,18 +54,16 @@ async function apiCall(endpoint, options = {}) {
     return response.json();
 }
 
-// Format duration
+// Format functions
 function formatDuration(seconds) {
     if (!seconds) return 'N/A';
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
     const s = seconds % 60;
-    
     if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
     return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-// Format date
 function formatDate(dateStr) {
     if (!dateStr) return 'Unknown';
     try {
@@ -77,7 +74,6 @@ function formatDate(dateStr) {
     }
 }
 
-// Format number
 function formatNumber(num) {
     if (!num) return '0';
     if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
@@ -85,9 +81,13 @@ function formatNumber(num) {
     return num.toString();
 }
 
-// Load library
+// Library
+let libraryCache = [];
+
 async function loadLibrary() {
     const library = await apiCall('/api/library');
+    libraryCache = library;
+    localStorage.setItem('library_cache', JSON.stringify(library));
     const grid = document.getElementById('library-grid');
     
     if (library.length === 0) {
@@ -101,6 +101,7 @@ async function loadLibrary() {
                         `<div class="no-thumbnail">📹</div>`
                     }
                     <div class="video-duration">${formatDuration(video.duration)}</div>
+                    ${video.auto_downloaded ? '<div class="auto-badge">AUTO</div>' : ''}
                 </div>
                 <div class="video-info">
                     <h3 class="video-title">${video.title}</h3>
@@ -119,17 +120,10 @@ async function loadLibrary() {
     }
 }
 
-// Play video
 function playVideo(videoId) {
-    const library = JSON.parse(localStorage.getItem('library_cache') || '[]');
-    const video = library.find(v => v.id === videoId);
+    const video = libraryCache.find(v => v.id === videoId);
+    if (!video) return;
     
-    if (!video) {
-        alert('Video not found');
-        return;
-    }
-    
-    // Create modal player
     const modal = document.createElement('div');
     modal.className = 'video-modal';
     modal.innerHTML = `
@@ -138,7 +132,6 @@ function playVideo(videoId) {
             <h2>${video.title}</h2>
             <video controls autoplay>
                 <source src="/videos/${video.video_file}" type="video/mp4">
-                Your browser doesn't support video playback.
             </video>
             <div class="video-details">
                 <p><strong>Channel:</strong> ${video.channel}</p>
@@ -151,36 +144,56 @@ function playVideo(videoId) {
     document.body.appendChild(modal);
 }
 
-// Delete video
 async function deleteVideo(videoId) {
-    if (!confirm('Are you sure you want to delete this video?')) return;
-    
-    try {
-        await apiCall(`/api/library/${videoId}`, { method: 'DELETE' });
-        loadLibrary();
-    } catch (error) {
-        alert('Failed to delete video');
-    }
+    if (!confirm('Delete this video?')) return;
+    await apiCall(`/api/library/${videoId}`, { method: 'DELETE' });
+    loadLibrary();
 }
 
-// Load channels
-async function loadChannels() {
-    const channels = await apiCall('/api/channels');
-    const container = document.getElementById('channels-list');
+// Search
+document.getElementById('search').addEventListener('input', (e) => {
+    const query = e.target.value.toLowerCase();
+    const grid = document.getElementById('library-grid');
     
-    if (channels.length === 0) {
-        container.innerHTML = '<p class="empty-state">No channels followed yet.</p>';
+    if (!query) {
+        loadLibrary();
+        return;
+    }
+    
+    const filtered = libraryCache.filter(v => 
+        v.title.toLowerCase().includes(query) ||
+        v.channel.toLowerCase().includes(query)
+    );
+    
+    if (filtered.length === 0) {
+        grid.innerHTML = '<p class="empty-state">No videos found.</p>';
     } else {
-        container.innerHTML = channels.map(channel => `
-            <div class="channel-card">
-                <h3>${channel.name}</h3>
-                <p>${channel.video_count} videos</p>
+        grid.innerHTML = filtered.map(video => `
+            <div class="video-card">
+                <div class="video-thumbnail">
+                    ${video.thumbnail_file ? 
+                        `<img src="/videos/${video.thumbnail_file}">` :
+                        `<div class="no-thumbnail">📹</div>`}
+                    <div class="video-duration">${formatDuration(video.duration)}</div>
+                </div>
+                <div class="video-info">
+                    <h3 class="video-title">${video.title}</h3>
+                    <p class="video-channel">${video.channel}</p>
+                    <div class="video-meta">
+                        <span>👁️ ${formatNumber(video.view_count)}</span>
+                        <span>📅 ${formatDate(video.upload_date)}</span>
+                    </div>
+                </div>
+                <div class="video-actions">
+                    <button class="btn-play" onclick="playVideo('${video.id}')">▶️</button>
+                    <button class="btn-delete" onclick="deleteVideo('${video.id}')">🗑️</button>
+                </div>
             </div>
         `).join('');
     }
-}
+});
 
-// Download video with WebSocket
+// Download
 let downloadWs = null;
 
 document.getElementById('download-btn').addEventListener('click', async () => {
@@ -191,17 +204,12 @@ document.getElementById('download-btn').addEventListener('click', async () => {
     const progressText = document.querySelector('#download-progress p');
     const downloadBtn = document.getElementById('download-btn');
     
-    if (!url) {
-        alert('Please enter a YouTube URL');
-        return;
-    }
+    if (!url) return alert('Enter a YouTube URL');
     
-    // Show progress
     progressDiv.style.display = 'block';
     downloadBtn.disabled = true;
     progressText.textContent = 'Connecting...';
     
-    // Connect WebSocket
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     downloadWs = new WebSocket(`${wsProtocol}//${window.location.host}/api/ws/download`);
     
@@ -217,7 +225,7 @@ document.getElementById('download-btn').addEventListener('click', async () => {
             progressFill.style.width = '10%';
         } else if (data.status === 'downloading') {
             const percent = parseFloat(data.percent) || 0;
-            progressText.textContent = `Downloading: ${data.percent} (${data.speed}) - ETA: ${data.eta}`;
+            progressText.textContent = `${data.percent} (${data.speed}) - ETA: ${data.eta}`;
             progressFill.style.width = `${percent}%`;
         } else if (data.status === 'finished') {
             progressText.textContent = data.message;
@@ -241,100 +249,85 @@ document.getElementById('download-btn').addEventListener('click', async () => {
             }, 3000);
         }
     };
-    
-    downloadWs.onerror = (error) => {
-        progressText.textContent = 'Connection error';
-        progressText.style.color = '#f44';
-        setTimeout(() => {
-            progressDiv.style.display = 'none';
-            downloadBtn.disabled = false;
-            progressText.style.color = '';
-        }, 3000);
-    };
 });
 
-// Search functionality
-let libraryCache = [];
-
-document.getElementById('search').addEventListener('input', (e) => {
-    const query = e.target.value.toLowerCase();
-    const grid = document.getElementById('library-grid');
+// Channels
+async function loadChannels() {
+    const channels = await apiCall('/api/channels');
+    const container = document.getElementById('channels-list');
     
-    if (!query) {
-        loadLibrary();
-        return;
-    }
-    
-    const filtered = libraryCache.filter(video => 
-        video.title.toLowerCase().includes(query) ||
-        video.channel.toLowerCase().includes(query)
-    );
-    
-    if (filtered.length === 0) {
-        grid.innerHTML = '<p class="empty-state">No videos found.</p>';
+    if (channels.length === 0) {
+        container.innerHTML = '<p class="empty-state">No channels yet.</p>';
     } else {
-        grid.innerHTML = filtered.map(video => `
-            <div class="video-card" data-id="${video.id}">
-                <div class="video-thumbnail">
-                    ${video.thumbnail_file ? 
-                        `<img src="/videos/${video.thumbnail_file}" alt="${video.title}">` :
-                        `<div class="no-thumbnail">📹</div>`
-                    }
-                    <div class="video-duration">${formatDuration(video.duration)}</div>
+        container.innerHTML = channels.map(ch => `
+            <div class="channel-card">
+                ${ch.thumbnail ? `<img src="${ch.thumbnail}" class="channel-thumb">` : ''}
+                <div class="channel-info">
+                    <h3>${ch.name}</h3>
+                    <p>${ch.video_count} videos</p>
+                    <p class="channel-date">Added ${formatDate(ch.added_at)}</p>
                 </div>
-                <div class="video-info">
-                    <h3 class="video-title">${video.title}</h3>
-                    <p class="video-channel">${video.channel}</p>
-                    <div class="video-meta">
-                        <span>👁️ ${formatNumber(video.view_count)}</span>
-                        <span>📅 ${formatDate(video.upload_date)}</span>
-                    </div>
-                </div>
-                <div class="video-actions">
-                    <button class="btn-play" onclick="playVideo('${video.id}')">▶️ Play</button>
-                    <button class="btn-delete" onclick="deleteVideo('${video.id}')">🗑️</button>
-                </div>
-            </div>
-        `).join('');
-    }
-});
-
-// Enhanced library load with cache
-async function loadLibrary() {
-    const library = await apiCall('/api/library');
-    libraryCache = library;
-    localStorage.setItem('library_cache', JSON.stringify(library));
-    const grid = document.getElementById('library-grid');
-    
-    if (library.length === 0) {
-        grid.innerHTML = '<p class="empty-state">No videos yet. Start downloading!</p>';
-    } else {
-        grid.innerHTML = library.map(video => `
-            <div class="video-card" data-id="${video.id}">
-                <div class="video-thumbnail">
-                    ${video.thumbnail_file ? 
-                        `<img src="/videos/${video.thumbnail_file}" alt="${video.title}">` :
-                        `<div class="no-thumbnail">📹</div>`
-                    }
-                    <div class="video-duration">${formatDuration(video.duration)}</div>
-                </div>
-                <div class="video-info">
-                    <h3 class="video-title">${video.title}</h3>
-                    <p class="video-channel">${video.channel}</p>
-                    <div class="video-meta">
-                        <span>👁️ ${formatNumber(video.view_count)}</span>
-                        <span>📅 ${formatDate(video.upload_date)}</span>
-                    </div>
-                </div>
-                <div class="video-actions">
-                    <button class="btn-play" onclick="playVideo('${video.id}')">▶️ Play</button>
-                    <button class="btn-delete" onclick="deleteVideo('${video.id}')">🗑️</button>
+                <div class="channel-actions">
+                    <label class="toggle">
+                        <input type="checkbox" ${ch.auto_download ? 'checked' : ''} 
+                               onchange="toggleAutoDownload('${ch.id}', this.checked)">
+                        <span>Auto-DL</span>
+                    </label>
+                    <button class="btn-check" onclick="checkChannelNow('${ch.id}')">🔄 Check</button>
+                    <button class="btn-delete-channel" onclick="deleteChannel('${ch.id}')">🗑️</button>
                 </div>
             </div>
         `).join('');
     }
 }
 
+function openAddChannelModal() {
+    document.getElementById('add-channel-modal').style.display = 'flex';
+}
+
+function closeAddChannelModal() {
+    document.getElementById('add-channel-modal').style.display = 'none';
+    document.getElementById('add-channel-form').reset();
+}
+
+document.getElementById('add-channel-btn').addEventListener('click', openAddChannelModal);
+
+document.getElementById('add-channel-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const url = document.getElementById('channel-url').value;
+    const quality = document.getElementById('channel-quality').value;
+    const autoDownload = document.getElementById('auto-download').checked;
+    
+    try {
+        await apiCall('/api/channels', {
+            method: 'POST',
+            body: JSON.stringify({ channel_url: url, quality, auto_download: autoDownload })
+        });
+        closeAddChannelModal();
+        loadChannels();
+    } catch (e) {
+        alert('Failed to add channel');
+    }
+});
+
+async function toggleAutoDownload(channelId, enabled) {
+    await apiCall(`/api/channels/${channelId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ auto_download: enabled })
+    });
+}
+
+async function checkChannelNow(channelId) {
+    await apiCall(`/api/channels/${channelId}/check`, { method: 'POST' });
+    alert('Checking for new videos...');
+}
+
+async function deleteChannel(channelId) {
+    if (!confirm('Remove this channel?')) return;
+    await apiCall(`/api/channels/${channelId}`, { method: 'DELETE' });
+    loadChannels();
+}
+
 // Initial load
 loadLibrary();
-loadChannels();

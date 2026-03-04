@@ -5,9 +5,11 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import os
+import threading
 
 from auth import verify_token, router as auth_router
 from downloader import router as download_router
+import scheduler
 
 app = FastAPI(title="YTArchive", version="1.0.0")
 
@@ -35,6 +37,14 @@ async def root():
 @app.get("/app")
 async def app_page():
     return FileResponse("static/app.html")
+
+@app.on_event("startup")
+async def startup_event():
+    """Start scheduler on app startup"""
+    # Run scheduler in separate thread
+    scheduler_thread = threading.Thread(target=scheduler.start_scheduler, daemon=True)
+    scheduler_thread.start()
+    print("✅ Channel scheduler started")
 
 if __name__ == "__main__":
     # Create data directories

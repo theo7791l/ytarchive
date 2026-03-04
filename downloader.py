@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import Optional
 import yt_dlp
 from auth import verify_token
+import scheduler
 
 router = APIRouter()
 
@@ -21,6 +22,7 @@ class DownloadRequest(BaseModel):
 class ChannelRequest(BaseModel):
     channel_url: str
     auto_download: bool = True
+    quality: str = "best"
 
 def load_library():
     if not os.path.exists(LIBRARY_FILE):
@@ -77,7 +79,6 @@ async def download_video(url: str, quality: str = "best", progress: Optional[Dow
     """Download a video using yt-dlp"""
     os.makedirs(VIDEOS_DIR, exist_ok=True)
     
-    # Quality mapping
     quality_map = {
         "best": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
         "1080p": "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]/best",
@@ -101,7 +102,6 @@ async def download_video(url: str, quality: str = "best", progress: Optional[Dow
     
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            # Extract info first
             info = ydl.extract_info(url, download=False)
             
             if info is None:
@@ -116,17 +116,14 @@ async def download_video(url: str, quality: str = "best", progress: Optional[Dow
             description = info.get('description', '')
             view_count = info.get('view_count', 0)
             
-            # Format upload date
             if upload_date and len(upload_date) == 8:
                 upload_date = f"{upload_date[:4]}-{upload_date[4:6]}-{upload_date[6:]}"
             
-            # Download the video
             if progress:
                 await progress.send_update({'status': 'starting', 'message': f'Downloading: {title}'})
             
             ydl.download([url])
             
-            # Find downloaded files
             video_file = None
             thumbnail_file = None
             
@@ -145,10 +142,7 @@ async def download_video(url: str, quality: str = "best", progress: Optional[Dow
             if not video_file:
                 raise Exception("Video file not found after download")
             
-            # Add to library
             library = load_library()
-            
-            # Check if already exists
             existing = next((v for v in library if v['id'] == video_id), None)
             if existing:
                 return existing
@@ -192,7 +186,6 @@ async def download_video(url: str, quality: str = "best", progress: Optional[Dow
 
 @router.post("/download")
 async def download_video_endpoint(req: DownloadRequest, username: str = Depends(verify_token)):
-    """Download a video without WebSocket"""
     try:
         video = await download_video(req.url, req.quality)
         return {
@@ -207,11 +200,9 @@ async def download_video_endpoint(req: DownloadRequest, username: str = Depends(
 
 @router.websocket("/ws/download")
 async def download_video_ws(websocket: WebSocket):
-    """Download a video with real-time progress via WebSocket"""
     await websocket.accept()
     
     try:
-        # Receive download request
         data = await websocket.receive_json()
         url = data.get('url')
         quality = data.get('quality', 'best')
@@ -222,16 +213,12 @@ async def download_video_ws(websocket: WebSocket):
             await websocket.close()
             return
         
-        # Verify token (simple check, you can enhance this)
         if not token:
             await websocket.send_json({'status': 'error', 'message': 'Authentication required'})
             await websocket.close()
             return
         
-        # Create progress tracker
         progress = DownloadProgress(websocket)
-        
-        # Download video
         await download_video(url, quality, progress)
         
     except WebSocketDisconnect:
@@ -253,14 +240,12 @@ async def get_library(username: str = Depends(verify_token)):
 
 @router.delete("/library/{video_id}")
 async def delete_video(video_id: str, username: str = Depends(verify_token)):
-    """Delete a video from library and disk"""
     library = load_library()
     video = next((v for v in library if v['id'] == video_id), None)
     
     if not video:
         raise HTTPException(status_code=404, detail="Video not found")
     
-    # Delete files
     video_path = os.path.join(VIDEOS_DIR, video['video_file'])
     if os.path.exists(video_path):
         os.remove(video_path)
@@ -270,7 +255,6 @@ async def delete_video(video_id: str, username: str = Depends(verify_token)):
         if os.path.exists(thumb_path):
             os.remove(thumb_path)
     
-    # Remove from library
     library = [v for v in library if v['id'] != video_id]
     save_library(library)
     
@@ -278,9 +262,94 @@ async def delete_video(video_id: str, username: str = Depends(verify_token)):
 
 @router.post("/channels")
 async def add_channel(req: ChannelRequest, username: str = Depends(verify_token)):
-    """Add a channel to follow (Step 3 implementation)"""
-    return {"status": "pending", "message": "Channel tracking coming in Step 3"}
+    """Add a channel to follow"""
+    try:
+        # Get channel info
+        channel_info = scheduler.get_channel_info(req.channel_url)
+        
+        channels = load_channels()
+        
+        # Check if already exists
+        if any(ch['id'] == channel_info['id'] for ch in channels):
+            raise HTTPException(status_code=400, detail="Channel already exists")
+        
+        # Create channel entry
+        channel = {
+            'id': channel_info['id'],
+            'name': channel_info['name'],
+            'url': req.channel_url,
+            'thumbnail': channel_info.get('thumbnail', ''),
+            'auto_download': req.auto_download,
+            'quality': req.quality,
+            'added_at': datetime.now().isoformat(),
+            'last_checked': None,
+            'video_count': 0
+        }
+        
+        channels.append(channel)
+        save_channels(channels)
+        
+        # Trigger immediate check if auto_download is enabled
+        if req.auto_download:
+            asyncio.create_task(scheduler.check_channel_updates(channel))
+        
+        return {
+            'status': 'success',
+            'message': f'Channel {channel["name"]} added',
+            'channel': channel
+        }
+        
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/channels")
 async def get_channels(username: str = Depends(verify_token)):
-    return load_channels()
+    channels = load_channels()
+    
+    # Update video counts
+    library = load_library()
+    for channel in channels:
+        channel['video_count'] = len([v for v in library if v.get('channel_id') == channel['id']])
+    
+    return channels
+
+@router.delete("/channels/{channel_id}")
+async def delete_channel(channel_id: str, username: str = Depends(verify_token)):
+    channels = load_channels()
+    channel = next((ch for ch in channels if ch['id'] == channel_id), None)
+    
+    if not channel:
+        raise HTTPException(status_code=404, detail="Channel not found")
+    
+    channels = [ch for ch in channels if ch['id'] != channel_id]
+    save_channels(channels)
+    
+    return {'status': 'success', 'message': 'Channel removed'}
+
+@router.patch("/channels/{channel_id}")
+async def update_channel(channel_id: str, auto_download: bool, username: str = Depends(verify_token)):
+    channels = load_channels()
+    channel = next((ch for ch in channels if ch['id'] == channel_id), None)
+    
+    if not channel:
+        raise HTTPException(status_code=404, detail="Channel not found")
+    
+    channel['auto_download'] = auto_download
+    save_channels(channels)
+    
+    return {'status': 'success', 'channel': channel}
+
+@router.post("/channels/{channel_id}/check")
+async def check_channel_now(channel_id: str, username: str = Depends(verify_token)):
+    """Manually trigger channel check"""
+    channels = load_channels()
+    channel = next((ch for ch in channels if ch['id'] == channel_id), None)
+    
+    if not channel:
+        raise HTTPException(status_code=404, detail="Channel not found")
+    
+    asyncio.create_task(scheduler.check_channel_updates(channel))
+    
+    return {'status': 'success', 'message': 'Checking for new videos...'}
