@@ -1,7 +1,7 @@
-from fastapi import FastAPI, HTTPException, Depends, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Depends, WebSocket, WebSocketDisconnect, Header
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from pydantic import BaseModel
 import json
 import os
@@ -13,7 +13,7 @@ from collections import defaultdict
 
 from downloader import download_video
 from scheduler import start_scheduler, check_channel_updates, get_channel_info
-from auth import router as auth_router, verify_token, verify_admin
+from auth import router as auth_router, verify_token, verify_admin, get_user_b2_credentials
 
 # Create necessary directories before app initialization
 os.makedirs("videos", exist_ok=True)
@@ -25,7 +25,6 @@ app = FastAPI(title="YTArchive", version="2.0")
 
 # Mount static files and media
 app.mount("/static", StaticFiles(directory="static"), name="static")
-app.mount("/videos", StaticFiles(directory="videos"), name="videos")
 app.mount("/avatars", StaticFiles(directory="avatars"), name="avatars")
 
 # Include auth router
@@ -95,35 +94,119 @@ async def health_check():
 
 @app.get("/api/library")
 async def get_library(user: dict = Depends(verify_token)):
+    """Get library filtered by user ownership"""
     library = load_json(LIBRARY_FILE)
-    return library
+    # Filter videos owned by this user
+    user_library = [v for v in library if v.get('owner') == user['username']]
+    return user_library
 
-@app.delete("/api/library/{video_id}")
-async def delete_video(video_id: str, user: dict = Depends(verify_token)):
+@app.get("/api/video/{video_id}/stream")
+async def stream_video(video_id: str, user: dict = Depends(verify_token)):
+    """Get B2 streaming URL for video"""
     library = load_json(LIBRARY_FILE)
     video = next((v for v in library if v['id'] == video_id), None)
     
     if not video:
         raise HTTPException(status_code=404, detail="Video not found")
     
-    # Delete files
-    video_path = os.path.join("videos", video['video_file'])
-    if os.path.exists(video_path):
-        os.remove(video_path)
+    # Check ownership
+    if video.get('owner') != user['username']:
+        raise HTTPException(status_code=403, detail="Access denied")
     
+    # Check if video is on B2
+    if video.get('storage') != 'b2':
+        raise HTTPException(status_code=400, detail="Video not stored on B2")
+    
+    # Get B2 credentials
+    b2_creds = get_user_b2_credentials(user['username'])
+    if not b2_creds:
+        raise HTTPException(status_code=400, detail="B2 not configured")
+    
+    # Generate signed URL
+    from b2_storage import B2Storage
+    b2 = B2Storage(
+        b2_creds["key_id"],
+        b2_creds["application_key"],
+        b2_creds["bucket_name"]
+    )
+    
+    if not await b2.authorize():
+        raise HTTPException(status_code=500, detail="Failed to authorize with B2")
+    
+    # Get download URL (valid for 1 hour)
+    video_url = await b2.get_download_url(video['video_file'], duration_seconds=3600)
+    
+    if not video_url:
+        raise HTTPException(status_code=500, detail="Failed to generate streaming URL")
+    
+    # Also get thumbnail URL if exists
+    thumbnail_url = None
     if video.get('thumbnail_file'):
-        thumb_path = os.path.join("videos", video['thumbnail_file'])
-        if os.path.exists(thumb_path):
-            os.remove(thumb_path)
+        thumbnail_url = await b2.get_download_url(video['thumbnail_file'], duration_seconds=3600)
     
+    return {
+        "video_url": video_url,
+        "thumbnail_url": thumbnail_url,
+        "expires_in": 3600  # 1 hour
+    }
+
+@app.delete("/api/library/{video_id}")
+async def delete_video(video_id: str, user: dict = Depends(verify_token)):
+    """Delete video from library and B2 storage"""
+    library = load_json(LIBRARY_FILE)
+    video = next((v for v in library if v['id'] == video_id), None)
+    
+    if not video:
+        raise HTTPException(status_code=404, detail="Video not found")
+    
+    # Check ownership
+    if video.get('owner') != user['username']:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Delete from B2 if stored there
+    if video.get('storage') == 'b2':
+        b2_creds = get_user_b2_credentials(user['username'])
+        if b2_creds:
+            try:
+                from b2_storage import B2Storage
+                b2 = B2Storage(
+                    b2_creds["key_id"],
+                    b2_creds["application_key"],
+                    b2_creds["bucket_name"]
+                )
+                
+                if await b2.authorize():
+                    # Delete video file
+                    if video.get('b2_video_file_id'):
+                        await b2.delete_file(video['b2_video_file_id'], video['video_file'])
+                    
+                    # Delete thumbnail
+                    if video.get('b2_thumbnail_file_id') and video.get('thumbnail_file'):
+                        await b2.delete_file(video['b2_thumbnail_file_id'], video['thumbnail_file'])
+            except Exception as e:
+                print(f"Error deleting from B2: {e}")
+    else:
+        # Legacy: delete local files
+        video_path = os.path.join("videos", video['video_file'])
+        if os.path.exists(video_path):
+            os.remove(video_path)
+        
+        if video.get('thumbnail_file'):
+            thumb_path = os.path.join("videos", video['thumbnail_file'])
+            if os.path.exists(thumb_path):
+                os.remove(thumb_path)
+    
+    # Remove from library
     library = [v for v in library if v['id'] != video_id]
     save_json(LIBRARY_FILE, library)
     return {"message": "Video deleted"}
 
 @app.websocket("/api/ws/download")
 async def websocket_download(websocket: WebSocket):
-    """WebSocket for download progress - NO AUTH (already authed on page)"""
+    """WebSocket for download progress"""
     await websocket.accept()
+    
+    username = None
     
     try:
         # Wait for download request
@@ -131,12 +214,25 @@ async def websocket_download(websocket: WebSocket):
         
         url = data.get('url')
         quality = data.get('quality', 'best')
+        token = data.get('token')
         
         if not url:
             await websocket.send_json({"status": "error", "message": "URL is required"})
             return
         
-        # Download with progress
+        if not token:
+            await websocket.send_json({"status": "error", "message": "Authentication required"})
+            return
+        
+        # Verify token
+        try:
+            payload = jwt.decode(token, os.getenv("JWT_SECRET", "ytarchive-secret-change-this-in-production"), algorithms=["HS256"])
+            username = payload.get("sub")
+        except:
+            await websocket.send_json({"status": "error", "message": "Invalid token"})
+            return
+        
+        # Download with progress (now includes username for B2)
         async def progress_callback(status, message, percent=None, speed=None, eta=None):
             try:
                 payload = {"status": status, "message": message}
@@ -150,7 +246,7 @@ async def websocket_download(websocket: WebSocket):
             except:
                 pass
         
-        success, video_info = await download_video(url, quality, progress_callback)
+        success, video_info = await download_video(url, quality, progress_callback, username)
         
         if success:
             library = load_json(LIBRARY_FILE)
@@ -178,14 +274,18 @@ async def websocket_download(websocket: WebSocket):
 
 @app.get("/api/channels")
 async def get_channels(user: dict = Depends(verify_token)):
+    """Get channels filtered by user ownership"""
     channels = load_json(CHANNELS_FILE)
     library = load_json(LIBRARY_FILE)
     
-    # Count videos per channel
-    for channel in channels:
-        channel['video_count'] = len([v for v in library if v.get('channel_id') == channel['id']])
+    # Filter user's channels
+    user_channels = [c for c in channels if c.get('owner') == user['username']]
     
-    return channels
+    # Count videos per channel
+    for channel in user_channels:
+        channel['video_count'] = len([v for v in library if v.get('channel_id') == channel['id'] and v.get('owner') == user['username']])
+    
+    return user_channels
 
 @app.post("/api/channels")
 async def add_channel(channel: ChannelAdd, user: dict = Depends(verify_token)):
@@ -196,8 +296,8 @@ async def add_channel(channel: ChannelAdd, user: dict = Depends(verify_token)):
     if not info:
         raise HTTPException(status_code=400, detail="Invalid channel URL")
     
-    # Check if already exists
-    if any(c['id'] == info['id'] for c in channels):
+    # Check if already exists for this user
+    if any(c['id'] == info['id'] and c.get('owner') == user['username'] for c in channels):
         raise HTTPException(status_code=400, detail="Channel already added")
     
     channel_data = {
@@ -208,7 +308,8 @@ async def add_channel(channel: ChannelAdd, user: dict = Depends(verify_token)):
         "quality": channel.quality,
         "auto_download": channel.auto_download,
         "added_at": datetime.now().isoformat(),
-        "last_check": None
+        "last_check": None,
+        "owner": user['username']  # Track ownership
     }
     
     channels.append(channel_data)
@@ -223,14 +324,15 @@ async def add_channel(channel: ChannelAdd, user: dict = Depends(verify_token)):
 @app.delete("/api/channels/{channel_id}")
 async def delete_channel(channel_id: str, user: dict = Depends(verify_token)):
     channels = load_json(CHANNELS_FILE)
-    channels = [c for c in channels if c['id'] != channel_id]
+    # Only delete if owned by user
+    channels = [c for c in channels if not (c['id'] == channel_id and c.get('owner') == user['username'])]
     save_json(CHANNELS_FILE, channels)
     return {"message": "Channel removed"}
 
 @app.patch("/api/channels/{channel_id}")
 async def update_channel(channel_id: str, update: ChannelUpdate, user: dict = Depends(verify_token)):
     channels = load_json(CHANNELS_FILE)
-    channel = next((c for c in channels if c['id'] == channel_id), None)
+    channel = next((c for c in channels if c['id'] == channel_id and c.get('owner') == user['username']), None)
     
     if not channel:
         raise HTTPException(status_code=404, detail="Channel not found")
@@ -242,7 +344,7 @@ async def update_channel(channel_id: str, update: ChannelUpdate, user: dict = De
 @app.post("/api/channels/{channel_id}/check")
 async def check_channel(channel_id: str, user: dict = Depends(verify_token)):
     channels = load_json(CHANNELS_FILE)
-    channel = next((c for c in channels if c['id'] == channel_id), None)
+    channel = next((c for c in channels if c['id'] == channel_id and c.get('owner') == user['username']), None)
     
     if not channel:
         raise HTTPException(status_code=404, detail="Channel not found")
@@ -255,12 +357,12 @@ async def get_channel_stats(channel_id: str, user: dict = Depends(verify_token))
     channels = load_json(CHANNELS_FILE)
     library = load_json(LIBRARY_FILE)
     
-    channel = next((c for c in channels if c['id'] == channel_id), None)
+    channel = next((c for c in channels if c['id'] == channel_id and c.get('owner') == user['username']), None)
     if not channel:
         raise HTTPException(status_code=404, detail="Channel not found")
     
-    # Get all videos for this channel
-    channel_videos = [v for v in library if v.get('channel_id') == channel_id]
+    # Get all videos for this channel (user's only)
+    channel_videos = [v for v in library if v.get('channel_id') == channel_id and v.get('owner') == user['username']]
     
     if not channel_videos:
         return {
@@ -337,7 +439,7 @@ async def get_channel_stats(channel_id: str, user: dict = Depends(verify_token))
 @app.on_event("startup")
 async def startup_event():
     print("\n" + "="*60)
-    print("🚀 YTArchive v2.0 Starting...")
+    print("🚀 YTArchive v2.0 + Backblaze B2 Starting...")
     print("="*60)
     
     from auth import load_users
@@ -360,6 +462,13 @@ async def startup_event():
     print("   - Avatar upload system")
     print("   - Admin panel at /admin")
     print("   - User profiles at /profile")
+    print("   - ☁️  Backblaze B2 cloud storage")
+    
+    print("\n☁️  Backblaze B2:")
+    print("   - Configure B2 in your profile")
+    print("   - Videos stored in your personal B2 bucket")
+    print("   - Automatic upload after download")
+    print("   - Streaming directly from B2")
     
     print("="*60 + "\n")
     
