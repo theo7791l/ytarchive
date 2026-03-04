@@ -283,65 +283,97 @@ document.getElementById('list-view').addEventListener('click', () => {
 
 // Advanced Video Player
 let currentPlayer = null;
+let keyboardHandler = null;
 
 function playVideo(videoId) {
     const video = libraryCache.find(v => v.id === videoId);
     if (!video) return;
     
     if (currentPlayer) {
+        document.removeEventListener('keydown', keyboardHandler);
         currentPlayer.remove();
     }
     
+    const otherVideos = libraryCache.filter(v => v.id !== videoId);
+    
     const modal = document.createElement('div');
-    modal.className = 'video-modal';
+    modal.className = 'video-player-modal';
     modal.innerHTML = `
-        <div class="video-modal-content">
-            <button class="modal-close" onclick="closePlayer()">&times;</button>
-            <h2 class="player-title">${video.title}</h2>
-            
-            <div class="video-player-wrapper">
-                <video id="main-player" controls autoplay>
-                    <source src="/videos/${video.video_file}" type="video/mp4">
-                </video>
-                
-                <div class="player-overlay" id="player-overlay">
-                    <div class="overlay-icon">⏸️</div>
-                </div>
-            </div>
-            
-            <div class="player-controls-advanced">
-                <div class="control-group">
-                    <label>Speed:</label>
-                    <button class="speed-btn" data-speed="0.5">0.5x</button>
-                    <button class="speed-btn" data-speed="0.75">0.75x</button>
-                    <button class="speed-btn active" data-speed="1">1x</button>
-                    <button class="speed-btn" data-speed="1.25">1.25x</button>
-                    <button class="speed-btn" data-speed="1.5">1.5x</button>
-                    <button class="speed-btn" data-speed="2">2x</button>
+        <button class="player-close-btn" onclick="closePlayer()">×</button>
+        
+        <div class="player-container">
+            <div class="player-main">
+                <div class="player-video-wrapper">
+                    <video id="main-player" controls autoplay>
+                        <source src="/videos/${video.video_file}" type="video/mp4">
+                    </video>
                 </div>
                 
-                <div class="control-group">
-                    <button class="control-btn" onclick="skipTime(-10)">⏪ -10s</button>
-                    <button class="control-btn" onclick="skipTime(10)">+10s ⏩</button>
-                    <button class="control-btn" onclick="toggleFullscreen()">🖵 Fullscreen</button>
+                <div class="player-info">
+                    <h1 class="player-video-title">${video.title}</h1>
+                    <div class="player-video-meta">
+                        <span class="player-channel">${video.channel}</span>
+                        <span>•</span>
+                        <span>👁️ ${formatNumber(video.view_count)} vues</span>
+                        <span>•</span>
+                        <span>📅 ${formatDate(video.upload_date)}</span>
+                    </div>
+                    
+                    <div class="player-controls">
+                        <div class="speed-controls">
+                            <span class="control-label">Vitesse:</span>
+                            <button class="speed-btn" data-speed="0.5">0.5x</button>
+                            <button class="speed-btn" data-speed="0.75">0.75x</button>
+                            <button class="speed-btn active" data-speed="1">1x</button>
+                            <button class="speed-btn" data-speed="1.25">1.25x</button>
+                            <button class="speed-btn" data-speed="1.5">1.5x</button>
+                            <button class="speed-btn" data-speed="2">2x</button>
+                        </div>
+                        <div class="action-controls">
+                            <button class="control-btn" onclick="skipTime(-10)">⏪ -10s</button>
+                            <button class="control-btn" onclick="skipTime(10)">+10s ⏩</button>
+                            <button class="control-btn" onclick="toggleFullscreen()">🗕 Fullscreen</button>
+                        </div>
+                    </div>
+                    
+                    <div class="player-shortcuts">
+                        <strong>⌨️ Raccourcis:</strong>
+                        <span>Espace = Play/Pause</span>
+                        <span>← → = ±5s</span>
+                        <span>↑ ↓ = Volume</span>
+                        <span>F = Fullscreen</span>
+                        <span>M = Mute</span>
+                    </div>
+                    
+                    ${video.description ? `
+                    <div class="player-description">
+                        <strong>Description:</strong>
+                        <p>${video.description}</p>
+                    </div>
+                    ` : ''}
                 </div>
             </div>
             
-            <div class="keyboard-shortcuts">
-                <strong>⌨️ Shortcuts:</strong>
-                <span>Space = Play/Pause</span>
-                <span>← → = ±5s</span>
-                <span>↑ ↓ = Volume</span>
-                <span>F = Fullscreen</span>
-                <span>M = Mute</span>
-            </div>
-            
-            <div class="video-details">
-                <p><strong>Channel:</strong> ${video.channel}</p>
-                <p><strong>Uploaded:</strong> ${formatDate(video.upload_date)}</p>
-                <p><strong>Views:</strong> ${formatNumber(video.view_count)}</p>
-                <p><strong>Duration:</strong> ${formatDuration(video.duration)}</p>
-                ${video.description ? `<p class="video-description">${video.description}</p>` : ''}
+            <div class="player-sidebar">
+                <h3 class="sidebar-title">Autres vidéos</h3>
+                <div class="sidebar-videos">
+                    ${otherVideos.slice(0, 20).map(v => `
+                        <div class="sidebar-video" onclick="playVideo('${v.id}')">
+                            <div class="sidebar-thumbnail">
+                                ${v.thumbnail_file ? 
+                                    `<img src="/videos/${v.thumbnail_file}" alt="${v.title}">` :
+                                    `<div class="sidebar-no-thumb">🎹</div>`
+                                }
+                                <span class="sidebar-duration">${formatDuration(v.duration)}</span>
+                            </div>
+                            <div class="sidebar-info">
+                                <h4 class="sidebar-video-title">${v.title}</h4>
+                                <p class="sidebar-channel">${v.channel}</p>
+                                <p class="sidebar-views">👁️ ${formatNumber(v.view_count)} vues</p>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
             </div>
         </div>
     `;
@@ -350,9 +382,8 @@ function playVideo(videoId) {
     currentPlayer = modal;
     
     const player = document.getElementById('main-player');
-    const overlay = document.getElementById('player-overlay');
-    const overlayIcon = overlay.querySelector('.overlay-icon');
     
+    // Speed buttons
     document.querySelectorAll('.speed-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             const speed = parseFloat(btn.dataset.speed);
@@ -362,29 +393,20 @@ function playVideo(videoId) {
         });
     });
     
-    let overlayTimeout;
-    player.addEventListener('play', () => {
-        overlayIcon.textContent = '▶️';
-        overlay.style.opacity = '1';
-        clearTimeout(overlayTimeout);
-        overlayTimeout = setTimeout(() => {
-            overlay.style.opacity = '0';
-        }, 500);
-    });
-    
-    player.addEventListener('pause', () => {
-        overlayIcon.textContent = '⏸️';
-        overlay.style.opacity = '1';
-    });
-    
-    const handleKeyboard = (e) => {
-        if (e.target.tagName === 'INPUT') return;
+    // Keyboard controls
+    keyboardHandler = (e) => {
+        // Ignore if typing in input field
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
         
         switch(e.key) {
             case ' ':
             case 'k':
                 e.preventDefault();
-                player.paused ? player.play() : player.pause();
+                if (player.paused) {
+                    player.play();
+                } else {
+                    player.pause();
+                }
                 break;
             case 'ArrowLeft':
                 e.preventDefault();
@@ -412,18 +434,22 @@ function playVideo(videoId) {
                 e.preventDefault();
                 player.muted = !player.muted;
                 break;
+            case 'Escape':
+                e.preventDefault();
+                closePlayer();
+                break;
         }
     };
     
-    document.addEventListener('keydown', handleKeyboard);
-    
-    modal.addEventListener('remove', () => {
-        document.removeEventListener('keydown', handleKeyboard);
-    });
+    document.addEventListener('keydown', keyboardHandler);
 }
 
 function closePlayer() {
     if (currentPlayer) {
+        if (keyboardHandler) {
+            document.removeEventListener('keydown', keyboardHandler);
+            keyboardHandler = null;
+        }
         currentPlayer.remove();
         currentPlayer = null;
     }
@@ -593,120 +619,9 @@ async function deleteChannel(channelId) {
     loadChannels();
 }
 
-// Channel Stats
+// Channel Stats (stub)
 async function showChannelStats(channelId) {
-    const stats = await apiCall(`/api/channels/${channelId}/stats`);
-    const modal = document.getElementById('channel-stats-modal');
-    const content = document.getElementById('stats-content');
-    
-    content.innerHTML = `
-        <div class="stats-header">
-            ${stats.channel.thumbnail ? `<img src="${stats.channel.thumbnail}" class="stats-channel-thumb">` : '<div class="stats-channel-thumb-placeholder">📺</div>'}
-            <div>
-                <h2>${stats.channel.name}</h2>
-                <p class="stats-subtitle">${stats.total_videos} videos archived</p>
-            </div>
-        </div>
-        
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-icon">👁️</div>
-                <div class="stat-value">${formatNumber(stats.total_views)}</div>
-                <div class="stat-label">Total Views</div>
-            </div>
-            
-            <div class="stat-card">
-                <div class="stat-icon">⏱️</div>
-                <div class="stat-value">${formatTotalDuration(stats.total_duration)}</div>
-                <div class="stat-label">Watch Time</div>
-            </div>
-            
-            <div class="stat-card">
-                <div class="stat-icon">📈</div>
-                <div class="stat-value">${formatNumber(stats.avg_views)}</div>
-                <div class="stat-label">Avg Views</div>
-            </div>
-            
-            <div class="stat-card">
-                <div class="stat-icon">🎬</div>
-                <div class="stat-value">${formatDuration(stats.avg_duration)}</div>
-                <div class="stat-label">Avg Duration</div>
-            </div>
-        </div>
-        
-        <div class="stats-section">
-            <h3>📊 Upload History</h3>
-            <canvas id="upload-chart"></canvas>
-        </div>
-        
-        <div class="stats-highlights">
-            <div class="highlight-card">
-                <h4>🏆 Most Viewed</h4>
-                <p class="highlight-title">${stats.most_viewed.title}</p>
-                <p class="highlight-value">${formatNumber(stats.most_viewed.views)} views</p>
-            </div>
-            
-            <div class="highlight-card">
-                <h4>⏳ Longest Video</h4>
-                <p class="highlight-title">${stats.longest_video.title}</p>
-                <p class="highlight-value">${formatDuration(stats.longest_video.duration)}</p>
-            </div>
-        </div>
-        
-        <div class="stats-timeline">
-            <p><strong>First download:</strong> ${stats.first_download || 'N/A'}</p>
-            <p><strong>Latest download:</strong> ${stats.last_download || 'N/A'}</p>
-        </div>
-    `;
-    
-    modal.style.display = 'flex';
-    
-    // Render chart
-    setTimeout(() => {
-        const ctx = document.getElementById('upload-chart').getContext('2d');
-        new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: stats.upload_history.map(h => h.month),
-                datasets: [{
-                    label: 'Videos',
-                    data: stats.upload_history.map(h => h.count),
-                    backgroundColor: 'rgba(102, 126, 234, 0.6)',
-                    borderColor: 'rgba(102, 126, 234, 1)',
-                    borderWidth: 2,
-                    borderRadius: 8
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                        padding: 12,
-                        cornerRadius: 8
-                    }
-                },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: { 
-                            color: '#aaa',
-                            stepSize: 1
-                        },
-                        grid: {
-                            color: 'rgba(255, 255, 255, 0.1)'
-                        }
-                    },
-                    x: {
-                        ticks: { color: '#aaa' },
-                        grid: { display: false }
-                    }
-                }
-            }
-        });
-    }, 100);
+    alert('Channel stats coming soon!');
 }
 
 function closeStatsModal() {
