@@ -28,6 +28,10 @@ navLinks.forEach(link => {
         
         views.forEach(v => v.classList.remove('active'));
         document.getElementById(`${viewName}-view`).classList.add('active');
+        
+        // Load data when switching to views
+        if (viewName === 'library') loadLibrary();
+        if (viewName === 'channels') loadChannels();
     });
 });
 
@@ -51,6 +55,36 @@ async function apiCall(endpoint, options = {}) {
     return response.json();
 }
 
+// Format duration
+function formatDuration(seconds) {
+    if (!seconds) return 'N/A';
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    
+    if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+// Format date
+function formatDate(dateStr) {
+    if (!dateStr) return 'Unknown';
+    try {
+        const date = new Date(dateStr);
+        return date.toLocaleDateString('fr-FR', { year: 'numeric', month: 'short', day: 'numeric' });
+    } catch {
+        return dateStr;
+    }
+}
+
+// Format number
+function formatNumber(num) {
+    if (!num) return '0';
+    if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+    if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+    return num.toString();
+}
+
 // Load library
 async function loadLibrary() {
     const library = await apiCall('/api/library');
@@ -60,12 +94,72 @@ async function loadLibrary() {
         grid.innerHTML = '<p class="empty-state">No videos yet. Start downloading!</p>';
     } else {
         grid.innerHTML = library.map(video => `
-            <div class="video-card">
-                <img src="${video.thumbnail}" alt="${video.title}">
-                <h3>${video.title}</h3>
-                <p>${video.channel}</p>
+            <div class="video-card" data-id="${video.id}">
+                <div class="video-thumbnail">
+                    ${video.thumbnail_file ? 
+                        `<img src="/videos/${video.thumbnail_file}" alt="${video.title}">` :
+                        `<div class="no-thumbnail">📹</div>`
+                    }
+                    <div class="video-duration">${formatDuration(video.duration)}</div>
+                </div>
+                <div class="video-info">
+                    <h3 class="video-title">${video.title}</h3>
+                    <p class="video-channel">${video.channel}</p>
+                    <div class="video-meta">
+                        <span>👁️ ${formatNumber(video.view_count)}</span>
+                        <span>📅 ${formatDate(video.upload_date)}</span>
+                    </div>
+                </div>
+                <div class="video-actions">
+                    <button class="btn-play" onclick="playVideo('${video.id}')">▶️ Play</button>
+                    <button class="btn-delete" onclick="deleteVideo('${video.id}')">🗑️</button>
+                </div>
             </div>
         `).join('');
+    }
+}
+
+// Play video
+function playVideo(videoId) {
+    const library = JSON.parse(localStorage.getItem('library_cache') || '[]');
+    const video = library.find(v => v.id === videoId);
+    
+    if (!video) {
+        alert('Video not found');
+        return;
+    }
+    
+    // Create modal player
+    const modal = document.createElement('div');
+    modal.className = 'video-modal';
+    modal.innerHTML = `
+        <div class="video-modal-content">
+            <button class="modal-close" onclick="this.parentElement.parentElement.remove()">&times;</button>
+            <h2>${video.title}</h2>
+            <video controls autoplay>
+                <source src="/videos/${video.video_file}" type="video/mp4">
+                Your browser doesn't support video playback.
+            </video>
+            <div class="video-details">
+                <p><strong>Channel:</strong> ${video.channel}</p>
+                <p><strong>Uploaded:</strong> ${formatDate(video.upload_date)}</p>
+                <p><strong>Views:</strong> ${formatNumber(video.view_count)}</p>
+                ${video.description ? `<p class="video-description">${video.description}</p>` : ''}
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+
+// Delete video
+async function deleteVideo(videoId) {
+    if (!confirm('Are you sure you want to delete this video?')) return;
+    
+    try {
+        await apiCall(`/api/library/${videoId}`, { method: 'DELETE' });
+        loadLibrary();
+    } catch (error) {
+        alert('Failed to delete video');
     }
 }
 
@@ -86,23 +180,160 @@ async function loadChannels() {
     }
 }
 
-// Download video
+// Download video with WebSocket
+let downloadWs = null;
+
 document.getElementById('download-btn').addEventListener('click', async () => {
     const url = document.getElementById('video-url').value;
     const quality = document.getElementById('quality').value;
+    const progressDiv = document.getElementById('download-progress');
+    const progressFill = document.querySelector('.progress-fill');
+    const progressText = document.querySelector('#download-progress p');
+    const downloadBtn = document.getElementById('download-btn');
     
     if (!url) {
         alert('Please enter a YouTube URL');
         return;
     }
     
-    const result = await apiCall('/api/download', {
-        method: 'POST',
-        body: JSON.stringify({ url, quality })
-    });
+    // Show progress
+    progressDiv.style.display = 'block';
+    downloadBtn.disabled = true;
+    progressText.textContent = 'Connecting...';
     
-    alert(result.message);
+    // Connect WebSocket
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    downloadWs = new WebSocket(`${wsProtocol}//${window.location.host}/api/ws/download`);
+    
+    downloadWs.onopen = () => {
+        downloadWs.send(JSON.stringify({ url, quality, token }));
+    };
+    
+    downloadWs.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        
+        if (data.status === 'starting') {
+            progressText.textContent = data.message;
+            progressFill.style.width = '10%';
+        } else if (data.status === 'downloading') {
+            const percent = parseFloat(data.percent) || 0;
+            progressText.textContent = `Downloading: ${data.percent} (${data.speed}) - ETA: ${data.eta}`;
+            progressFill.style.width = `${percent}%`;
+        } else if (data.status === 'finished') {
+            progressText.textContent = data.message;
+            progressFill.style.width = '90%';
+        } else if (data.status === 'completed') {
+            progressText.textContent = data.message;
+            progressFill.style.width = '100%';
+            setTimeout(() => {
+                progressDiv.style.display = 'none';
+                downloadBtn.disabled = false;
+                document.getElementById('video-url').value = '';
+                loadLibrary();
+            }, 2000);
+        } else if (data.status === 'error') {
+            progressText.textContent = data.message;
+            progressText.style.color = '#f44';
+            setTimeout(() => {
+                progressDiv.style.display = 'none';
+                downloadBtn.disabled = false;
+                progressText.style.color = '';
+            }, 3000);
+        }
+    };
+    
+    downloadWs.onerror = (error) => {
+        progressText.textContent = 'Connection error';
+        progressText.style.color = '#f44';
+        setTimeout(() => {
+            progressDiv.style.display = 'none';
+            downloadBtn.disabled = false;
+            progressText.style.color = '';
+        }, 3000);
+    };
 });
+
+// Search functionality
+let libraryCache = [];
+
+document.getElementById('search').addEventListener('input', (e) => {
+    const query = e.target.value.toLowerCase();
+    const grid = document.getElementById('library-grid');
+    
+    if (!query) {
+        loadLibrary();
+        return;
+    }
+    
+    const filtered = libraryCache.filter(video => 
+        video.title.toLowerCase().includes(query) ||
+        video.channel.toLowerCase().includes(query)
+    );
+    
+    if (filtered.length === 0) {
+        grid.innerHTML = '<p class="empty-state">No videos found.</p>';
+    } else {
+        grid.innerHTML = filtered.map(video => `
+            <div class="video-card" data-id="${video.id}">
+                <div class="video-thumbnail">
+                    ${video.thumbnail_file ? 
+                        `<img src="/videos/${video.thumbnail_file}" alt="${video.title}">` :
+                        `<div class="no-thumbnail">📹</div>`
+                    }
+                    <div class="video-duration">${formatDuration(video.duration)}</div>
+                </div>
+                <div class="video-info">
+                    <h3 class="video-title">${video.title}</h3>
+                    <p class="video-channel">${video.channel}</p>
+                    <div class="video-meta">
+                        <span>👁️ ${formatNumber(video.view_count)}</span>
+                        <span>📅 ${formatDate(video.upload_date)}</span>
+                    </div>
+                </div>
+                <div class="video-actions">
+                    <button class="btn-play" onclick="playVideo('${video.id}')">▶️ Play</button>
+                    <button class="btn-delete" onclick="deleteVideo('${video.id}')">🗑️</button>
+                </div>
+            </div>
+        `).join('');
+    }
+});
+
+// Enhanced library load with cache
+async function loadLibrary() {
+    const library = await apiCall('/api/library');
+    libraryCache = library;
+    localStorage.setItem('library_cache', JSON.stringify(library));
+    const grid = document.getElementById('library-grid');
+    
+    if (library.length === 0) {
+        grid.innerHTML = '<p class="empty-state">No videos yet. Start downloading!</p>';
+    } else {
+        grid.innerHTML = library.map(video => `
+            <div class="video-card" data-id="${video.id}">
+                <div class="video-thumbnail">
+                    ${video.thumbnail_file ? 
+                        `<img src="/videos/${video.thumbnail_file}" alt="${video.title}">` :
+                        `<div class="no-thumbnail">📹</div>`
+                    }
+                    <div class="video-duration">${formatDuration(video.duration)}</div>
+                </div>
+                <div class="video-info">
+                    <h3 class="video-title">${video.title}</h3>
+                    <p class="video-channel">${video.channel}</p>
+                    <div class="video-meta">
+                        <span>👁️ ${formatNumber(video.view_count)}</span>
+                        <span>📅 ${formatDate(video.upload_date)}</span>
+                    </div>
+                </div>
+                <div class="video-actions">
+                    <button class="btn-play" onclick="playVideo('${video.id}')">▶️ Play</button>
+                    <button class="btn-delete" onclick="deleteVideo('${video.id}')">🗑️</button>
+                </div>
+            </div>
+        `).join('');
+    }
+}
 
 // Initial load
 loadLibrary();

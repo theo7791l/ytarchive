@@ -24,8 +24,9 @@ app.add_middleware(
 app.include_router(auth_router, prefix="/api/auth", tags=["auth"])
 app.include_router(download_router, prefix="/api", tags=["download"])
 
-# Static files
+# Static files & videos
 app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/videos", StaticFiles(directory="videos"), name="videos")
 
 @app.get("/")
 async def root():
