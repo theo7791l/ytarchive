@@ -122,25 +122,24 @@ async def delete_video(video_id: str, user: dict = Depends(verify_token)):
 
 @app.websocket("/api/ws/download")
 async def websocket_download(websocket: WebSocket, token: str = Query(...)):
-    ws_open = False
+    # Accept connection first to avoid 403
+    await websocket.accept()
     
     try:
-        # Verify token from query param BEFORE accepting
+        # Verify token from query param
         try:
             jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
         except Exception as e:
-            await websocket.close(code=1008, reason="Invalid token")
+            await websocket.send_json({"status": "error", "message": "Invalid token"})
+            await websocket.close(code=1008)
             return
-        
-        # Token is valid, accept connection
-        await websocket.accept()
-        ws_open = True
         
         # Wait for download request from client
         try:
             data = await asyncio.wait_for(websocket.receive_json(), timeout=10.0)
         except asyncio.TimeoutError:
             await websocket.send_json({"status": "error", "message": "No data received"})
+            await websocket.close()
             return
         
         url = data.get('url')
@@ -148,12 +147,11 @@ async def websocket_download(websocket: WebSocket, token: str = Query(...)):
         
         if not url:
             await websocket.send_json({"status": "error", "message": "URL is required"})
+            await websocket.close()
             return
         
         # Download with progress updates
         async def progress_callback(status, message, percent=None, speed=None, eta=None):
-            if not ws_open:
-                return
             try:
                 payload = {"status": status, "message": message}
                 if percent:
@@ -174,33 +172,29 @@ async def websocket_download(websocket: WebSocket, token: str = Query(...)):
             library.append(video_info)
             save_json(LIBRARY_FILE, library)
             
-            if ws_open:
-                await websocket.send_json({
-                    "status": "completed",
-                    "message": "Download complete!"
-                })
+            await websocket.send_json({
+                "status": "completed",
+                "message": "Download complete!"
+            })
         else:
-            if ws_open:
-                await websocket.send_json({
-                    "status": "error",
-                    "message": video_info
-                })
+            await websocket.send_json({
+                "status": "error",
+                "message": video_info
+            })
     
     except WebSocketDisconnect:
-        ws_open = False
+        pass
     except Exception as e:
         print(f"WebSocket error: {e}")
-        if ws_open:
-            try:
-                await websocket.send_json({"status": "error", "message": str(e)})
-            except:
-                pass
+        try:
+            await websocket.send_json({"status": "error", "message": str(e)})
+        except:
+            pass
     finally:
-        if ws_open:
-            try:
-                await websocket.close()
-            except:
-                pass
+        try:
+            await websocket.close()
+        except:
+            pass
 
 @app.get("/api/channels")
 async def get_channels(user: dict = Depends(verify_token)):
