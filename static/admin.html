@@ -27,7 +27,7 @@
 
         .page-header h1 {
             font-size: 42px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100());
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
@@ -38,12 +38,6 @@
             border-radius: 20px;
             overflow: hidden;
             border: 2px solid rgba(255, 255, 255, 0.1);
-            animation: fadeInUp 0.6s ease;
-        }
-
-        @keyframes fadeInUp {
-            from { opacity: 0; transform: translateY(30px); }
-            to { opacity: 1; transform: translateY(0); }
         }
 
         table {
@@ -74,7 +68,6 @@
 
         tbody tr:hover {
             background: rgba(102, 126, 234, 0.1);
-            transform: scale(1.01);
         }
 
         .user-avatar {
@@ -83,11 +76,6 @@
             border-radius: 50%;
             object-fit: cover;
             border: 2px solid #667eea;
-            transition: transform 0.3s ease;
-        }
-
-        .user-avatar:hover {
-            transform: scale(1.2);
         }
 
         .user-avatar-placeholder {
@@ -98,21 +86,19 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 24px;
+            font-size: 20px;
+            font-weight: 600;
             border: 2px solid #667eea;
+            color: white;
         }
 
         .role-badge {
             padding: 6px 12px;
             border-radius: 8px;
-            font-size: 12px;
-            font-weight: 600;
+            font-size: 11px;
+            font-weight: 700;
             text-transform: uppercase;
-            transition: transform 0.2s ease;
-        }
-
-        .role-badge:hover {
-            transform: scale(1.1);
+            letter-spacing: 0.5px;
         }
 
         .role-admin {
@@ -143,7 +129,7 @@
         }
 
         .btn-action:hover {
-            transform: translateY(-3px);
+            transform: translateY(-2px);
         }
 
         .btn-edit {
@@ -154,7 +140,6 @@
 
         .btn-edit:hover {
             background: rgba(102, 126, 234, 0.3);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
         }
 
         .btn-delete {
@@ -165,7 +150,6 @@
 
         .btn-delete:hover {
             background: rgba(255, 68, 68, 0.3);
-            box-shadow: 0 5px 15px rgba(255, 68, 68, 0.4);
         }
 
         .user-modal {
@@ -175,7 +159,6 @@
             width: 100%;
             height: 100%;
             background: rgba(0, 0, 0, 0.9);
-            backdrop-filter: blur(10px);
             display: none;
             align-items: center;
             justify-content: center;
@@ -184,7 +167,6 @@
 
         .user-modal.active {
             display: flex;
-            animation: fadeIn 0.3s ease;
         }
 
         .modal-content {
@@ -196,12 +178,6 @@
             max-height: 90vh;
             overflow-y: auto;
             border: 2px solid rgba(255, 255, 255, 0.1);
-            animation: slideUp 0.4s ease;
-        }
-
-        @keyframes slideUp {
-            from { opacity: 0; transform: translateY(50px); }
-            to { opacity: 1; transform: translateY(0); }
         }
 
         .modal-header {
@@ -233,7 +209,7 @@
 
         .modal-close:hover {
             background: #ff4444;
-            transform: rotate(90deg) scale(1.1);
+            transform: rotate(90deg);
         }
 
         .form-group {
@@ -264,7 +240,6 @@
             outline: none;
             border-color: #667eea;
             background: rgba(255, 255, 255, 0.08);
-            box-shadow: 0 0 20px rgba(102, 126, 234, 0.3);
         }
 
         .form-actions {
@@ -304,7 +279,6 @@
 
         .btn-secondary:hover {
             background: rgba(255, 255, 255, 0.2);
-            transform: translateY(-3px);
         }
 
         .user-profile-dropdown {
@@ -322,6 +296,7 @@
             border-radius: 25px;
             cursor: pointer;
             transition: all 0.3s ease;
+            color: white;
         }
 
         .user-profile-btn:hover {
@@ -344,8 +319,10 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 16px;
+            font-size: 14px;
+            font-weight: 600;
             border: 2px solid #667eea;
+            color: white;
         }
 
         .dropdown-menu {
@@ -363,12 +340,6 @@
 
         .dropdown-menu.active {
             display: block;
-            animation: fadeInDropdown 0.3s ease;
-        }
-
-        @keyframes fadeInDropdown {
-            from { opacity: 0; transform: translateY(-10px); }
-            to { opacity: 1; transform: translateY(0); }
         }
 
         .dropdown-item {
@@ -405,39 +376,29 @@
 <body>
     <nav class="navbar">
         <div class="nav-brand">
-            <h1>🎬 YTArchive Admin</h1>
+            <h1>YTArchive Admin</h1>
         </div>
         <div class="nav-menu">
-            <a href="/app" class="nav-link">📚 Library</a>
-            <a href="/app#channels" class="nav-link">📺 Channels</a>
-            <a href="/app#download" class="nav-link">⬇️ Download</a>
+            <a href="/app" class="nav-link">Library</a>
+            <a href="/app#channels" class="nav-link">Channels</a>
+            <a href="/app#download" class="nav-link">Download</a>
         </div>
         <div class="nav-user">
             <div class="user-profile-dropdown">
                 <button class="user-profile-btn" onclick="toggleDropdown()">
                     <div id="nav-avatar-container">
-                        <div class="user-avatar-placeholder-small">👤</div>
+                        <div class="user-avatar-placeholder-small">A</div>
                     </div>
                     <div style="display: flex; flex-direction: column; align-items: flex-start;">
                         <span id="nav-username" style="font-weight: 600;"></span>
                         <span id="nav-role" class="role-badge-small admin">admin</span>
                     </div>
-                    <span style="font-size: 12px;">▼</span>
                 </button>
                 <div class="dropdown-menu" id="dropdown-menu">
-                    <a href="/profile" class="dropdown-item">
-                        <span>👤</span>
-                        <span>Mon Profil</span>
-                    </a>
-                    <a href="/admin" class="dropdown-item" style="background: rgba(102, 126, 234, 0.1);">
-                        <span>⚙️</span>
-                        <span>Administration</span>
-                    </a>
+                    <a href="/profile" class="dropdown-item">Profile</a>
+                    <a href="/admin" class="dropdown-item" style="background: rgba(102, 126, 234, 0.1);">Administration</a>
                     <hr style="margin: 0; border: none; border-top: 1px solid rgba(255, 255, 255, 0.1);">
-                    <a href="#" class="dropdown-item" onclick="logout(); return false;" style="color: #ff4444;">
-                        <span>🚪</span>
-                        <span>Déconnexion</span>
-                    </a>
+                    <a href="#" class="dropdown-item" onclick="logout(); return false;" style="color: #ff4444;">Logout</a>
                 </div>
             </div>
         </div>
@@ -446,10 +407,10 @@
     <div class="admin-container">
         <div class="page-header">
             <div>
-                <h1>👥 Gestion des Utilisateurs</h1>
-                <p style="color: #aaa; margin-top: 10px; font-size: 18px;">Gérez les comptes et permissions</p>
+                <h1>User Management</h1>
+                <p style="color: #aaa; margin-top: 10px; font-size: 18px;">Manage accounts and permissions</p>
             </div>
-            <button class="btn-primary" onclick="openCreateUserModal()" style="width: auto; padding: 15px 30px;">➕ Créer un utilisateur</button>
+            <button class="btn-primary" onclick="openCreateUserModal()" style="width: auto; padding: 15px 30px;">Create User</button>
         </div>
 
         <div class="users-table">
@@ -457,40 +418,37 @@
                 <thead>
                     <tr>
                         <th>Avatar</th>
-                        <th>Nom d'utilisateur</th>
-                        <th>Nom d'affichage</th>
+                        <th>Username</th>
+                        <th>Display Name</th>
                         <th>Email</th>
-                        <th>Rôle</th>
-                        <th>Créé le</th>
-                        <th>Dernière connexion</th>
+                        <th>Role</th>
+                        <th>Created</th>
+                        <th>Last Login</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
-                <tbody id="users-list">
-                    <!-- Users will be loaded here -->
-                </tbody>
+                <tbody id="users-list"></tbody>
             </table>
         </div>
     </div>
 
-    <!-- Create/Edit User Modal -->
     <div class="user-modal" id="user-modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2 id="modal-title">Créer un utilisateur</h2>
-                <button class="modal-close" onclick="closeUserModal()">×</button>
+                <h2 id="modal-title">Create User</h2>
+                <button class="modal-close" onclick="closeUserModal()">&times;</button>
             </div>
             <form id="user-form">
                 <div class="form-group">
-                    <label>Nom d'utilisateur</label>
+                    <label>Username</label>
                     <input type="text" id="form-username" required>
                 </div>
                 <div class="form-group" id="password-group">
-                    <label>Mot de passe</label>
+                    <label>Password</label>
                     <input type="password" id="form-password">
                 </div>
                 <div class="form-group">
-                    <label>Nom d'affichage</label>
+                    <label>Display Name</label>
                     <input type="text" id="form-display-name">
                 </div>
                 <div class="form-group">
@@ -498,15 +456,15 @@
                     <input type="email" id="form-email">
                 </div>
                 <div class="form-group">
-                    <label>Rôle</label>
+                    <label>Role</label>
                     <select id="form-role">
-                        <option value="member">Membre</option>
+                        <option value="member">Member</option>
                         <option value="admin">Admin</option>
                     </select>
                 </div>
                 <div class="form-actions">
-                    <button type="button" class="btn-secondary" onclick="closeUserModal()">Annuler</button>
-                    <button type="submit" class="btn-primary" id="form-submit">Créer</button>
+                    <button type="button" class="btn-secondary" onclick="closeUserModal()">Cancel</button>
+                    <button type="submit" class="btn-primary" id="form-submit">Create</button>
                 </div>
             </form>
         </div>
@@ -515,23 +473,17 @@
     <script>
         const token = localStorage.getItem('token');
         const username = localStorage.getItem('username');
-
-        if (!token) {
-            window.location.href = '/';
-        }
-
+        if (!token) window.location.href = '/';
         let editingUser = null;
 
         function toggleDropdown() {
             document.getElementById('dropdown-menu').classList.toggle('active');
         }
-
         window.addEventListener('click', (e) => {
             if (!e.target.closest('.user-profile-dropdown')) {
                 document.getElementById('dropdown-menu').classList.remove('active');
             }
         });
-
         function logout() {
             localStorage.removeItem('token');
             localStorage.removeItem('username');
@@ -545,15 +497,18 @@
                 });
                 if (response.ok) {
                     const user = await response.json();
+                    const initial = (user.display_name || user.username).charAt(0).toUpperCase();
                     document.getElementById('nav-username').textContent = user.display_name || user.username;
-                    
                     if (user.avatar) {
                         document.getElementById('nav-avatar-container').innerHTML = 
                             `<img src="/avatars/${user.avatar}" class="user-avatar-small" alt="Avatar">`;
+                    } else {
+                        document.getElementById('nav-avatar-container').innerHTML = 
+                            `<div class="user-avatar-placeholder-small">${initial}</div>`;
                     }
                 }
             } catch (error) {
-                console.error('Error loading profile:', error);
+                console.error('Error:', error);
             }
         }
 
@@ -566,26 +521,25 @@
                     'Content-Type': 'application/json'
                 }
             });
-            
             if (response.status === 401 || response.status === 403) {
-                alert('Accès refusé. Vous devez être admin.');
+                alert('Access denied');
                 window.location.href = '/app';
                 return;
             }
-            
             return response.json();
         }
 
         async function loadUsers() {
             const users = await apiCall('/api/auth/admin/users');
             const tbody = document.getElementById('users-list');
-            
-            tbody.innerHTML = users.map(user => `
+            tbody.innerHTML = users.map(user => {
+                const initial = (user.display_name || user.username).charAt(0).toUpperCase();
+                return `
                 <tr>
                     <td>
                         ${user.avatar ? 
                             `<img src="/avatars/${user.avatar}" class="user-avatar" alt="${user.username}">` :
-                            `<div class="user-avatar-placeholder">👤</div>`
+                            `<div class="user-avatar-placeholder">${initial}</div>`
                         }
                     </td>
                     <td><strong>${user.username}</strong></td>
@@ -593,24 +547,23 @@
                     <td>${user.email || '-'}</td>
                     <td><span class="role-badge role-${user.role}">${user.role}</span></td>
                     <td>${new Date(user.created_at).toLocaleDateString('fr-FR')}</td>
-                    <td>${user.last_login ? new Date(user.last_login).toLocaleDateString('fr-FR') : 'Jamais'}</td>
+                    <td>${user.last_login ? new Date(user.last_login).toLocaleDateString('fr-FR') : 'Never'}</td>
                     <td>
                         <div class="action-buttons">
-                            <button class="btn-action btn-edit" onclick="editUser('${user.username}')">✏️ Modifier</button>
+                            <button class="btn-action btn-edit" onclick="editUser('${user.username}')">Edit</button>
                             ${user.username !== username ? 
-                                `<button class="btn-action btn-delete" onclick="deleteUser('${user.username}')">🗑️ Supprimer</button>` :
-                                ''
+                                `<button class="btn-action btn-delete" onclick="deleteUser('${user.username}')">Delete</button>` : ''
                             }
                         </div>
                     </td>
                 </tr>
-            `).join('');
+            `}).join('');
         }
 
         function openCreateUserModal() {
             editingUser = null;
-            document.getElementById('modal-title').textContent = 'Créer un utilisateur';
-            document.getElementById('form-submit').textContent = 'Créer';
+            document.getElementById('modal-title').textContent = 'Create User';
+            document.getElementById('form-submit').textContent = 'Create';
             document.getElementById('password-group').style.display = 'block';
             document.getElementById('form-username').disabled = false;
             document.getElementById('user-form').reset();
@@ -620,16 +573,14 @@
         async function editUser(username) {
             const user = await apiCall(`/api/auth/admin/users/${username}`);
             editingUser = username;
-            
-            document.getElementById('modal-title').textContent = 'Modifier l\'utilisateur';
-            document.getElementById('form-submit').textContent = 'Sauvegarder';
+            document.getElementById('modal-title').textContent = 'Edit User';
+            document.getElementById('form-submit').textContent = 'Save';
             document.getElementById('password-group').style.display = 'none';
             document.getElementById('form-username').value = user.username;
             document.getElementById('form-username').disabled = true;
             document.getElementById('form-display-name').value = user.display_name || '';
             document.getElementById('form-email').value = user.email || '';
             document.getElementById('form-role').value = user.role;
-            
             document.getElementById('user-modal').classList.add('active');
         }
 
@@ -640,7 +591,6 @@
 
         document.getElementById('user-form').addEventListener('submit', async (e) => {
             e.preventDefault();
-            
             const username = document.getElementById('form-username').value;
             const password = document.getElementById('form-password').value;
             const displayName = document.getElementById('form-display-name').value;
@@ -658,32 +608,26 @@
                 });
             } else {
                 if (!password) {
-                    alert('Mot de passe requis');
+                    alert('Password required');
                     return;
                 }
                 await apiCall('/api/auth/admin/users', {
                     method: 'POST',
                     body: JSON.stringify({
-                        username: username,
-                        password: password,
+                        username, password,
                         display_name: displayName || null,
                         email: email || null,
-                        role: role
+                        role
                     })
                 });
             }
-            
             closeUserModal();
             loadUsers();
         });
 
         async function deleteUser(username) {
-            if (!confirm(`Supprimer l'utilisateur ${username} ?`)) return;
-            
-            await apiCall(`/api/auth/admin/users/${username}`, {
-                method: 'DELETE'
-            });
-            
+            if (!confirm(`Delete user ${username}?`)) return;
+            await apiCall(`/api/auth/admin/users/${username}`, { method: 'DELETE' });
             loadUsers();
         }
 
