@@ -5,15 +5,6 @@ if (!token) {
     window.location.href = '/';
 }
 
-document.getElementById('username').textContent = username;
-
-// Logout
-document.getElementById('logout').addEventListener('click', () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('username');
-    window.location.href = '/';
-});
-
 // View switching
 const navLinks = document.querySelectorAll('.nav-link');
 const views = document.querySelectorAll('.view');
@@ -33,6 +24,36 @@ navLinks.forEach(link => {
         if (viewName === 'channels') loadChannels();
     });
 });
+
+// Handle hash navigation (for /app#channels, /app#download)
+function handleHashNavigation() {
+    const hash = window.location.hash.substring(1); // Remove #
+    
+    if (hash && (hash === 'channels' || hash === 'download' || hash === 'library')) {
+        // Activate the correct nav link
+        navLinks.forEach(l => {
+            if (l.dataset.view === hash) {
+                l.classList.add('active');
+            } else {
+                l.classList.remove('active');
+            }
+        });
+        
+        // Show the correct view
+        views.forEach(v => v.classList.remove('active'));
+        const targetView = document.getElementById(`${hash}-view`);
+        if (targetView) {
+            targetView.classList.add('active');
+            
+            // Load data if needed
+            if (hash === 'library') loadLibrary();
+            if (hash === 'channels') loadChannels();
+        }
+    }
+}
+
+// Listen for hash changes
+window.addEventListener('hashchange', handleHashNavigation);
 
 // API helper
 async function apiCall(endpoint, options = {}) {
@@ -202,7 +223,7 @@ function renderLibrary() {
                 <div class="video-thumbnail">
                     ${video.thumbnail_file ? 
                         `<img src="/videos/${video.thumbnail_file}" alt="${video.title}">` :
-                        `<div class="no-thumbnail">🎹</div>`
+                        `<div class="no-thumbnail">VIDEO</div>`
                     }
                     <div class="video-duration">${formatDuration(video.duration)}</div>
                     ${video.auto_downloaded ? '<div class="auto-badge">AUTO</div>' : ''}
@@ -211,13 +232,13 @@ function renderLibrary() {
                     <h3 class="video-title">${video.title}</h3>
                     <p class="video-channel">${video.channel}</p>
                     <div class="video-meta">
-                        <span>👁️ ${formatNumber(video.view_count)}</span>
-                        <span>📅 ${formatDate(video.upload_date)}</span>
+                        <span>${formatNumber(video.view_count)} views</span>
+                        <span>${formatDate(video.upload_date)}</span>
                     </div>
                 </div>
                 <div class="video-actions">
-                    <button class="btn-play" onclick="playVideo('${video.id}')" title="Play">▶️</button>
-                    <button class="btn-delete" onclick="deleteVideo('${video.id}')" title="Delete">🗑️</button>
+                    <button class="btn-play" onclick="playVideo('${video.id}')" title="Play">Play</button>
+                    <button class="btn-delete" onclick="deleteVideo('${video.id}')" title="Delete">Delete</button>
                 </div>
             </div>
         `).join('');
@@ -227,7 +248,7 @@ function renderLibrary() {
                 <div class="list-thumbnail">
                     ${video.thumbnail_file ? 
                         `<img src="/videos/${video.thumbnail_file}" alt="${video.title}">` :
-                        `<div class="no-thumbnail-small">🎹</div>`
+                        `<div class="no-thumbnail-small">VIDEO</div>`
                     }
                     <div class="video-duration-small">${formatDuration(video.duration)}</div>
                 </div>
@@ -236,15 +257,15 @@ function renderLibrary() {
                     <div class="list-meta">
                         <span class="list-channel">${video.channel}</span>
                         <span>•</span>
-                        <span>👁️ ${formatNumber(video.view_count)}</span>
+                        <span>${formatNumber(video.view_count)} views</span>
                         <span>•</span>
-                        <span>📅 ${formatDate(video.upload_date)}</span>
+                        <span>${formatDate(video.upload_date)}</span>
                         ${video.auto_downloaded ? '<span class="auto-badge-small">AUTO</span>' : ''}
                     </div>
                 </div>
                 <div class="list-actions">
-                    <button class="btn-play-small" onclick="playVideo('${video.id}')" title="Play">▶️ Play</button>
-                    <button class="btn-delete-small" onclick="deleteVideo('${video.id}')" title="Delete">🗑️</button>
+                    <button class="btn-play-small" onclick="playVideo('${video.id}')" title="Play">Play</button>
+                    <button class="btn-delete-small" onclick="deleteVideo('${video.id}')" title="Delete">Delete</button>
                 </div>
             </div>
         `).join('');
@@ -314,14 +335,14 @@ function playVideo(videoId) {
                     <div class="player-video-meta">
                         <span class="player-channel">${video.channel}</span>
                         <span>•</span>
-                        <span>👁️ ${formatNumber(video.view_count)} vues</span>
+                        <span>${formatNumber(video.view_count)} views</span>
                         <span>•</span>
-                        <span>📅 ${formatDate(video.upload_date)}</span>
+                        <span>${formatDate(video.upload_date)}</span>
                     </div>
                     
                     <div class="player-controls">
                         <div class="speed-controls">
-                            <span class="control-label">Vitesse:</span>
+                            <span class="control-label">Speed:</span>
                             <button class="speed-btn" data-speed="0.5">0.5x</button>
                             <button class="speed-btn" data-speed="0.75">0.75x</button>
                             <button class="speed-btn active" data-speed="1">1x</button>
@@ -330,15 +351,15 @@ function playVideo(videoId) {
                             <button class="speed-btn" data-speed="2">2x</button>
                         </div>
                         <div class="action-controls">
-                            <button class="control-btn" onclick="skipTime(-10)">⏪ -10s</button>
-                            <button class="control-btn" onclick="skipTime(10)">+10s ⏩</button>
-                            <button class="control-btn" onclick="toggleFullscreen()">🗕 Fullscreen</button>
+                            <button class="control-btn" onclick="skipTime(-10)">-10s</button>
+                            <button class="control-btn" onclick="skipTime(10)">+10s</button>
+                            <button class="control-btn" onclick="toggleFullscreen()">Fullscreen</button>
                         </div>
                     </div>
                     
                     <div class="player-shortcuts">
-                        <strong>⌨️ Raccourcis:</strong>
-                        <span>Espace = Play/Pause</span>
+                        <strong>Shortcuts:</strong>
+                        <span>Space = Play/Pause</span>
                         <span>← → = ±5s</span>
                         <span>↑ ↓ = Volume</span>
                         <span>F = Fullscreen</span>
@@ -355,21 +376,21 @@ function playVideo(videoId) {
             </div>
             
             <div class="player-sidebar">
-                <h3 class="sidebar-title">Autres vidéos</h3>
+                <h3 class="sidebar-title">Other Videos</h3>
                 <div class="sidebar-videos">
                     ${otherVideos.slice(0, 20).map(v => `
                         <div class="sidebar-video" onclick="playVideo('${v.id}')">
                             <div class="sidebar-thumbnail">
                                 ${v.thumbnail_file ? 
                                     `<img src="/videos/${v.thumbnail_file}" alt="${v.title}">` :
-                                    `<div class="sidebar-no-thumb">🎹</div>`
+                                    `<div class="sidebar-no-thumb">VIDEO</div>`
                                 }
                                 <span class="sidebar-duration">${formatDuration(v.duration)}</span>
                             </div>
                             <div class="sidebar-info">
                                 <h4 class="sidebar-video-title">${v.title}</h4>
                                 <p class="sidebar-channel">${v.channel}</p>
-                                <p class="sidebar-views">👁️ ${formatNumber(v.view_count)} vues</p>
+                                <p class="sidebar-views">${formatNumber(v.view_count)} views</p>
                             </div>
                         </div>
                     `).join('')}
@@ -395,18 +416,13 @@ function playVideo(videoId) {
     
     // Keyboard controls
     keyboardHandler = (e) => {
-        // Ignore if typing in input field
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
         
         switch(e.key) {
             case ' ':
             case 'k':
                 e.preventDefault();
-                if (player.paused) {
-                    player.play();
-                } else {
-                    player.pause();
-                }
+                player.paused ? player.play() : player.pause();
                 break;
             case 'ArrowLeft':
                 e.preventDefault();
@@ -550,7 +566,7 @@ async function loadChannels() {
     } else {
         container.innerHTML = channels.map(ch => `
             <div class="channel-card">
-                ${ch.thumbnail ? `<img src="${ch.thumbnail}" class="channel-thumb">` : '<div class="channel-thumb-placeholder">📺</div>'}
+                ${ch.thumbnail ? `<img src="${ch.thumbnail}" class="channel-thumb">` : '<div class="channel-thumb-placeholder">CH</div>'}
                 <div class="channel-info">
                     <h3>${ch.name}</h3>
                     <p>${ch.video_count} videos</p>
@@ -562,9 +578,9 @@ async function loadChannels() {
                                onchange="toggleAutoDownload('${ch.id}', this.checked)">
                         <span>Auto-DL</span>
                     </label>
-                    <button class="btn-stats" onclick="showChannelStats('${ch.id}')">📊 Stats</button>
-                    <button class="btn-check" onclick="checkChannelNow('${ch.id}')">🔄 Check</button>
-                    <button class="btn-delete-channel" onclick="deleteChannel('${ch.id}')">🗑️</button>
+                    <button class="btn-stats" onclick="showChannelStats('${ch.id}')">Stats</button>
+                    <button class="btn-check" onclick="checkChannelNow('${ch.id}')">Check</button>
+                    <button class="btn-delete-channel" onclick="deleteChannel('${ch.id}')">Delete</button>
                 </div>
             </div>
         `).join('');
@@ -619,7 +635,6 @@ async function deleteChannel(channelId) {
     loadChannels();
 }
 
-// Channel Stats (stub)
 async function showChannelStats(channelId) {
     alert('Channel stats coming soon!');
 }
@@ -630,3 +645,6 @@ function closeStatsModal() {
 
 // Initial load
 loadLibrary();
+
+// Handle hash navigation on page load
+handleHashNavigation();
