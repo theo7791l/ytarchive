@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>YTArchive - Mon Profil</title>
+    <title>YTArchive - Profile</title>
     <link rel="stylesheet" href="/static/css/app.css">
     <style>
         .profile-container {
@@ -29,28 +29,16 @@
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             margin-bottom: 10px;
-            animation: slideDown 0.6s ease;
-        }
-
-        @keyframes slideDown {
-            from { opacity: 0; transform: translateY(-20px); }
-            to { opacity: 1; transform: translateY(0); }
         }
 
         .profile-card {
             background: rgba(255, 255, 255, 0.05);
             backdrop-filter: blur(10px);
-            border-radius: 25px;
+            border-radius: 20px;
             padding: 40px;
             margin-bottom: 30px;
             border: 2px solid rgba(255, 255, 255, 0.1);
             transition: all 0.3s ease;
-            animation: fadeInUp 0.7s ease;
-        }
-
-        @keyframes fadeInUp {
-            from { opacity: 0; transform: translateY(30px); }
-            to { opacity: 1; transform: translateY(0); }
         }
 
         .profile-card:hover {
@@ -78,7 +66,7 @@
         }
 
         .avatar-preview:hover {
-            transform: scale(1.05) rotate(5deg);
+            transform: scale(1.05);
         }
 
         .avatar-placeholder {
@@ -90,13 +78,15 @@
             align-items: center;
             justify-content: center;
             font-size: 48px;
+            font-weight: 600;
             border: 4px solid #667eea;
             box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
             transition: all 0.3s ease;
+            color: white;
         }
 
         .avatar-placeholder:hover {
-            transform: scale(1.05) rotate(-5deg);
+            transform: scale(1.05);
         }
 
         .avatar-controls h3 {
@@ -114,7 +104,7 @@
         .btn-upload, .btn-remove {
             padding: 12px 24px;
             border: none;
-            border-radius: 12px;
+            border-radius: 10px;
             cursor: pointer;
             font-weight: 600;
             transition: all 0.3s ease;
@@ -168,7 +158,7 @@
             padding: 15px 20px;
             background: rgba(255, 255, 255, 0.05);
             border: 2px solid rgba(255, 255, 255, 0.1);
-            border-radius: 12px;
+            border-radius: 10px;
             color: white;
             font-size: 15px;
             transition: all 0.3s ease;
@@ -184,21 +174,22 @@
         .role-display {
             padding: 10px 20px;
             background: rgba(102, 126, 234, 0.2);
-            border-radius: 10px;
+            border-radius: 8px;
             display: inline-block;
             font-weight: 600;
             color: #667eea;
             text-transform: uppercase;
+            letter-spacing: 1px;
             border: 2px solid rgba(102, 126, 234, 0.3);
         }
 
         .btn-save {
             width: 100%;
             padding: 16px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100());
             color: white;
             border: none;
-            border-radius: 12px;
+            border-radius: 10px;
             font-size: 16px;
             font-weight: 600;
             cursor: pointer;
@@ -210,10 +201,6 @@
             box-shadow: 0 15px 35px rgba(102, 126, 234, 0.5);
         }
 
-        .btn-save:active {
-            transform: translateY(-1px);
-        }
-
         .divider {
             height: 2px;
             background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
@@ -223,7 +210,7 @@
         .danger-zone {
             background: rgba(255, 68, 68, 0.1);
             border: 2px solid rgba(255, 68, 68, 0.3);
-            border-radius: 20px;
+            border-radius: 15px;
             padding: 30px;
         }
 
@@ -233,16 +220,10 @@
 
         .success-message, .error-message {
             padding: 15px 20px;
-            border-radius: 12px;
+            border-radius: 10px;
             margin-bottom: 20px;
             font-weight: 600;
             display: none;
-            animation: slideInDown 0.4s ease;
-        }
-
-        @keyframes slideInDown {
-            from { opacity: 0; transform: translateY(-20px); }
-            to { opacity: 1; transform: translateY(0); }
         }
 
         .success-message {
@@ -272,6 +253,7 @@
             border-radius: 25px;
             cursor: pointer;
             transition: all 0.3s ease;
+            color: white;
         }
 
         .user-profile-btn:hover {
@@ -294,8 +276,10 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 16px;
+            font-size: 14px;
+            font-weight: 600;
             border: 2px solid #667eea;
+            color: white;
         }
 
         .dropdown-menu {
@@ -313,12 +297,6 @@
 
         .dropdown-menu.active {
             display: block;
-            animation: fadeInDropdown 0.3s ease;
-        }
-
-        @keyframes fadeInDropdown {
-            from { opacity: 0; transform: translateY(-10px); }
-            to { opacity: 1; transform: translateY(0); }
         }
 
         .dropdown-item {
@@ -350,38 +328,34 @@
 <body>
     <nav class="navbar">
         <div class="nav-brand">
-            <h1>🎬 YTArchive</h1>
+            <h1>YTArchive</h1>
         </div>
         <div class="nav-menu">
-            <a href="/app" class="nav-link">📚 Library</a>
-            <a href="/app#channels" class="nav-link">📺 Channels</a>
-            <a href="/app#download" class="nav-link">⬇️ Download</a>
+            <a href="/app" class="nav-link">Library</a>
+            <a href="/app#channels" class="nav-link">Channels</a>
+            <a href="/app#download" class="nav-link">Download</a>
         </div>
         <div class="nav-user">
             <div class="user-profile-dropdown">
                 <button class="user-profile-btn" onclick="toggleDropdown()">
                     <div id="nav-avatar-container">
-                        <div class="user-avatar-placeholder-small">👤</div>
+                        <div class="user-avatar-placeholder-small">U</div>
                     </div>
                     <div style="display: flex; flex-direction: column; align-items: flex-start;">
                         <span id="nav-username" style="font-weight: 600;"></span>
-                        <span id="nav-role" class="role-badge-small">membre</span>
+                        <span id="nav-role" class="role-badge-small">member</span>
                     </div>
-                    <span style="font-size: 12px;">▼</span>
                 </button>
                 <div class="dropdown-menu" id="dropdown-menu">
                     <a href="/profile" class="dropdown-item" style="background: rgba(102, 126, 234, 0.1);">
-                        <span>👤</span>
-                        <span>Mon Profil</span>
+                        <span>Profile</span>
                     </a>
                     <a href="/admin" class="dropdown-item" id="nav-admin-link" style="display: none;">
-                        <span>⚙️</span>
                         <span>Administration</span>
                     </a>
                     <hr style="margin: 0; border: none; border-top: 1px solid rgba(255, 255, 255, 0.1);">
                     <a href="#" class="dropdown-item" onclick="logout(); return false;" style="color: #ff4444;">
-                        <span>🚪</span>
-                        <span>Déconnexion</span>
+                        <span>Logout</span>
                     </a>
                 </div>
             </div>
@@ -390,8 +364,8 @@
 
     <div class="profile-container">
         <div class="profile-header">
-            <h1>👤 Mon Profil</h1>
-            <p style="color: #aaa; font-size: 18px;">Gérez vos informations personnelles</p>
+            <h1>My Profile</h1>
+            <p style="color: #aaa; font-size: 18px;">Manage your personal information</p>
         </div>
 
         <div id="success-msg" class="success-message"></div>
@@ -401,40 +375,40 @@
             <!-- Avatar Section -->
             <div class="avatar-section">
                 <div id="avatar-container">
-                    <div class="avatar-placeholder">👤</div>
+                    <div class="avatar-placeholder">U</div>
                 </div>
                 <div class="avatar-controls">
-                    <h3>📷 Photo de profil</h3>
-                    <p style="color: #aaa; margin-bottom: 15px;">Image recommandée : 400x400px, max 2MB</p>
+                    <h3>Profile Picture</h3>
+                    <p style="color: #aaa; margin-bottom: 15px;">Recommended: 400x400px, max 2MB</p>
                     <input type="file" id="avatar-input" accept="image/*" style="display: none;">
                     <div class="avatar-buttons">
-                        <button class="btn-upload" onclick="document.getElementById('avatar-input').click()">📷 Changer</button>
-                        <button class="btn-remove" id="remove-avatar-btn" onclick="removeAvatar()">🗑️ Supprimer</button>
+                        <button class="btn-upload" onclick="document.getElementById('avatar-input').click()">Upload</button>
+                        <button class="btn-remove" id="remove-avatar-btn" onclick="removeAvatar()">Remove</button>
                     </div>
                 </div>
             </div>
 
             <!-- Profile Info -->
             <div class="form-section">
-                <h3>📋 Informations personnelles</h3>
+                <h3>Personal Information</h3>
                 <form id="profile-form">
                     <div class="form-group">
-                        <label>Nom d'utilisateur</label>
+                        <label>Username</label>
                         <input type="text" id="username-field" disabled>
                     </div>
                     <div class="form-group">
-                        <label>Nom d'affichage</label>
-                        <input type="text" id="display-name" placeholder="Votre nom complet">
+                        <label>Display Name</label>
+                        <input type="text" id="display-name" placeholder="Your full name">
                     </div>
                     <div class="form-group">
                         <label>Email</label>
-                        <input type="email" id="email" placeholder="votre@email.com">
+                        <input type="email" id="email" placeholder="your@email.com">
                     </div>
                     <div class="form-group">
-                        <label>Rôle</label>
-                        <span class="role-display" id="role-display">MEMBRE</span>
+                        <label>Role</label>
+                        <span class="role-display" id="role-display">MEMBER</span>
                     </div>
-                    <button type="submit" class="btn-save">💾 Sauvegarder les modifications</button>
+                    <button type="submit" class="btn-save">Save Changes</button>
                 </form>
             </div>
 
@@ -442,21 +416,21 @@
 
             <!-- Change Password -->
             <div class="form-section danger-zone">
-                <h3>🔒 Changer le mot de passe</h3>
+                <h3>Change Password</h3>
                 <form id="password-form">
                     <div class="form-group">
-                        <label>Ancien mot de passe</label>
+                        <label>Current Password</label>
                         <input type="password" id="old-password" required>
                     </div>
                     <div class="form-group">
-                        <label>Nouveau mot de passe</label>
+                        <label>New Password</label>
                         <input type="password" id="new-password" required minlength="6">
                     </div>
                     <div class="form-group">
-                        <label>Confirmer le nouveau mot de passe</label>
+                        <label>Confirm New Password</label>
                         <input type="password" id="confirm-password" required minlength="6">
                     </div>
-                    <button type="submit" class="btn-save">🔑 Changer le mot de passe</button>
+                    <button type="submit" class="btn-save">Change Password</button>
                 </form>
             </div>
         </div>
@@ -464,7 +438,6 @@
 
     <script>
         const token = localStorage.getItem('token');
-        const username = localStorage.getItem('username');
 
         if (!token) {
             window.location.href = '/';
@@ -532,6 +505,8 @@
             const response = await apiCall('/api/auth/me');
             currentUser = await response.json();
             
+            const initial = (currentUser.display_name || currentUser.username).charAt(0).toUpperCase();
+            
             // Update navbar
             document.getElementById('nav-username').textContent = currentUser.display_name || currentUser.username;
             document.getElementById('nav-role').textContent = currentUser.role;
@@ -544,6 +519,8 @@
             const navAvatarContainer = document.getElementById('nav-avatar-container');
             if (currentUser.avatar) {
                 navAvatarContainer.innerHTML = `<img src="/avatars/${currentUser.avatar}" class="user-avatar-small" alt="Avatar">`;
+            } else {
+                navAvatarContainer.innerHTML = `<div class="user-avatar-placeholder-small">${initial}</div>`;
             }
             
             // Update form fields
@@ -558,7 +535,7 @@
                 avatarContainer.innerHTML = `<img src="/avatars/${currentUser.avatar}" class="avatar-preview" alt="Avatar">`;
                 document.getElementById('remove-avatar-btn').style.display = 'block';
             } else {
-                avatarContainer.innerHTML = '<div class="avatar-placeholder">👤</div>';
+                avatarContainer.innerHTML = `<div class="avatar-placeholder">${initial}</div>`;
                 document.getElementById('remove-avatar-btn').style.display = 'none';
             }
         }
@@ -569,7 +546,7 @@
             if (!file) return;
             
             if (file.size > 2 * 1024 * 1024) {
-                showMessage('Image trop volumineuse (max 2MB)', true);
+                showMessage('Image too large (max 2MB)', true);
                 return;
             }
             
@@ -585,23 +562,23 @@
             });
             
             if (response.ok) {
-                showMessage('✅ Avatar mis à jour avec succès!');
+                showMessage('Avatar updated successfully!');
                 loadProfile();
             } else {
-                showMessage('❌ Erreur lors de l\'upload', true);
+                showMessage('Error uploading avatar', true);
             }
         });
 
         // Remove avatar
         async function removeAvatar() {
-            if (!confirm('Supprimer votre avatar ?')) return;
+            if (!confirm('Remove your avatar?')) return;
             
             const response = await apiCall('/api/auth/me/avatar', {
                 method: 'DELETE'
             });
             
             if (response.ok) {
-                showMessage('✅ Avatar supprimé');
+                showMessage('Avatar removed');
                 loadProfile();
             }
         }
@@ -625,10 +602,10 @@
             });
             
             if (response.ok) {
-                showMessage('✅ Profil mis à jour avec succès!');
+                showMessage('Profile updated successfully!');
                 loadProfile();
             } else {
-                showMessage('❌ Erreur lors de la mise à jour', true);
+                showMessage('Error updating profile', true);
             }
         });
 
@@ -641,12 +618,12 @@
             const confirmPassword = document.getElementById('confirm-password').value;
             
             if (newPassword !== confirmPassword) {
-                showMessage('❌ Les mots de passe ne correspondent pas', true);
+                showMessage('Passwords do not match', true);
                 return;
             }
             
             if (newPassword.length < 6) {
-                showMessage('❌ Le mot de passe doit contenir au moins 6 caractères', true);
+                showMessage('Password must be at least 6 characters', true);
                 return;
             }
             
@@ -662,15 +639,14 @@
             });
             
             if (response.ok) {
-                showMessage('✅ Mot de passe changé avec succès!');
+                showMessage('Password changed successfully!');
                 document.getElementById('password-form').reset();
             } else {
                 const error = await response.json();
-                showMessage('❌ ' + (error.detail || 'Erreur lors du changement'), true);
+                showMessage(error.detail || 'Error changing password', true);
             }
         });
 
-        // Initial load
         loadProfile();
     </script>
 </body>
