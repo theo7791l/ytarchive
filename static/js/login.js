@@ -14,7 +14,7 @@ form.addEventListener('submit', async (e) => {
     submitBtn.textContent = 'Logging in...';
     
     try {
-        const response = await fetch('/api/auth/login', {
+        const response = await fetch('/api/login', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -25,8 +25,8 @@ form.addEventListener('submit', async (e) => {
         const data = await response.json();
         
         if (response.ok) {
-            localStorage.setItem('token', data.access_token);
-            localStorage.setItem('username', username);
+            localStorage.setItem('token', data.token);
+            localStorage.setItem('username', data.username);
             window.location.href = '/app';
         } else {
             throw new Error(data.detail || 'Login failed');
