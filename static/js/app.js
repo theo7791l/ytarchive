@@ -81,24 +81,131 @@ function formatNumber(num) {
     return num.toString();
 }
 
-// Library
-let libraryCache = [];
+function formatTotalDuration(totalSeconds) {
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    return `${hours}h ${minutes}m`;
+}
 
+// Library State
+let libraryCache = [];
+let currentView = 'grid';
+let currentFilter = 'all';
+let currentSort = 'date-desc';
+let currentSearch = '';
+
+// Load Library
 async function loadLibrary() {
     const library = await apiCall('/api/library');
     libraryCache = library;
     localStorage.setItem('library_cache', JSON.stringify(library));
+    
+    updateStats();
+    updateChannelFilter();
+    renderLibrary();
+}
+
+// Update Stats
+function updateStats() {
+    const totalVideos = libraryCache.length;
+    const uniqueChannels = new Set(libraryCache.map(v => v.channel_id)).size;
+    const totalDuration = libraryCache.reduce((sum, v) => sum + (v.duration || 0), 0);
+    
+    document.getElementById('total-videos').textContent = `${totalVideos} video${totalVideos !== 1 ? 's' : ''}`;
+    document.getElementById('total-channels').textContent = `${uniqueChannels} channel${uniqueChannels !== 1 ? 's' : ''}`;
+    document.getElementById('total-duration').textContent = formatTotalDuration(totalDuration);
+}
+
+// Update Channel Filter Dropdown
+function updateChannelFilter() {
+    const channels = {};
+    libraryCache.forEach(v => {
+        if (v.channel && v.channel_id) {
+            channels[v.channel_id] = v.channel;
+        }
+    });
+    
+    const filterSelect = document.getElementById('channel-filter');
+    filterSelect.innerHTML = '<option value="all">All Channels</option>';
+    
+    Object.entries(channels)
+        .sort((a, b) => a[1].localeCompare(b[1]))
+        .forEach(([id, name]) => {
+            const option = document.createElement('option');
+            option.value = id;
+            option.textContent = name;
+            filterSelect.appendChild(option);
+        });
+    
+    filterSelect.value = currentFilter;
+}
+
+// Filter and Sort
+function getFilteredAndSorted() {
+    let filtered = [...libraryCache];
+    
+    // Apply search
+    if (currentSearch) {
+        const query = currentSearch.toLowerCase();
+        filtered = filtered.filter(v => 
+            v.title.toLowerCase().includes(query) ||
+            v.channel.toLowerCase().includes(query)
+        );
+    }
+    
+    // Apply channel filter
+    if (currentFilter !== 'all') {
+        filtered = filtered.filter(v => v.channel_id === currentFilter);
+    }
+    
+    // Apply sorting
+    const [field, order] = currentSort.split('-');
+    filtered.sort((a, b) => {
+        let aVal, bVal;
+        
+        if (field === 'date') {
+            aVal = new Date(a.upload_date || 0).getTime();
+            bVal = new Date(b.upload_date || 0).getTime();
+        } else if (field === 'title') {
+            aVal = a.title.toLowerCase();
+            bVal = b.title.toLowerCase();
+        } else if (field === 'views') {
+            aVal = a.view_count || 0;
+            bVal = b.view_count || 0;
+        } else if (field === 'duration') {
+            aVal = a.duration || 0;
+            bVal = b.duration || 0;
+        }
+        
+        if (order === 'asc') {
+            return aVal > bVal ? 1 : -1;
+        } else {
+            return aVal < bVal ? 1 : -1;
+        }
+    });
+    
+    return filtered;
+}
+
+// Render Library
+function renderLibrary() {
+    const filtered = getFilteredAndSorted();
     const grid = document.getElementById('library-grid');
     
-    if (library.length === 0) {
-        grid.innerHTML = '<p class="empty-state">No videos yet. Start downloading!</p>';
-    } else {
-        grid.innerHTML = library.map(video => `
+    grid.className = currentView === 'grid' ? 'video-grid' : 'video-list';
+    
+    if (filtered.length === 0) {
+        grid.innerHTML = '<p class="empty-state">No videos found.</p>';
+        return;
+    }
+    
+    if (currentView === 'grid') {
+        grid.innerHTML = filtered.map(video => `
             <div class="video-card" data-id="${video.id}">
                 <div class="video-thumbnail">
                     ${video.thumbnail_file ? 
                         `<img src="/videos/${video.thumbnail_file}" alt="${video.title}">` :
-                        `<div class="no-thumbnail">📹</div>`
+                        `<div class="no-thumbnail">🎹</div>`
                     }
                     <div class="video-duration">${formatDuration(video.duration)}</div>
                     ${video.auto_downloaded ? '<div class="auto-badge">AUTO</div>' : ''}
@@ -112,14 +219,72 @@ async function loadLibrary() {
                     </div>
                 </div>
                 <div class="video-actions">
-                    <button class="btn-play" onclick="playVideo('${video.id}')">▶️ Play</button>
-                    <button class="btn-delete" onclick="deleteVideo('${video.id}')">🗑️</button>
+                    <button class="btn-play" onclick="playVideo('${video.id}')" title="Play">▶️</button>
+                    <button class="btn-delete" onclick="deleteVideo('${video.id}')" title="Delete">🗑️</button>
+                </div>
+            </div>
+        `).join('');
+    } else {
+        grid.innerHTML = filtered.map(video => `
+            <div class="video-list-item" data-id="${video.id}">
+                <div class="list-thumbnail">
+                    ${video.thumbnail_file ? 
+                        `<img src="/videos/${video.thumbnail_file}" alt="${video.title}">` :
+                        `<div class="no-thumbnail-small">🎹</div>`
+                    }
+                    <div class="video-duration-small">${formatDuration(video.duration)}</div>
+                </div>
+                <div class="list-info">
+                    <h3 class="list-title">${video.title}</h3>
+                    <div class="list-meta">
+                        <span class="list-channel">${video.channel}</span>
+                        <span>•</span>
+                        <span>👁️ ${formatNumber(video.view_count)}</span>
+                        <span>•</span>
+                        <span>📅 ${formatDate(video.upload_date)}</span>
+                        ${video.auto_downloaded ? '<span class="auto-badge-small">AUTO</span>' : ''}
+                    </div>
+                </div>
+                <div class="list-actions">
+                    <button class="btn-play-small" onclick="playVideo('${video.id}')" title="Play">▶️ Play</button>
+                    <button class="btn-delete-small" onclick="deleteVideo('${video.id}')" title="Delete">🗑️</button>
                 </div>
             </div>
         `).join('');
     }
 }
 
+// Event Listeners for Filters
+document.getElementById('search').addEventListener('input', (e) => {
+    currentSearch = e.target.value;
+    renderLibrary();
+});
+
+document.getElementById('channel-filter').addEventListener('change', (e) => {
+    currentFilter = e.target.value;
+    renderLibrary();
+});
+
+document.getElementById('sort-by').addEventListener('change', (e) => {
+    currentSort = e.target.value;
+    renderLibrary();
+});
+
+document.getElementById('grid-view').addEventListener('click', () => {
+    currentView = 'grid';
+    document.getElementById('grid-view').classList.add('active');
+    document.getElementById('list-view').classList.remove('active');
+    renderLibrary();
+});
+
+document.getElementById('list-view').addEventListener('click', () => {
+    currentView = 'list';
+    document.getElementById('list-view').classList.add('active');
+    document.getElementById('grid-view').classList.remove('active');
+    renderLibrary();
+});
+
+// Play Video
 function playVideo(videoId) {
     const video = libraryCache.find(v => v.id === videoId);
     if (!video) return;
@@ -137,6 +302,7 @@ function playVideo(videoId) {
                 <p><strong>Channel:</strong> ${video.channel}</p>
                 <p><strong>Uploaded:</strong> ${formatDate(video.upload_date)}</p>
                 <p><strong>Views:</strong> ${formatNumber(video.view_count)}</p>
+                <p><strong>Duration:</strong> ${formatDuration(video.duration)}</p>
                 ${video.description ? `<p class="video-description">${video.description}</p>` : ''}
             </div>
         </div>
@@ -144,54 +310,12 @@ function playVideo(videoId) {
     document.body.appendChild(modal);
 }
 
+// Delete Video
 async function deleteVideo(videoId) {
     if (!confirm('Delete this video?')) return;
     await apiCall(`/api/library/${videoId}`, { method: 'DELETE' });
     loadLibrary();
 }
-
-// Search
-document.getElementById('search').addEventListener('input', (e) => {
-    const query = e.target.value.toLowerCase();
-    const grid = document.getElementById('library-grid');
-    
-    if (!query) {
-        loadLibrary();
-        return;
-    }
-    
-    const filtered = libraryCache.filter(v => 
-        v.title.toLowerCase().includes(query) ||
-        v.channel.toLowerCase().includes(query)
-    );
-    
-    if (filtered.length === 0) {
-        grid.innerHTML = '<p class="empty-state">No videos found.</p>';
-    } else {
-        grid.innerHTML = filtered.map(video => `
-            <div class="video-card">
-                <div class="video-thumbnail">
-                    ${video.thumbnail_file ? 
-                        `<img src="/videos/${video.thumbnail_file}">` :
-                        `<div class="no-thumbnail">📹</div>`}
-                    <div class="video-duration">${formatDuration(video.duration)}</div>
-                </div>
-                <div class="video-info">
-                    <h3 class="video-title">${video.title}</h3>
-                    <p class="video-channel">${video.channel}</p>
-                    <div class="video-meta">
-                        <span>👁️ ${formatNumber(video.view_count)}</span>
-                        <span>📅 ${formatDate(video.upload_date)}</span>
-                    </div>
-                </div>
-                <div class="video-actions">
-                    <button class="btn-play" onclick="playVideo('${video.id}')">▶️</button>
-                    <button class="btn-delete" onclick="deleteVideo('${video.id}')">🗑️</button>
-                </div>
-            </div>
-        `).join('');
-    }
-});
 
 // Download
 let downloadWs = null;
@@ -261,7 +385,7 @@ async function loadChannels() {
     } else {
         container.innerHTML = channels.map(ch => `
             <div class="channel-card">
-                ${ch.thumbnail ? `<img src="${ch.thumbnail}" class="channel-thumb">` : ''}
+                ${ch.thumbnail ? `<img src="${ch.thumbnail}" class="channel-thumb">` : '<div class="channel-thumb-placeholder">📺</div>'}
                 <div class="channel-info">
                     <h3>${ch.name}</h3>
                     <p>${ch.video_count} videos</p>

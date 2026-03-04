@@ -27,10 +27,41 @@
         <section id="library-view" class="view active">
             <div class="view-header">
                 <h2>Video Library</h2>
-                <div class="search-bar">
-                    <input type="text" id="search" placeholder="Search videos...">
+                <div class="library-stats">
+                    <span id="total-videos">0 videos</span>
+                    <span id="total-channels">0 channels</span>
+                    <span id="total-duration">0h 0m</span>
                 </div>
             </div>
+            
+            <div class="library-controls">
+                <div class="search-bar">
+                    <input type="text" id="search" placeholder="🔍 Search videos...">
+                </div>
+                
+                <div class="filter-group">
+                    <select id="channel-filter">
+                        <option value="all">All Channels</option>
+                    </select>
+                    
+                    <select id="sort-by">
+                        <option value="date-desc">Newest First</option>
+                        <option value="date-asc">Oldest First</option>
+                        <option value="title-asc">Title A-Z</option>
+                        <option value="title-desc">Title Z-A</option>
+                        <option value="views-desc">Most Views</option>
+                        <option value="views-asc">Least Views</option>
+                        <option value="duration-desc">Longest</option>
+                        <option value="duration-asc">Shortest</option>
+                    </select>
+                    
+                    <div class="view-toggle">
+                        <button id="grid-view" class="view-btn active" title="Grid View">⊞</button>
+                        <button id="list-view" class="view-btn" title="List View">☰</button>
+                    </div>
+                </div>
+            </div>
+            
             <div id="library-grid" class="video-grid">
                 <p class="empty-state">No videos yet. Start downloading!</p>
             </div>
