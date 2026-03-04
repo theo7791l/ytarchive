@@ -9,16 +9,18 @@
 <body>
     <nav class="navbar">
         <div class="nav-brand">
-            <h1>🎥 YTArchive</h1>
+            <h1>YTArchive</h1>
         </div>
         <div class="nav-menu">
-            <a href="#" class="nav-link active" data-view="library">📚 Library</a>
-            <a href="#" class="nav-link" data-view="download">⬇️ Download</a>
-            <a href="#" class="nav-link" data-view="channels">📡 Channels</a>
+            <a href="#" class="nav-link active" data-view="library">Library</a>
+            <a href="#" class="nav-link" data-view="download">Download</a>
+            <a href="#" class="nav-link" data-view="channels">Channels</a>
         </div>
         <div class="nav-user">
             <a href="/profile" class="profile-link">
-                <img src="/avatars/default.png" id="user-avatar" alt="Avatar">
+                <div class="user-avatar" id="user-avatar">
+                    <span id="avatar-letter">U</span>
+                </div>
                 <span id="username-display">User</span>
             </a>
             <button class="btn-logout" onclick="logout()">Logout</button>
@@ -31,7 +33,7 @@
             <span class="b2-warning-icon">⚠️</span>
             <div class="b2-warning-text">
                 <strong>Backblaze B2 Configuration Required</strong>
-                <p>You must configure your Backblaze B2 credentials to download videos. Click below to configure.</p>
+                <p>You must configure your Backblaze B2 credentials to download videos.</p>
             </div>
             <a href="/profile" class="btn-configure-b2">Configure B2 Now</a>
             <button class="btn-close-warning" onclick="closeB2Warning()">✕</button>
@@ -42,7 +44,7 @@
         <!-- Library View -->
         <div id="library-view" class="view active">
             <div class="view-header">
-                <h2>📚 Video Library</h2>
+                <h2>Video Library</h2>
                 <div class="header-stats">
                     <span id="total-videos">0 videos</span>
                     <span>•</span>
@@ -53,21 +55,21 @@
             </div>
 
             <div class="controls">
-                <input type="text" id="search" placeholder="🔍 Search videos or channels...">
+                <input type="text" id="search" placeholder="Search videos or channels...">
                 
                 <select id="channel-filter">
                     <option value="all">All Channels</option>
                 </select>
                 
                 <select id="sort-by">
-                    <option value="date-desc">📅 Date (Newest)</option>
-                    <option value="date-asc">📅 Date (Oldest)</option>
-                    <option value="title-asc">🔤 Title (A-Z)</option>
-                    <option value="title-desc">🔤 Title (Z-A)</option>
-                    <option value="views-desc">👁️ Views (High)</option>
-                    <option value="views-asc">👁️ Views (Low)</option>
-                    <option value="duration-desc">⏱️ Duration (Long)</option>
-                    <option value="duration-asc">⏱️ Duration (Short)</option>
+                    <option value="date-desc">Date (Newest)</option>
+                    <option value="date-asc">Date (Oldest)</option>
+                    <option value="title-asc">Title (A-Z)</option>
+                    <option value="title-desc">Title (Z-A)</option>
+                    <option value="views-desc">Views (High)</option>
+                    <option value="views-asc">Views (Low)</option>
+                    <option value="duration-desc">Duration (Long)</option>
+                    <option value="duration-asc">Duration (Short)</option>
                 </select>
                 
                 <div class="view-toggle">
@@ -82,7 +84,7 @@
         <!-- Download View -->
         <div id="download-view" class="view">
             <div class="view-header">
-                <h2>⬇️ Download Video</h2>
+                <h2>Download Video</h2>
                 <p class="view-description">Download videos from YouTube and store them on Backblaze B2</p>
             </div>
 
@@ -116,13 +118,13 @@
             </div>
 
             <div class="download-info">
-                <h3>ℹ️ Information</h3>
+                <h3>Information</h3>
                 <ul>
-                    <li>✅ All videos are automatically uploaded to your Backblaze B2 bucket</li>
-                    <li>✅ Local storage is only used temporarily during download</li>
-                    <li>✅ Videos are streamed directly from B2 when playing</li>
-                    <li>⚠️ You must configure Backblaze B2 in your profile first</li>
-                    <li>📊 Average video size: 480p ~300MB, 720p ~600MB, 1080p ~1.5GB</li>
+                    <li>All videos are automatically uploaded to your Backblaze B2 bucket</li>
+                    <li>Local storage is only used temporarily during download</li>
+                    <li>Videos are streamed directly from B2 when playing</li>
+                    <li>You must configure Backblaze B2 in your profile first</li>
+                    <li>Average video size: 480p ~300MB, 720p ~600MB, 1080p ~1.5GB</li>
                 </ul>
             </div>
         </div>
@@ -130,7 +132,7 @@
         <!-- Channels View -->
         <div id="channels-view" class="view">
             <div class="view-header">
-                <h2>📡 Channels</h2>
+                <h2>Channels</h2>
                 <button id="add-channel-btn" class="btn-add-channel">+ Add Channel</button>
             </div>
 
@@ -139,7 +141,7 @@
     </div>
 
     <!-- Add Channel Modal -->
-    <div id="add-channel-modal" class="modal">
+    <div id="add-channel-modal" class="modal" style="display: none;">
         <div class="modal-content">
             <div class="modal-header">
                 <h3>Add YouTube Channel</h3>
@@ -174,7 +176,7 @@
     </div>
 
     <!-- Channel Stats Modal -->
-    <div id="channel-stats-modal" class="modal">
+    <div id="channel-stats-modal" class="modal" style="display: none;">
         <div class="modal-content modal-large">
             <div class="modal-header">
                 <h3>Channel Statistics</h3>
@@ -198,10 +200,24 @@
                 if (response.ok) {
                     const user = await response.json();
                     
-                    // Update username and avatar
+                    // Update username
                     document.getElementById('username-display').textContent = user.username;
+                    
+                    // Update avatar - show first letter if no avatar
+                    const avatarDiv = document.getElementById('user-avatar');
+                    const avatarLetter = document.getElementById('avatar-letter');
+                    
                     if (user.avatar) {
-                        document.getElementById('user-avatar').src = `/avatars/${user.avatar}`;
+                        // If user has avatar image
+                        avatarDiv.style.backgroundImage = `url('/avatars/${user.avatar}')`;
+                        avatarDiv.style.backgroundSize = 'cover';
+                        avatarDiv.style.backgroundPosition = 'center';
+                        avatarLetter.style.display = 'none';
+                    } else {
+                        // Show first letter of username
+                        const firstLetter = user.username.charAt(0).toUpperCase();
+                        avatarLetter.textContent = firstLetter;
+                        avatarLetter.style.display = 'flex';
                     }
                     
                     // Check B2 configuration
@@ -212,7 +228,7 @@
                         const downloadBtn = document.getElementById('download-btn');
                         downloadBtn.disabled = true;
                         downloadBtn.title = 'Configure Backblaze B2 first';
-                        downloadBtn.textContent = '🔒 Configure B2 First';
+                        downloadBtn.textContent = 'Configure B2 First';
                     }
                 }
             } catch (error) {
