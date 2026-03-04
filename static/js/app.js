@@ -548,7 +548,7 @@ document.getElementById('download-btn').addEventListener('click', async () => {
     progressText.textContent = 'Connecting...';
     
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${wsProtocol}//${window.location.host}/api/ws/download?token=${encodeURIComponent(token)}`;
+    const wsUrl = `${wsProtocol}//${window.location.host}/api/ws/download`;
     downloadWs = new WebSocket(wsUrl);
     
     downloadWs.onopen = () => {
