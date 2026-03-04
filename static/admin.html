@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YTArchive - Admin Panel</title>
+    <link rel="stylesheet" href="/static/css/app.css">
+    <style>
+        .admin-container {
+            max-width: 1200px;
+            margin: 40px auto;
+            padding: 0 40px;
+        }
+
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 40px;
+        }
+
+        .page-header h1 {
+            font-size: 36px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .users-table {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            overflow: hidden;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead {
+            background: rgba(102, 126, 234, 0.2);
+        }
+
+        th {
+            padding: 20px;
+            text-align: left;
+            font-weight: 600;
+            color: #667eea;
+            border-bottom: 2px solid rgba(102, 126, 234, 0.3);
+        }
+
+        td {
+            padding: 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        tbody tr {
+            transition: all 0.3s ease;
+        }
+
+        tbody tr:hover {
+            background: rgba(102, 126, 234, 0.1);
+        }
+
+        .user-avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid #667eea;
+        }
+
+        .user-avatar-placeholder {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            border: 2px solid #667eea;
+        }
+
+        .role-badge {
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .role-admin {
+            background: rgba(255, 68, 68, 0.2);
+            color: #ff4444;
+            border: 1px solid rgba(255, 68, 68, 0.3);
+        }
+
+        .role-member {
+            background: rgba(102, 234, 171, 0.2);
+            color: #66eaab;
+            border: 1px solid rgba(102, 234, 171, 0.3);
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn-action {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .btn-edit {
+            background: rgba(102, 126, 234, 0.2);
+            color: #667eea;
+            border: 1px solid rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-edit:hover {
+            background: rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-delete {
+            background: rgba(255, 68, 68, 0.2);
+            color: #ff4444;
+            border: 1px solid rgba(255, 68, 68, 0.3);
+        }
+
+        .btn-delete:hover {
+            background: rgba(255, 68, 68, 0.3);
+        }
+
+        .user-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .user-modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: #1a1a2e;
+            border-radius: 15px;
+            padding: 40px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+
+        .modal-header h2 {
+            font-size: 24px;
+            color: #667eea;
+        }
+
+        .modal-close {
+            background: rgba(255, 68, 68, 0.8);
+            border: 2px solid #ff4444;
+            color: white;
+            font-size: 24px;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+
+        .modal-close:hover {
+            background: #ff4444;
+            transform: rotate(90deg);
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 10px;
+            font-weight: 600;
+            color: #aaa;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 12px 16px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            color: white;
+            font-size: 15px;
+            transition: all 0.3s ease;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .avatar-upload {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .avatar-preview {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid #667eea;
+        }
+
+        .avatar-preview-placeholder {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            border: 2px solid #667eea;
+        }
+
+        .btn-upload {
+            padding: 10px 20px;
+            background: rgba(102, 126, 234, 0.2);
+            color: #667eea;
+            border: 2px solid rgba(102, 126, 234, 0.3);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-upload:hover {
+            background: rgba(102, 126, 234, 0.3);
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 15px;
+            margin-top: 30px;
+        }
+
+        .btn-primary {
+            flex: 1;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            flex: 1;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">
+            <h1>🎥 YTArchive Admin</h1>
+        </div>
+        <div class="nav-menu">
+            <a href="/app" class="nav-link">Back to App</a>
+        </div>
+        <div class="nav-user">
+            <span id="username"></span>
+            <button class="btn-logout" id="logout">Déconnexion</button>
+        </div>
+    </nav>
+
+    <div class="admin-container">
+        <div class="page-header">
+            <div>
+                <h1>👥 Gestion des Utilisateurs</h1>
+                <p style="color: #aaa; margin-top: 10px;">Gérez les comptes et permissions</p>
+            </div>
+            <button class="btn-primary" onclick="openCreateUserModal()">➕ Créer un utilisateur</button>
+        </div>
+
+        <div class="users-table">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Avatar</th>
+                        <th>Nom d'utilisateur</th>
+                        <th>Nom d'affichage</th>
+                        <th>Email</th>
+                        <th>Rôle</th>
+                        <th>Créé le</th>
+                        <th>Dernière connexion</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="users-list">
+                    <!-- Users will be loaded here -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Create/Edit User Modal -->
+    <div class="user-modal" id="user-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modal-title">Créer un utilisateur</h2>
+                <button class="modal-close" onclick="closeUserModal()">×</button>
+            </div>
+            <form id="user-form">
+                <div class="form-group">
+                    <label>Nom d'utilisateur</label>
+                    <input type="text" id="form-username" required>
+                </div>
+                <div class="form-group" id="password-group">
+                    <label>Mot de passe</label>
+                    <input type="password" id="form-password">
+                </div>
+                <div class="form-group">
+                    <label>Nom d'affichage</label>
+                    <input type="text" id="form-display-name">
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="form-email">
+                </div>
+                <div class="form-group">
+                    <label>Rôle</label>
+                    <select id="form-role">
+                        <option value="member">Membre</option>
+                        <option value="admin">Admin</option>
+                    </select>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" onclick="closeUserModal()">Annuler</button>
+                    <button type="submit" class="btn-primary" id="form-submit">Créer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('token');
+        const username = localStorage.getItem('username');
+
+        if (!token) {
+            window.location.href = '/';
+        }
+
+        document.getElementById('username').textContent = username;
+        document.getElementById('logout').addEventListener('click', () => {
+            localStorage.removeItem('token');
+            localStorage.removeItem('username');
+            window.location.href = '/';
+        });
+
+        let editingUser = null;
+
+        async function apiCall(endpoint, options = {}) {
+            const response = await fetch(endpoint, {
+                ...options,
+                headers: {
+                    ...options.headers,
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (response.status === 401 || response.status === 403) {
+                alert('Accès refusé. Vous devez être admin.');
+                window.location.href = '/app';
+                return;
+            }
+            
+            return response.json();
+        }
+
+        async function loadUsers() {
+            const users = await apiCall('/api/auth/admin/users');
+            const tbody = document.getElementById('users-list');
+            
+            tbody.innerHTML = users.map(user => `
+                <tr>
+                    <td>
+                        ${user.avatar ? 
+                            `<img src="/avatars/${user.avatar}" class="user-avatar" alt="${user.username}">` :
+                            `<div class="user-avatar-placeholder">👤</div>`
+                        }
+                    </td>
+                    <td><strong>${user.username}</strong></td>
+                    <td>${user.display_name || '-'}</td>
+                    <td>${user.email || '-'}</td>
+                    <td><span class="role-badge role-${user.role}">${user.role}</span></td>
+                    <td>${new Date(user.created_at).toLocaleDateString('fr-FR')}</td>
+                    <td>${user.last_login ? new Date(user.last_login).toLocaleDateString('fr-FR') : 'Jamais'}</td>
+                    <td>
+                        <div class="action-buttons">
+                            <button class="btn-action btn-edit" onclick="editUser('${user.username}')">✏️</button>
+                            ${user.username !== username ? 
+                                `<button class="btn-action btn-delete" onclick="deleteUser('${user.username}')">🗑️</button>` :
+                                ''
+                            }
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function openCreateUserModal() {
+            editingUser = null;
+            document.getElementById('modal-title').textContent = 'Créer un utilisateur';
+            document.getElementById('form-submit').textContent = 'Créer';
+            document.getElementById('password-group').style.display = 'block';
+            document.getElementById('form-username').disabled = false;
+            document.getElementById('user-form').reset();
+            document.getElementById('user-modal').classList.add('active');
+        }
+
+        async function editUser(username) {
+            const user = await apiCall(`/api/auth/admin/users/${username}`);
+            editingUser = username;
+            
+            document.getElementById('modal-title').textContent = 'Modifier l\'utilisateur';
+            document.getElementById('form-submit').textContent = 'Sauvegarder';
+            document.getElementById('password-group').style.display = 'none';
+            document.getElementById('form-username').value = user.username;
+            document.getElementById('form-username').disabled = true;
+            document.getElementById('form-display-name').value = user.display_name || '';
+            document.getElementById('form-email').value = user.email || '';
+            document.getElementById('form-role').value = user.role;
+            
+            document.getElementById('user-modal').classList.add('active');
+        }
+
+        function closeUserModal() {
+            document.getElementById('user-modal').classList.remove('active');
+            editingUser = null;
+        }
+
+        document.getElementById('user-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const username = document.getElementById('form-username').value;
+            const password = document.getElementById('form-password').value;
+            const displayName = document.getElementById('form-display-name').value;
+            const email = document.getElementById('form-email').value;
+            const role = document.getElementById('form-role').value;
+            
+            if (editingUser) {
+                // Update user
+                await apiCall(`/api/auth/admin/users/${editingUser}`, {
+                    method: 'PUT',
+                    body: JSON.stringify({
+                        display_name: displayName || null,
+                        email: email || null,
+                        role: role
+                    })
+                });
+            } else {
+                // Create user
+                if (!password) {
+                    alert('Mot de passe requis');
+                    return;
+                }
+                await apiCall('/api/auth/admin/users', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        username: username,
+                        password: password,
+                        display_name: displayName || null,
+                        email: email || null,
+                        role: role
+                    })
+                });
+            }
+            
+            closeUserModal();
+            loadUsers();
+        });
+
+        async function deleteUser(username) {
+            if (!confirm(`Supprimer l'utilisateur ${username} ?`)) return;
+            
+            await apiCall(`/api/auth/admin/users/${username}`, {
+                method: 'DELETE'
+            });
+            
+            loadUsers();
+        }
+
+        // Initial load
+        loadUsers();
+    </script>
+</body>
+</html>
