@@ -41,6 +41,11 @@ class UpdateUserRequest(BaseModel):
     display_name: Optional[str] = None
     role: Optional[str] = None
 
+class B2CredentialsRequest(BaseModel):
+    key_id: str
+    application_key: str
+    bucket_name: str
+
 class ChangePasswordRequest(BaseModel):
     old_password: Optional[str] = None
     new_password: str
@@ -53,6 +58,8 @@ class UserResponse(BaseModel):
     avatar: Optional[str]
     created_at: str
     last_login: Optional[str]
+    has_b2_configured: bool = False
+    b2_bucket_name: Optional[str] = None
 
 def hash_password(password: str) -> str:
     """Hash a password using bcrypt"""
@@ -73,7 +80,10 @@ def load_users():
                 "display_name": "Administrator",
                 "avatar": None,
                 "created_at": datetime.now().isoformat(),
-                "last_login": None
+                "last_login": None,
+                "b2_key_id": None,
+                "b2_application_key": None,
+                "b2_bucket_name": None
             }
         }
         save_users(default_users)
@@ -114,6 +124,7 @@ def verify_admin(user: dict = Depends(verify_token)) -> dict:
     return user
 
 def get_user_response(username: str, user_data: dict) -> UserResponse:
+    has_b2 = bool(user_data.get("b2_key_id") and user_data.get("b2_application_key") and user_data.get("b2_bucket_name"))
     return UserResponse(
         username=username,
         email=user_data.get("email"),
@@ -121,7 +132,9 @@ def get_user_response(username: str, user_data: dict) -> UserResponse:
         role=user_data.get("role", "member"),
         avatar=user_data.get("avatar"),
         created_at=user_data.get("created_at", datetime.now().isoformat()),
-        last_login=user_data.get("last_login")
+        last_login=user_data.get("last_login"),
+        has_b2_configured=has_b2,
+        b2_bucket_name=user_data.get("b2_bucket_name") if has_b2 else None
     )
 
 @router.post("/login", response_model=TokenResponse)
@@ -173,6 +186,45 @@ async def update_current_user(req: UpdateUserRequest, user: dict = Depends(verif
     
     save_users(users)
     return get_user_response(username, user_data)
+
+@router.post("/me/b2-credentials")
+async def set_b2_credentials(req: B2CredentialsRequest, user: dict = Depends(verify_token)):
+    """Set or update Backblaze B2 credentials for current user"""
+    from b2_storage import test_b2_credentials
+    
+    # Test credentials first
+    success, message = await test_b2_credentials(req.key_id, req.application_key, req.bucket_name)
+    if not success:
+        raise HTTPException(status_code=400, detail=f"Invalid B2 credentials: {message}")
+    
+    users = load_users()
+    username = user["username"]
+    
+    if username not in users:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    users[username]["b2_key_id"] = req.key_id
+    users[username]["b2_application_key"] = req.application_key
+    users[username]["b2_bucket_name"] = req.bucket_name
+    save_users(users)
+    
+    return {"status": "success", "message": "B2 credentials configured successfully"}
+
+@router.delete("/me/b2-credentials")
+async def delete_b2_credentials(user: dict = Depends(verify_token)):
+    """Remove B2 credentials from current user"""
+    users = load_users()
+    username = user["username"]
+    
+    if username not in users:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    users[username]["b2_key_id"] = None
+    users[username]["b2_application_key"] = None
+    users[username]["b2_bucket_name"] = None
+    save_users(users)
+    
+    return {"status": "success", "message": "B2 credentials removed"}
 
 @router.post("/me/avatar")
 async def upload_avatar(file: UploadFile = File(...), user: dict = Depends(verify_token)):
@@ -269,7 +321,10 @@ async def create_user(req: CreateUserRequest, admin: dict = Depends(verify_admin
         "display_name": req.display_name or req.username,
         "avatar": None,
         "created_at": datetime.now().isoformat(),
-        "last_login": None
+        "last_login": None,
+        "b2_key_id": None,
+        "b2_application_key": None,
+        "b2_bucket_name": None
     }
     
     save_users(users)
@@ -339,3 +394,19 @@ async def reset_user_password(username: str, req: ChangePasswordRequest, admin: 
     save_users(users)
     
     return {"status": "success", "message": f"Password reset for {username}"}
+
+def get_user_b2_credentials(username: str) -> Optional[dict]:
+    """Get B2 credentials for a user (used internally)"""
+    users = load_users()
+    if username not in users:
+        return None
+    
+    user = users[username]
+    if not (user.get("b2_key_id") and user.get("b2_application_key") and user.get("b2_bucket_name")):
+        return None
+    
+    return {
+        "key_id": user["b2_key_id"],
+        "application_key": user["b2_application_key"],
+        "bucket_name": user["b2_bucket_name"]
+    }
