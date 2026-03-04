@@ -12,14 +12,14 @@ from typing import Optional, List
 import asyncio
 from collections import defaultdict
 
-from downloader import download_video, get_video_info
+from downloader import download_video
 from scheduler import start_scheduler, check_channel_updates, get_channel_info
 
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
 app.mount("/videos", StaticFiles(directory="videos"), name="videos")
 
-SECRET_KEY = "ytarchive-secret-key-change-me"
+SECRET_KEY = os.getenv("SECRET_KEY", "ytarchive-secret-key-change-me")
 USERS_FILE = "users.json"
 LIBRARY_FILE = "library.json"
 CHANNELS_FILE = "channels.json"
@@ -69,6 +69,16 @@ async def root():
 @app.get("/app")
 async def app_page():
     return FileResponse("static/app.html")
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for monitoring"""
+    return {
+        "status": "healthy",
+        "timestamp": datetime.now().isoformat(),
+        "videos": len(load_json(LIBRARY_FILE)),
+        "channels": len(load_json(CHANNELS_FILE))
+    }
 
 @app.post("/api/register")
 async def register(user: User):
@@ -347,4 +357,6 @@ async def startup_event():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    # Support for SkyBots and other container platforms with PORT env var
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
