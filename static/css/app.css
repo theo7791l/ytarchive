@@ -489,12 +489,40 @@ body::before {
     padding-left: 25px;
 }
 
-.menu-item span {
-    font-size: 18px;
-    width: 20px;
+/* Menu Icon Styles - Lettres dans badges */
+.menu-icon {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: rgba(102, 126, 234, 0.2);
+    border: 2px solid rgba(102, 126, 234, 0.4);
     display: flex;
     align-items: center;
     justify-content: center;
+    font-size: 11px;
+    font-weight: 800;
+    color: #667eea;
+    flex-shrink: 0;
+    transition: all 0.3s ease;
+}
+
+.menu-item:hover .menu-icon {
+    background: rgba(102, 126, 234, 0.4);
+    border-color: #667eea;
+    color: white;
+    transform: scale(1.1);
+}
+
+.logout-item .menu-icon {
+    background: rgba(255, 68, 68, 0.2);
+    border-color: rgba(255, 68, 68, 0.4);
+    color: #ff4444;
+}
+
+.logout-item:hover .menu-icon {
+    background: rgba(255, 68, 68, 0.4);
+    border-color: #ff4444;
+    color: white;
 }
 
 .menu-divider {
@@ -674,34 +702,36 @@ body::before {
 .video-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-    gap: 30px;
+    gap: 36px;
 }
 
+/* Video Card - Bien délimitée */
 .video-card {
-    background: rgba(255, 255, 255, 0.05);
+    background: rgba(15, 15, 30, 0.85);
     backdrop-filter: blur(10px);
-    border-radius: 20px;
+    border-radius: 18px;
     overflow: hidden;
-    transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-    border: 2px solid rgba(102, 126, 234, 0.1);
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    border: 2px solid rgba(102, 126, 234, 0.25);
     animation: slideInUp 0.6s ease;
     animation-fill-mode: both;
     animation-delay: calc(var(--i) * 0.05s);
     position: relative;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
 }
 
 .video-card::before {
     content: '';
     position: absolute;
-    top: -2px;
-    left: -2px;
-    right: -2px;
-    bottom: -2px;
-    background: linear-gradient(135deg, #667eea, #764ba2);
-    border-radius: 20px;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.15), rgba(118, 75, 162, 0.15));
     opacity: 0;
     z-index: -1;
-    transition: opacity 0.5s ease;
+    transition: opacity 0.4s ease;
+    border-radius: 18px;
 }
 
 .video-card:hover::before {
@@ -709,17 +739,18 @@ body::before {
 }
 
 .video-card:hover {
-    transform: translateY(-10px) scale(1.02);
-    box-shadow: 0 20px 60px rgba(102, 126, 234, 0.4);
-    border-color: transparent;
+    transform: translateY(-8px) scale(1.02);
+    box-shadow: 0 16px 50px rgba(102, 126, 234, 0.5);
+    border-color: rgba(102, 126, 234, 0.6);
 }
 
 .video-thumbnail {
     position: relative;
     width: 100%;
     height: 180px;
-    background: rgba(0, 0, 0, 0.3);
+    background: rgba(0, 0, 0, 0.5);
     overflow: hidden;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.05);
 }
 
 .video-thumbnail img {
@@ -730,18 +761,19 @@ body::before {
 }
 
 .video-card:hover .video-thumbnail img {
-    transform: scale(1.1);
+    transform: scale(1.08);
 }
 
 .video-duration {
     position: absolute;
     bottom: 10px;
     right: 10px;
-    background: rgba(0, 0, 0, 0.9);
-    padding: 6px 12px;
-    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.92);
+    padding: 5px 10px;
+    border-radius: 6px;
     font-size: 12px;
     font-weight: 700;
+    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .no-thumbnail {
@@ -750,31 +782,37 @@ body::before {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    font-size: 24px;
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.3) 0%, rgba(118, 75, 162, 0.3) 100%);
+    font-size: 32px;
     font-weight: 700;
-    letter-spacing: 2px;
+    letter-spacing: 3px;
+    color: rgba(255, 255, 255, 0.6);
 }
 
+/* B2 Badge - Clean sans emoji */
 .b2-badge {
     position: absolute;
     top: 10px;
     left: 10px;
-    background: rgba(102, 234, 171, 0.9);
+    background: rgba(102, 234, 171, 0.95);
     color: #0f0f1e;
-    padding: 6px 12px;
-    border-radius: 8px;
-    font-size: 11px;
-    font-weight: 700;
+    padding: 5px 10px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    border: 1px solid rgba(102, 234, 171, 0.4);
+    box-shadow: 0 2px 8px rgba(102, 234, 171, 0.3);
 }
 
 .video-info {
-    padding: 20px;
-    background: rgba(0, 0, 0, 0.2);
+    padding: 18px;
+    background: rgba(0, 0, 0, 0.25);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
 }
 
 .video-title {
-    font-size: 16px;
+    font-size: 15px;
     font-weight: 600;
     margin-bottom: 10px;
     overflow: hidden;
@@ -784,6 +822,7 @@ body::before {
     -webkit-box-orient: vertical;
     line-height: 1.4;
     transition: color 0.3s ease;
+    color: rgba(255, 255, 255, 0.95);
 }
 
 .video-card:hover .video-title {
@@ -791,38 +830,39 @@ body::before {
 }
 
 .video-channel {
-    color: #aaa;
-    font-size: 14px;
-    margin-bottom: 12px;
+    color: rgba(170, 170, 170, 0.9);
+    font-size: 13px;
+    margin-bottom: 10px;
     transition: color 0.3s ease;
 }
 
 .video-card:hover .video-channel {
-    color: #fff;
+    color: rgba(255, 255, 255, 0.9);
 }
 
 .video-meta {
     display: flex;
-    gap: 15px;
+    gap: 10px;
     font-size: 12px;
-    color: #888;
+    color: rgba(136, 136, 136, 0.8);
     flex-wrap: wrap;
 }
 
 .video-actions {
     display: flex;
-    gap: 12px;
-    padding: 0 20px 20px;
+    gap: 10px;
+    padding: 14px 18px;
+    background: rgba(0, 0, 0, 0.2);
 }
 
 .btn-play, .btn-delete {
     flex: 1;
-    padding: 12px;
+    padding: 11px;
     border: none;
     border-radius: 10px;
     cursor: pointer;
     font-weight: 700;
-    font-size: 14px;
+    font-size: 13px;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -831,24 +871,25 @@ body::before {
 .btn-play {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
-    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
 }
 
 .btn-play:hover {
-    transform: translateY(-3px) scale(1.05);
-    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.5);
+    transform: translateY(-2px) scale(1.03);
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
 }
 
 .btn-delete {
-    background: rgba(255, 68, 68, 0.2);
+    background: rgba(255, 68, 68, 0.15);
     color: #ff4444;
     border: 2px solid rgba(255, 68, 68, 0.3);
 }
 
 .btn-delete:hover {
-    background: rgba(255, 68, 68, 0.3);
-    transform: translateY(-3px) scale(1.05);
-    box-shadow: 0 8px 25px rgba(255, 68, 68, 0.4);
+    background: rgba(255, 68, 68, 0.25);
+    transform: translateY(-2px) scale(1.03);
+    box-shadow: 0 6px 20px rgba(255, 68, 68, 0.4);
+    border-color: #ff4444;
 }
 
 /* Empty State */
