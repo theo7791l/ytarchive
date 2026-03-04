@@ -15,6 +15,10 @@ from collections import defaultdict
 from downloader import download_video
 from scheduler import start_scheduler, check_channel_updates, get_channel_info
 
+# Create necessary directories before app initialization
+os.makedirs("videos", exist_ok=True)
+os.makedirs("static", exist_ok=True)
+
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
 app.mount("/videos", StaticFiles(directory="videos"), name="videos")
@@ -348,10 +352,6 @@ async def get_channel_stats(channel_id: str, username: str = Depends(verify_toke
 
 @app.on_event("startup")
 async def startup_event():
-    # Ensure directories exist
-    os.makedirs("videos", exist_ok=True)
-    os.makedirs("static", exist_ok=True)
-    
     # Start scheduler
     asyncio.create_task(start_scheduler())
 
