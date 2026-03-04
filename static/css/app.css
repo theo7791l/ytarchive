@@ -59,6 +59,17 @@
     }
 }
 
+@keyframes slideInDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     background: linear-gradient(-45deg, #0f0f1e, #1a1a2e, #16213e, #0f0f1e);
@@ -379,7 +390,11 @@ body::before {
 
 .nav-user { display: flex; align-items: center; gap: 20px; }
 
-/* Profile Link with Avatar */
+/* Profile Dropdown */
+.profile-dropdown {
+    position: relative;
+}
+
 .profile-link {
     display: flex;
     align-items: center;
@@ -391,6 +406,7 @@ body::before {
     background: rgba(255, 255, 255, 0.05);
     border: 2px solid rgba(102, 126, 234, 0.3);
     transition: all 0.3s ease;
+    cursor: pointer;
 }
 
 .profile-link:hover {
@@ -428,21 +444,72 @@ body::before {
     font-size: 14px;
 }
 
-.btn-logout {
-    padding: 10px 20px;
-    background: rgba(255, 68, 68, 0.2);
-    color: #ff4444;
-    border: 2px solid rgba(255, 68, 68, 0.3);
-    border-radius: 10px;
-    font-weight: 700;
-    cursor: pointer;
-    transition: all 0.3s ease;
+/* Profile Dropdown Menu */
+.profile-menu {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    background: rgba(26, 26, 46, 0.98);
+    backdrop-filter: blur(20px);
+    border: 2px solid rgba(102, 126, 234, 0.3);
+    border-radius: 15px;
+    min-width: 220px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-10px);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+    z-index: 1000;
 }
 
-.btn-logout:hover {
-    background: rgba(255, 68, 68, 0.3);
-    transform: translateY(-3px) scale(1.05);
-    box-shadow: 0 8px 25px rgba(255, 68, 68, 0.4);
+.profile-menu.show {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+    animation: slideInDown 0.3s ease;
+}
+
+.menu-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 20px;
+    color: #fff;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 14px;
+    transition: all 0.3s ease;
+    border-left: 3px solid transparent;
+}
+
+.menu-item:hover {
+    background: rgba(102, 126, 234, 0.15);
+    border-left-color: #667eea;
+    padding-left: 25px;
+}
+
+.menu-item span {
+    font-size: 18px;
+    width: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.menu-divider {
+    height: 1px;
+    background: rgba(255, 255, 255, 0.1);
+    margin: 8px 0;
+}
+
+.logout-item {
+    color: #ff4444;
+}
+
+.logout-item:hover {
+    background: rgba(255, 68, 68, 0.15);
+    border-left-color: #ff4444;
 }
 
 /* Container */
