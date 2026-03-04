@@ -5,20 +5,11 @@ if (!token) {
     window.location.href = '/';
 }
 
-// Toast Notification System
-function showToast(message, type = 'success') {
-    const toast = document.createElement('div');
-    toast.className = `toast toast-${type}`;
-    toast.textContent = message;
-    
-    document.body.appendChild(toast);
-    
-    setTimeout(() => toast.classList.add('show'), 10);
-    
-    setTimeout(() => {
-        toast.classList.remove('show');
-        setTimeout(() => toast.remove(), 300);
-    }, 3000);
+// Logout
+function logout() {
+    localStorage.removeItem('token');
+    localStorage.removeItem('username');
+    window.location.href = '/';
 }
 
 // View switching
@@ -40,45 +31,6 @@ navLinks.forEach(link => {
         if (viewName === 'channels') loadChannels();
     });
 });
-
-// Handle hash navigation
-function handleHashNavigation() {
-    const hash = window.location.hash.substring(1);
-    
-    if (hash && (hash === 'channels' || hash === 'download')) {
-        navLinks.forEach(l => {
-            if (l.dataset.view === hash) {
-                l.classList.add('active');
-            } else {
-                l.classList.remove('active');
-            }
-        });
-        
-        views.forEach(v => v.classList.remove('active'));
-        const targetView = document.getElementById(`${hash}-view`);
-        if (targetView) {
-            targetView.classList.add('active');
-            if (hash === 'channels') loadChannels();
-        }
-    } else {
-        // Default: show library
-        navLinks.forEach(l => {
-            if (l.dataset.view === 'library') {
-                l.classList.add('active');
-            } else {
-                l.classList.remove('active');
-            }
-        });
-        
-        views.forEach(v => v.classList.remove('active'));
-        const libraryView = document.getElementById('library-view');
-        if (libraryView) {
-            libraryView.classList.add('active');
-        }
-    }
-}
-
-window.addEventListener('hashchange', handleHashNavigation);
 
 // API helper
 async function apiCall(endpoint, options = {}) {
@@ -144,6 +96,19 @@ let currentView = 'grid';
 let currentFilter = 'all';
 let currentSort = 'date-desc';
 let currentSearch = '';
+
+// Toast notifications
+function showToast(message, type = 'info') {
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type} show`;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+}
 
 // Load Library
 async function loadLibrary() {
@@ -238,7 +203,45 @@ function getFilteredAndSorted() {
     return filtered;
 }
 
-// Render Library with Clean Cards
+// Get proper thumbnail URL with B2 path support
+function getThumbnailUrl(video) {
+    if (video.storage === 'b2' && video.thumbnail_url) {
+        // Miniature déjà signée avec URL complète
+        return video.thumbnail_url;
+    } else if (video.thumbnail_file) {
+        // Miniature locale
+        return `/videos/${video.thumbnail_file}`;
+    }
+    return null;
+}
+
+// Get proper video URL
+function getVideoUrl(video) {
+    if (video.storage === 'b2' && video.video_url) {
+        return video.video_url;
+    } else if (video.video_file) {
+        return `/videos/${video.video_file}`;
+    }
+    return null;
+}
+
+// Create fallback thumbnail with first letters
+function createFallbackThumbnail(title) {
+    const words = title.split(' ').filter(w => w.length > 0);
+    let letters = '';
+    
+    if (words.length >= 2) {
+        letters = words[0][0].toUpperCase() + words[1][0].toUpperCase();
+    } else if (words.length === 1) {
+        letters = words[0].substring(0, 2).toUpperCase();
+    } else {
+        letters = 'YT';
+    }
+    
+    return `<div class="no-thumbnail">${letters}</div>`;
+}
+
+// Render Library
 function renderLibrary() {
     const filtered = getFilteredAndSorted();
     const grid = document.getElementById('library-grid');
@@ -276,9 +279,12 @@ function createVideoCard(video, index) {
     const thumbnail = document.createElement('div');
     thumbnail.className = 'video-thumbnail';
     
-    if (video.thumbnail_file) {
+    // Check if thumbnail exists
+    const thumbnailUrl = getThumbnailUrl(video);
+    
+    if (thumbnailUrl) {
         const img = document.createElement('img');
-        img.src = `/videos/${video.thumbnail_file}`;
+        img.src = thumbnailUrl;
         img.alt = video.title;
         img.onerror = function() {
             this.style.display = 'none';
@@ -368,9 +374,11 @@ function createVideoListItem(video, index) {
     const thumbnail = document.createElement('div');
     thumbnail.className = 'list-thumbnail';
     
-    if (video.thumbnail_file) {
+    const thumbnailUrl = getThumbnailUrl(video);
+    
+    if (thumbnailUrl) {
         const img = document.createElement('img');
-        img.src = `/videos/${video.thumbnail_file}`;
+        img.src = thumbnailUrl;
         img.alt = video.title;
         img.onerror = function() {
             this.style.display = 'none';
@@ -483,20 +491,22 @@ async function playVideo(videoId) {
     
     showToast('Chargement de la vidéo...', 'info');
     
-    let videoUrl = `/videos/${video.video_file}`;
-    let thumbnailUrl = video.thumbnail_file ? `/videos/${video.thumbnail_file}` : null;
+    let videoUrl, thumbnailUrl;
     
+    // Fetch streaming URLs for B2 videos
     if (video.storage === 'b2') {
         try {
             const streamData = await apiCall(`/api/video/${videoId}/stream`);
             videoUrl = streamData.video_url;
-            if (streamData.thumbnail_url) {
-                thumbnailUrl = streamData.thumbnail_url;
-            }
+            thumbnailUrl = streamData.thumbnail_url;
         } catch (error) {
             showToast('Échec du chargement depuis B2: ' + error.message, 'error');
             return;
         }
+    } else {
+        // Local storage
+        videoUrl = `/videos/${video.video_file}`;
+        thumbnailUrl = video.thumbnail_file ? `/videos/${video.thumbnail_file}` : null;
     }
     
     const otherVideos = libraryCache.filter(v => v.id !== videoId);
@@ -563,22 +573,26 @@ async function playVideo(videoId) {
             <div class="player-sidebar">
                 <h3 class="sidebar-title">Autres vidéos</h3>
                 <div class="sidebar-videos">
-                    ${otherVideos.slice(0, 20).map(v => `
-                        <div class="sidebar-video" onclick="playVideo('${v.id}')">
-                            <div class="sidebar-thumbnail">
-                                ${v.thumbnail_file ? 
-                                    `<img src="/videos/${v.thumbnail_file}" alt="${v.title}" onerror="this.style.display='none';this.parentElement.innerHTML='<div class=\"sidebar-no-thumb\">VID</div>'">` :
-                                    `<div class="sidebar-no-thumb">VID</div>`
-                                }
-                                <span class="sidebar-duration">${formatDuration(v.duration)}</span>
+                    ${otherVideos.slice(0, 20).map(v => {
+                        const sidebarThumbUrl = getThumbnailUrl(v);
+                        const sidebarThumbHtml = sidebarThumbUrl 
+                            ? `<img src="${sidebarThumbUrl}" alt="${v.title}" onerror="this.style.display='none';this.parentElement.innerHTML='<div class=\"sidebar-no-thumb\">VID</div>'">` 
+                            : `<div class="sidebar-no-thumb">VID</div>`;
+                        
+                        return `
+                            <div class="sidebar-video" onclick="playVideo('${v.id}')">
+                                <div class="sidebar-thumbnail">
+                                    ${sidebarThumbHtml}
+                                    <span class="sidebar-duration">${formatDuration(v.duration)}</span>
+                                </div>
+                                <div class="sidebar-info">
+                                    <h4 class="sidebar-video-title">${v.title}</h4>
+                                    <p class="sidebar-channel">${v.channel}</p>
+                                    <p class="sidebar-views">${formatNumber(v.view_count)} vues</p>
+                                </div>
                             </div>
-                            <div class="sidebar-info">
-                                <h4 class="sidebar-video-title">${v.title}</h4>
-                                <p class="sidebar-channel">${v.channel}</p>
-                                <p class="sidebar-views">${formatNumber(v.view_count)} vues</p>
-                            </div>
-                        </div>
-                    `).join('')}
+                        `;
+                    }).join('')}
                 </div>
             </div>
         </div>
@@ -885,5 +899,4 @@ function closeStatsModal() {
 }
 
 // Initial load
-handleHashNavigation();
 loadLibrary();
