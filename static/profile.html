@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YTArchive - Mon Profil</title>
+    <link rel="stylesheet" href="/static/css/app.css">
+    <style>
+        .profile-container {
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 0 40px;
+        }
+
+        .profile-header {
+            text-align: center;
+            margin-bottom: 50px;
+        }
+
+        .profile-header h1 {
+            font-size: 36px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+
+        .profile-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            padding: 40px;
+            margin-bottom: 30px;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .avatar-section {
+            display: flex;
+            align-items: center;
+            gap: 30px;
+            margin-bottom: 40px;
+            padding-bottom: 30px;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .avatar-preview {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 4px solid #667eea;
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+        }
+
+        .avatar-placeholder {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 48px;
+            border: 4px solid #667eea;
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+        }
+
+        .avatar-controls {
+            flex: 1;
+        }
+
+        .avatar-controls h3 {
+            margin-bottom: 15px;
+            color: #667eea;
+        }
+
+        .avatar-buttons {
+            display: flex;
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .btn-upload, .btn-remove {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .btn-upload {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-upload:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-remove {
+            background: rgba(255, 68, 68, 0.2);
+            color: #ff4444;
+            border: 2px solid rgba(255, 68, 68, 0.3);
+        }
+
+        .btn-remove:hover {
+            background: rgba(255, 68, 68, 0.3);
+        }
+
+        .form-section {
+            margin-bottom: 40px;
+        }
+
+        .form-section h3 {
+            margin-bottom: 25px;
+            color: #667eea;
+            font-size: 22px;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 10px;
+            font-weight: 600;
+            color: #aaa;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 15px 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            color: white;
+            font-size: 15px;
+            transition: all 0.3s ease;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .form-group input:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .role-display {
+            padding: 10px 20px;
+            background: rgba(102, 126, 234, 0.2);
+            border-radius: 8px;
+            display: inline-block;
+            font-weight: 600;
+            color: #667eea;
+            text-transform: uppercase;
+        }
+
+        .btn-save {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-save:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .divider {
+            height: 2px;
+            background: rgba(255, 255, 255, 0.1);
+            margin: 40px 0;
+        }
+
+        .danger-zone {
+            background: rgba(255, 68, 68, 0.1);
+            border: 2px solid rgba(255, 68, 68, 0.3);
+            border-radius: 15px;
+            padding: 30px;
+        }
+
+        .danger-zone h3 {
+            color: #ff4444;
+            margin-bottom: 15px;
+        }
+
+        .success-message, .error-message {
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-weight: 600;
+            display: none;
+        }
+
+        .success-message {
+            background: rgba(102, 234, 171, 0.2);
+            color: #66eaab;
+            border: 2px solid rgba(102, 234, 171, 0.3);
+        }
+
+        .error-message {
+            background: rgba(255, 68, 68, 0.2);
+            color: #ff4444;
+            border: 2px solid rgba(255, 68, 68, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">
+            <h1>🎥 YTArchive</h1>
+        </div>
+        <div class="nav-menu">
+            <a href="/app" class="nav-link">📚 Library</a>
+            <a href="/app#channels" class="nav-link">📺 Channels</a>
+            <a href="/profile" class="nav-link active">👤 Profil</a>
+            <a href="/admin" class="nav-link" id="admin-link" style="display: none;">⚙️ Admin</a>
+        </div>
+        <div class="nav-user">
+            <span id="username"></span>
+            <button class="btn-logout" id="logout">Déconnexion</button>
+        </div>
+    </nav>
+
+    <div class="profile-container">
+        <div class="profile-header">
+            <h1>👤 Mon Profil</h1>
+            <p style="color: #aaa;">Gérez vos informations personnelles</p>
+        </div>
+
+        <div id="success-msg" class="success-message"></div>
+        <div id="error-msg" class="error-message"></div>
+
+        <div class="profile-card">
+            <!-- Avatar Section -->
+            <div class="avatar-section">
+                <div id="avatar-container">
+                    <div class="avatar-placeholder">👤</div>
+                </div>
+                <div class="avatar-controls">
+                    <h3>Photo de profil</h3>
+                    <p style="color: #aaa; margin-bottom: 15px;">Image recommandée : 400x400px, max 2MB</p>
+                    <input type="file" id="avatar-input" accept="image/*" style="display: none;">
+                    <div class="avatar-buttons">
+                        <button class="btn-upload" onclick="document.getElementById('avatar-input').click()">📷 Changer</button>
+                        <button class="btn-remove" id="remove-avatar-btn" onclick="removeAvatar()">🗑️ Supprimer</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Profile Info -->
+            <div class="form-section">
+                <h3>📋 Informations personnelles</h3>
+                <form id="profile-form">
+                    <div class="form-group">
+                        <label>Nom d'utilisateur</label>
+                        <input type="text" id="username-field" disabled>
+                    </div>
+                    <div class="form-group">
+                        <label>Nom d'affichage</label>
+                        <input type="text" id="display-name" placeholder="Votre nom complet">
+                    </div>
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" id="email" placeholder="votre@email.com">
+                    </div>
+                    <div class="form-group">
+                        <label>Rôle</label>
+                        <span class="role-display" id="role-display">MEMBRE</span>
+                    </div>
+                    <button type="submit" class="btn-save">💾 Sauvegarder les modifications</button>
+                </form>
+            </div>
+
+            <div class="divider"></div>
+
+            <!-- Change Password -->
+            <div class="form-section danger-zone">
+                <h3>🔒 Changer le mot de passe</h3>
+                <form id="password-form">
+                    <div class="form-group">
+                        <label>Ancien mot de passe</label>
+                        <input type="password" id="old-password" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Nouveau mot de passe</label>
+                        <input type="password" id="new-password" required minlength="6">
+                    </div>
+                    <div class="form-group">
+                        <label>Confirmer le nouveau mot de passe</label>
+                        <input type="password" id="confirm-password" required minlength="6">
+                    </div>
+                    <button type="submit" class="btn-save">🔑 Changer le mot de passe</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('token');
+        const username = localStorage.getItem('username');
+
+        if (!token) {
+            window.location.href = '/';
+        }
+
+        document.getElementById('username').textContent = username;
+        document.getElementById('logout').addEventListener('click', () => {
+            localStorage.removeItem('token');
+            localStorage.removeItem('username');
+            window.location.href = '/';
+        });
+
+        let currentUser = null;
+
+        async function apiCall(endpoint, options = {}) {
+            const response = await fetch(endpoint, {
+                ...options,
+                headers: {
+                    ...options.headers,
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            
+            if (response.status === 401) {
+                localStorage.removeItem('token');
+                window.location.href = '/';
+                return;
+            }
+            
+            return response;
+        }
+
+        function showMessage(message, isError = false) {
+            const successMsg = document.getElementById('success-msg');
+            const errorMsg = document.getElementById('error-msg');
+            
+            if (isError) {
+                errorMsg.textContent = message;
+                errorMsg.style.display = 'block';
+                successMsg.style.display = 'none';
+            } else {
+                successMsg.textContent = message;
+                successMsg.style.display = 'block';
+                errorMsg.style.display = 'none';
+            }
+            
+            setTimeout(() => {
+                successMsg.style.display = 'none';
+                errorMsg.style.display = 'none';
+            }, 5000);
+        }
+
+        async function loadProfile() {
+            const response = await apiCall('/api/auth/me');
+            currentUser = await response.json();
+            
+            // Show admin link if admin
+            if (currentUser.role === 'admin') {
+                document.getElementById('admin-link').style.display = 'block';
+            }
+            
+            // Update fields
+            document.getElementById('username-field').value = currentUser.username;
+            document.getElementById('display-name').value = currentUser.display_name || '';
+            document.getElementById('email').value = currentUser.email || '';
+            document.getElementById('role-display').textContent = currentUser.role.toUpperCase();
+            
+            // Update avatar
+            const avatarContainer = document.getElementById('avatar-container');
+            if (currentUser.avatar) {
+                avatarContainer.innerHTML = `<img src="/avatars/${currentUser.avatar}" class="avatar-preview" alt="Avatar">`;
+                document.getElementById('remove-avatar-btn').style.display = 'block';
+            } else {
+                avatarContainer.innerHTML = '<div class="avatar-placeholder">👤</div>';
+                document.getElementById('remove-avatar-btn').style.display = 'none';
+            }
+        }
+
+        // Upload avatar
+        document.getElementById('avatar-input').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            if (file.size > 2 * 1024 * 1024) {
+                showMessage('Image trop volumineuse (max 2MB)', true);
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            const response = await fetch('/api/auth/me/avatar', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                },
+                body: formData
+            });
+            
+            if (response.ok) {
+                showMessage('✅ Avatar mis à jour avec succès!');
+                loadProfile();
+            } else {
+                showMessage('❌ Erreur lors de l\'upload', true);
+            }
+        });
+
+        // Remove avatar
+        async function removeAvatar() {
+            if (!confirm('Supprimer votre avatar ?')) return;
+            
+            const response = await apiCall('/api/auth/me/avatar', {
+                method: 'DELETE'
+            });
+            
+            if (response.ok) {
+                showMessage('✅ Avatar supprimé');
+                loadProfile();
+            }
+        }
+
+        // Update profile
+        document.getElementById('profile-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const displayName = document.getElementById('display-name').value;
+            const email = document.getElementById('email').value;
+            
+            const response = await apiCall('/api/auth/me', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    display_name: displayName || null,
+                    email: email || null
+                })
+            });
+            
+            if (response.ok) {
+                showMessage('✅ Profil mis à jour avec succès!');
+                loadProfile();
+            } else {
+                showMessage('❌ Erreur lors de la mise à jour', true);
+            }
+        });
+
+        // Change password
+        document.getElementById('password-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const oldPassword = document.getElementById('old-password').value;
+            const newPassword = document.getElementById('new-password').value;
+            const confirmPassword = document.getElementById('confirm-password').value;
+            
+            if (newPassword !== confirmPassword) {
+                showMessage('❌ Les mots de passe ne correspondent pas', true);
+                return;
+            }
+            
+            if (newPassword.length < 6) {
+                showMessage('❌ Le mot de passe doit contenir au moins 6 caractères', true);
+                return;
+            }
+            
+            const response = await apiCall('/api/auth/me/change-password', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    old_password: oldPassword,
+                    new_password: newPassword
+                })
+            });
+            
+            if (response.ok) {
+                showMessage('✅ Mot de passe changé avec succès!');
+                document.getElementById('password-form').reset();
+            } else {
+                const error = await response.json();
+                showMessage('❌ ' + (error.detail || 'Erreur lors du changement'), true);
+            }
+        });
+
+        // Initial load
+        loadProfile();
+    </script>
+</body>
+</html>
