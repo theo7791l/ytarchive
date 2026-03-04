@@ -7,32 +7,35 @@ import json
 import os
 from datetime import datetime, timedelta
 import jwt
-import bcrypt
 from typing import Optional, List
 import asyncio
 from collections import defaultdict
 
 from downloader import download_video
 from scheduler import start_scheduler, check_channel_updates, get_channel_info
+from auth import router as auth_router, verify_token, verify_admin
 
 # Create necessary directories before app initialization
 os.makedirs("videos", exist_ok=True)
 os.makedirs("static", exist_ok=True)
+os.makedirs("avatars", exist_ok=True)
+os.makedirs("data", exist_ok=True)
 
-app = FastAPI()
+app = FastAPI(title="YTArchive", version="2.0")
+
+# Mount static files and media
 app.mount("/static", StaticFiles(directory="static"), name="static")
 app.mount("/videos", StaticFiles(directory="videos"), name="videos")
+app.mount("/avatars", StaticFiles(directory="avatars"), name="avatars")
+
+# Include auth router
+app.include_router(auth_router, prefix="/api/auth", tags=["auth"])
 
 SECRET_KEY = os.getenv("SECRET_KEY", "ytarchive-secret-key-change-me")
-USERS_FILE = "users.json"
-LIBRARY_FILE = "library.json"
-CHANNELS_FILE = "channels.json"
+LIBRARY_FILE = "data/library.json"
+CHANNELS_FILE = "data/channels.json"
 
 security = HTTPBearer()
-
-class User(BaseModel):
-    username: str
-    password: str
 
 class VideoDownload(BaseModel):
     url: str
@@ -55,35 +58,9 @@ def load_json(filename: str, default=None):
         return json.load(f)
 
 def save_json(filename: str, data):
+    os.makedirs(os.path.dirname(filename), exist_ok=True)
     with open(filename, 'w') as f:
         json.dump(data, f, indent=2)
-
-def create_default_user():
-    """Create default admin user if no users exist"""
-    users = load_json(USERS_FILE, {})
-    if not users:
-        default_username = "admin"
-        default_password = "admin123"
-        hashed = bcrypt.hashpw(default_password.encode(), bcrypt.gensalt())
-        users[default_username] = hashed.decode()
-        save_json(USERS_FILE, users)
-        print("\n" + "="*60)
-        print("🔐 DEFAULT USER CREATED")
-        print("="*60)
-        print(f"Username: {default_username}")
-        print(f"Password: {default_password}")
-        print("\n⚠️  IMPORTANT: Change this password after first login!")
-        print("="*60 + "\n")
-        return True
-    return False
-
-def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    try:
-        token = credentials.credentials
-        payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
-        return payload['username']
-    except:
-        raise HTTPException(status_code=401, detail="Invalid token")
 
 @app.get("/")
 async def root():
@@ -96,55 +73,23 @@ async def app_page():
 @app.get("/health")
 async def health_check():
     """Health check endpoint for monitoring"""
-    users = load_json(USERS_FILE, {})
+    from auth import load_users
+    users = load_users()
     return {
         "status": "healthy",
         "timestamp": datetime.now().isoformat(),
         "videos": len(load_json(LIBRARY_FILE)),
         "channels": len(load_json(CHANNELS_FILE)),
-        "users": len(users),
-        "has_default_user": "admin" in users
+        "users": len(users)
     }
 
-@app.post("/api/register")
-async def register(user: User):
-    users = load_json(USERS_FILE, {})
-    
-    # Only allow registration if no users exist (first user)
-    if users:
-        raise HTTPException(status_code=403, detail="Registration is disabled. Users already exist.")
-    
-    if user.username in users:
-        raise HTTPException(status_code=400, detail="User exists")
-    
-    hashed = bcrypt.hashpw(user.password.encode(), bcrypt.gensalt())
-    users[user.username] = hashed.decode()
-    save_json(USERS_FILE, users)
-    return {"message": "User created"}
-
-@app.post("/api/login")
-async def login(user: User):
-    users = load_json(USERS_FILE, {})
-    if user.username not in users:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-    
-    if not bcrypt.checkpw(user.password.encode(), users[user.username].encode()):
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-    
-    token = jwt.encode(
-        {"username": user.username, "exp": datetime.utcnow() + timedelta(days=7)},
-        SECRET_KEY,
-        algorithm="HS256"
-    )
-    return {"token": token, "username": user.username}
-
 @app.get("/api/library")
-async def get_library(username: str = Depends(verify_token)):
+async def get_library(user: dict = Depends(verify_token)):
     library = load_json(LIBRARY_FILE)
     return library
 
 @app.delete("/api/library/{video_id}")
-async def delete_video(video_id: str, username: str = Depends(verify_token)):
+async def delete_video(video_id: str, user: dict = Depends(verify_token)):
     library = load_json(LIBRARY_FILE)
     video = next((v for v in library if v['id'] == video_id), None)
     
@@ -220,7 +165,7 @@ async def websocket_download(websocket: WebSocket):
         await websocket.close()
 
 @app.get("/api/channels")
-async def get_channels(username: str = Depends(verify_token)):
+async def get_channels(user: dict = Depends(verify_token)):
     channels = load_json(CHANNELS_FILE)
     library = load_json(LIBRARY_FILE)
     
@@ -231,7 +176,7 @@ async def get_channels(username: str = Depends(verify_token)):
     return channels
 
 @app.post("/api/channels")
-async def add_channel(channel: ChannelAdd, username: str = Depends(verify_token)):
+async def add_channel(channel: ChannelAdd, user: dict = Depends(verify_token)):
     channels = load_json(CHANNELS_FILE)
     
     # Extract channel info
@@ -264,14 +209,14 @@ async def add_channel(channel: ChannelAdd, username: str = Depends(verify_token)
     return channel_data
 
 @app.delete("/api/channels/{channel_id}")
-async def delete_channel(channel_id: str, username: str = Depends(verify_token)):
+async def delete_channel(channel_id: str, user: dict = Depends(verify_token)):
     channels = load_json(CHANNELS_FILE)
     channels = [c for c in channels if c['id'] != channel_id]
     save_json(CHANNELS_FILE, channels)
     return {"message": "Channel removed"}
 
 @app.patch("/api/channels/{channel_id}")
-async def update_channel(channel_id: str, update: ChannelUpdate, username: str = Depends(verify_token)):
+async def update_channel(channel_id: str, update: ChannelUpdate, user: dict = Depends(verify_token)):
     channels = load_json(CHANNELS_FILE)
     channel = next((c for c in channels if c['id'] == channel_id), None)
     
@@ -283,7 +228,7 @@ async def update_channel(channel_id: str, update: ChannelUpdate, username: str =
     return channel
 
 @app.post("/api/channels/{channel_id}/check")
-async def check_channel(channel_id: str, username: str = Depends(verify_token)):
+async def check_channel(channel_id: str, user: dict = Depends(verify_token)):
     channels = load_json(CHANNELS_FILE)
     channel = next((c for c in channels if c['id'] == channel_id), None)
     
@@ -294,7 +239,7 @@ async def check_channel(channel_id: str, username: str = Depends(verify_token)):
     return {"message": "Checking for new videos..."}
 
 @app.get("/api/channels/{channel_id}/stats")
-async def get_channel_stats(channel_id: str, username: str = Depends(verify_token)):
+async def get_channel_stats(channel_id: str, user: dict = Depends(verify_token)):
     channels = load_json(CHANNELS_FILE)
     library = load_json(LIBRARY_FILE)
     
@@ -379,8 +324,20 @@ async def get_channel_stats(channel_id: str, username: str = Depends(verify_toke
 
 @app.on_event("startup")
 async def startup_event():
-    # Create default user if none exist
-    create_default_user()
+    print("\n" + "="*60)
+    print("🚀 YTArchive Starting...")
+    print("="*60)
+    
+    from auth import load_users
+    users = load_users()
+    
+    if "admin" in users:
+        print("\n📝 Default admin account is active")
+        print("   Username: admin")
+        print("   Password: admin")
+        print("\n⚠️  Change the password after first login!")
+    
+    print("="*60 + "\n")
     
     # Start scheduler in background
     await start_scheduler(interval_hours=1)
