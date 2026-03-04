@@ -352,8 +352,8 @@ async def get_channel_stats(channel_id: str, username: str = Depends(verify_toke
 
 @app.on_event("startup")
 async def startup_event():
-    # Start scheduler
-    asyncio.create_task(start_scheduler())
+    # Start scheduler in background
+    await start_scheduler(interval_hours=1)
 
 if __name__ == "__main__":
     import uvicorn
