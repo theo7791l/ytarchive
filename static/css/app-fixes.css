@@ -1,0 +1,77 @@
+/* ==============================================
+   CSS FIXES for YTArchive UI Issues
+   Add these styles to fix positioning and sizing
+   ============================================== */
+
+/* Fix FAB Button - Position in bottom-right corner */
+.fab-add-channel {
+    position: fixed !important;
+    bottom: 40px !important;
+    right: 40px !important;
+    left: auto !important;
+    z-index: 9999 !important;
+}
+
+/* Fix auto-download toggle - Prevent text cutoff */
+.auto-download-toggle {
+    min-width: 280px !important;
+    flex: 1 1 auto !important;
+    max-width: 100% !important;
+}
+
+.auto-download-toggle span {
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+}
+
+/* New stat-icon-badge style - Replaces emoji icons */
+.stat-icon-badge {
+    width: 70px !important;
+    height: 70px !important;
+    border-radius: 18px !important;
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.25), rgba(118, 75, 162, 0.25)) !important;
+    border: 3px solid rgba(102, 126, 234, 0.5) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 22px !important;
+    font-weight: 900 !important;
+    color: #667eea !important;
+    letter-spacing: 1px !important;
+    transition: all 0.5s ease !important;
+    flex-shrink: 0 !important;
+    box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3) !important;
+}
+
+.stat-card:hover .stat-icon-badge {
+    transform: scale(1.15) rotate(-5deg) !important;
+    border-color: #667eea !important;
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.4), rgba(118, 75, 162, 0.4)) !important;
+    box-shadow: 0 12px 30px rgba(102, 126, 234, 0.6) !important;
+}
+
+/* Remove cursor:pointer from stat cards since they're not clickable */
+.stat-card {
+    cursor: default !important;
+}
+
+/* Responsive fixes for mobile */
+@media (max-width: 767px) {
+    .fab-add-channel {
+        bottom: 20px !important;
+        right: 20px !important;
+    }
+    
+    .auto-download-toggle {
+        min-width: 200px !important;
+        font-size: 12px !important;
+        padding: 14px 18px !important;
+    }
+    
+    .stat-icon-badge {
+        width: 55px !important;
+        height: 55px !important;
+        font-size: 18px !important;
+    }
+}
