@@ -74,18 +74,26 @@ async function startDownload() {
                 progressText.textContent = '✅ Téléchargement terminé !';
                 showToast('Vidéo téléchargée avec succès !', 'success');
                 
-                // Reset after 2 seconds
-                setTimeout(() => {
+                // Reset and reload library
+                setTimeout(async () => {
                     videoUrlInput.value = '';
                     progressContainer.style.display = 'none';
                     downloadBtn.disabled = false;
                     downloadBtn.textContent = 'Télécharger';
                     
-                    // Reload library if on library view
-                    if (document.getElementById('library-view').classList.contains('active')) {
-                        loadLibrary();
-                    }
-                }, 2000);
+                    // FORCE reload library
+                    console.log('FORÇAGE RECHARGEMENT LIBRARY...');
+                    await loadLibrary();
+                    
+                    // Switch to library view automatically
+                    document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+                    document.querySelector('[data-view="library"]').classList.add('active');
+                    
+                    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+                    document.getElementById('library-view').classList.add('active');
+                    
+                    showToast('Bibliothèque rechargée !', 'success');
+                }, 1500);
             } else if (data.status === 'error') {
                 throw new Error(data.message);
             }
