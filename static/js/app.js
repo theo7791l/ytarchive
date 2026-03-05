@@ -92,7 +92,7 @@ function formatTotalDuration(totalSeconds) {
 
 // Library State
 let libraryCache = [];
-let currentView = 'grid'; // 'grid', 'list', 'channels'
+let currentView = 'grid';
 let currentFilter = 'all';
 let currentSort = 'date-desc';
 let currentSearch = '';
@@ -199,14 +199,12 @@ function renderChannelsView() {
         return;
     }
     
-    // Apply search filter
     let filteredChannels = channels;
     if (currentSearch) {
         const query = currentSearch.toLowerCase();
         filteredChannels = channels.filter(c => c.name.toLowerCase().includes(query));
     }
     
-    // Sort by video count (default)
     filteredChannels.sort((a, b) => b.videoCount - a.videoCount);
     
     grid.innerHTML = '';
@@ -407,13 +405,19 @@ function createVideoCard(video, index) {
     const playBtn = document.createElement('button');
     playBtn.className = 'btn-play';
     playBtn.textContent = 'Lire';
-    playBtn.onclick = () => playVideo(video.id);
+    playBtn.onclick = (e) => {
+        e.stopPropagation();
+        playVideo(video.id);
+    };
     actions.appendChild(playBtn);
     
     const deleteBtn = document.createElement('button');
     deleteBtn.className = 'btn-delete';
     deleteBtn.textContent = 'Supprimer';
-    deleteBtn.onclick = () => deleteVideo(video.id);
+    deleteBtn.onclick = (e) => {
+        e.stopPropagation();
+        deleteVideo(video.id);
+    };
     actions.appendChild(deleteBtn);
     
     card.appendChild(actions);
@@ -496,13 +500,19 @@ function createVideoListItem(video, index) {
     const playBtn = document.createElement('button');
     playBtn.className = 'btn-play-small';
     playBtn.textContent = 'Lire';
-    playBtn.onclick = () => playVideo(video.id);
+    playBtn.onclick = (e) => {
+        e.stopPropagation();
+        playVideo(video.id);
+    };
     actions.appendChild(playBtn);
     
     const deleteBtn = document.createElement('button');
     deleteBtn.className = 'btn-delete-small';
     deleteBtn.textContent = 'Supprimer';
-    deleteBtn.onclick = () => deleteVideo(video.id);
+    deleteBtn.onclick = (e) => {
+        e.stopPropagation();
+        deleteVideo(video.id);
+    };
     actions.appendChild(deleteBtn);
     
     item.appendChild(actions);
@@ -549,9 +559,6 @@ document.getElementById('channels-view-btn').addEventListener('click', () => {
     document.getElementById('list-view').classList.remove('active');
     renderLibrary();
 });
-
-// SYNCED VIDEO PLAYER - Truncated for brevity, keep existing player code...
-// (Keep all your existing playVideo, closePlayer, deleteVideo functions)
 
 // Initial load
 loadLibrary();
