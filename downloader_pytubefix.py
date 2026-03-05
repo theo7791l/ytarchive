@@ -1,5 +1,6 @@
 import os
 import asyncio
+import subprocess
 from datetime import datetime
 from typing import Optional, Callable
 import traceback
@@ -37,16 +38,17 @@ async def download_video_pytubefix(url: str, quality: str = "best", progress_cal
     print(f"PYTUBEFIX DOWNLOADER")
     print(f"  Requested quality: {quality}")
     print(f"  Using pytubefix (alternative API)")
-    print(f"  Strategy: Try adaptive streams for higher quality")
+    print(f"  Strategy: Adaptive streams + local merge")
     print("="*60)
     
     video_file_path = None
     audio_file_path = None
+    merged_file_path = None
     thumbnail_file_path = None
     
     def cleanup_local_files():
         """Clean up local files"""
-        for file_path in [video_file_path, audio_file_path, thumbnail_file_path]:
+        for file_path in [video_file_path, audio_file_path, merged_file_path, thumbnail_file_path]:
             try:
                 if file_path and os.path.exists(file_path):
                     os.remove(file_path)
@@ -206,7 +208,53 @@ async def download_video_pytubefix(url: str, quality: str = "best", progress_cal
         audio_file_path = result['audio_path']
         thumbnail_file_path = result['thumbnail_path']
         
-        # Upload to B2 IMMEDIATELY to save disk space
+        # MERGE video and audio if using adaptive
+        final_video_path = video_file_path
+        
+        if result['use_adaptive'] and audio_file_path:
+            if progress_callback:
+                await progress_callback('processing', 'Merging video and audio...')
+            
+            print("\nMerging video and audio with ffmpeg...")
+            
+            merged_file_path = os.path.join(VIDEOS_DIR, f"{result['video_id']}.mp4")
+            
+            def merge_sync():
+                cmd = [
+                    'ffmpeg',
+                    '-i', video_file_path,
+                    '-i', audio_file_path,
+                    '-c:v', 'copy',  # Copy video codec (no re-encoding)
+                    '-c:a', 'aac',   # Re-encode audio to AAC
+                    '-y',            # Overwrite output file
+                    merged_file_path
+                ]
+                result = subprocess.run(cmd, capture_output=True, text=True)
+                if result.returncode != 0:
+                    raise Exception(f"ffmpeg failed: {result.stderr}")
+            
+            try:
+                await loop.run_in_executor(None, merge_sync)
+                print(f"✅ Merge complete: {merged_file_path}")
+                
+                # Delete temp files immediately
+                if os.path.exists(video_file_path):
+                    os.remove(video_file_path)
+                    print(f"Removed temp video: {video_file_path}")
+                    video_file_path = None
+                
+                if os.path.exists(audio_file_path):
+                    os.remove(audio_file_path)
+                    print(f"Removed temp audio: {audio_file_path}")
+                    audio_file_path = None
+                
+                final_video_path = merged_file_path
+            except Exception as merge_error:
+                print(f"⚠️  Merge failed: {merge_error}")
+                print(f"   Continuing with video-only upload")
+                final_video_path = video_file_path
+        
+        # Upload to B2
         if progress_callback:
             await progress_callback('uploading', 'Uploading to Backblaze B2...')
         
@@ -229,10 +277,10 @@ async def download_video_pytubefix(url: str, quality: str = "best", progress_cal
                 cleanup_local_files()
                 return (False, "Failed to get B2 upload URL")
             
-            # Upload video
-            b2_video_filename = f"videos/{username}/{result['video_id']}_video.mp4" if result['use_adaptive'] else f"videos/{username}/{result['video_id']}.mp4"
+            # Upload merged video
+            b2_video_filename = f"videos/{username}/{result['video_id']}.mp4"
             print(f"Uploading video to B2: {b2_video_filename}")
-            success, video_file_id = await b2.upload_file(video_file_path, b2_video_filename, progress_callback)
+            success, video_file_id = await b2.upload_file(final_video_path, b2_video_filename, progress_callback)
             
             if not success:
                 cleanup_local_files()
@@ -241,27 +289,10 @@ async def download_video_pytubefix(url: str, quality: str = "best", progress_cal
             print(f"✅ Video uploaded. File ID: {video_file_id}")
             
             # Delete video file immediately to free disk space
-            if os.path.exists(video_file_path):
-                os.remove(video_file_path)
-                print(f"Freed disk space: removed {video_file_path}")
-                video_file_path = None
-            
-            # Upload audio if exists
-            b2_audio_filename = None
-            audio_file_id = None
-            if audio_file_path:
-                b2_audio_filename = f"videos/{username}/{result['video_id']}_audio.m4a"
-                await b2.get_upload_url()
-                print(f"Uploading audio to B2: {b2_audio_filename}")
-                success_audio, audio_file_id = await b2.upload_file(audio_file_path, b2_audio_filename, progress_callback)
-                
-                if success_audio:
-                    print(f"✅ Audio uploaded. File ID: {audio_file_id}")
-                    # Delete audio immediately
-                    if os.path.exists(audio_file_path):
-                        os.remove(audio_file_path)
-                        print(f"Freed disk space: removed {audio_file_path}")
-                        audio_file_path = None
+            if os.path.exists(final_video_path):
+                os.remove(final_video_path)
+                print(f"Freed disk space: removed {final_video_path}")
+                merged_file_path = None
             
             # Upload thumbnail
             thumbnail_file_id = None
@@ -283,12 +314,6 @@ async def download_video_pytubefix(url: str, quality: str = "best", progress_cal
             if progress_callback:
                 await progress_callback('completed', f"Upload complete: {result['title']}")
             
-            if result['use_adaptive']:
-                print("\n⚠️  Note: Video and audio uploaded as separate files")
-                print(f"   Video: {b2_video_filename}")
-                if b2_audio_filename:
-                    print(f"   Audio: {b2_audio_filename}")
-            
             # Return video entry
             video_entry = {
                 'id': result['video_id'],
@@ -300,11 +325,9 @@ async def download_video_pytubefix(url: str, quality: str = "best", progress_cal
                 'description': result['description'][:500] if result['description'] else '',
                 'view_count': result['views'],
                 'video_file': b2_video_filename,
-                'audio_file': b2_audio_filename if result['use_adaptive'] else None,
                 'thumbnail_file': b2_thumbnail_filename,
                 'thumbnail_url': thumbnail_url,
                 'b2_video_file_id': video_file_id,
-                'b2_audio_file_id': audio_file_id,
                 'b2_thumbnail_file_id': thumbnail_file_id,
                 'quality': quality,
                 'actual_height': int(result['resolution'].replace('p', '')) if result['resolution'] else 0,
@@ -312,8 +335,7 @@ async def download_video_pytubefix(url: str, quality: str = "best", progress_cal
                 'url': url,
                 'storage': 'b2',
                 'owner': username,
-                'downloader': 'pytubefix',
-                'format': 'separated' if result['use_adaptive'] else 'progressive'
+                'downloader': 'pytubefix'
             }
             
             return (True, video_entry)
