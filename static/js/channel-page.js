@@ -1,4 +1,4 @@
-// Channel Page functionality - FULLSCREEN
+// Channel Page functionality - FULLSCREEN avec vraie photo YouTube
 
 let currentChannelPage = null;
 
@@ -17,31 +17,18 @@ async function openChannelPage(channelId, channelName) {
     const totalViews = channelVideos.reduce((sum, v) => sum + (v.view_count || 0), 0);
     const avgViews = totalVideos > 0 ? Math.round(totalViews / totalVideos) : 0;
     
-    // Get latest video to extract channel URL
-    const latestVideo = channelVideos.sort((a, b) => new Date(b.upload_date) - new Date(a.upload_date))[0];
-    
-    // Try to fetch channel data from YouTube (profile picture, etc)
-    let channelThumbUrl = null;
+    // Fetch REAL YouTube avatar from backend
+    let channelAvatarUrl = null;
     try {
-        // Use yt-dlp to get channel info
-        const response = await fetch(`https://www.youtube.com/channel/${channelId}`);
-        const html = await response.text();
-        
-        // Extract profile picture from HTML (basic method)
-        const avatarMatch = html.match(/"avatar":{"thumbnails":\[{"url":"([^"]+)"/i);
-        if (avatarMatch && avatarMatch[1]) {
-            channelThumbUrl = avatarMatch[1].replace(/=s\d+-c/, '=s176-c'); // Use 176x176 size
+        const response = await apiCall(`/api/channel/${channelId}/avatar`);
+        if (response && response.avatar_url) {
+            channelAvatarUrl = response.avatar_url;
         }
     } catch (error) {
-        console.log('Could not fetch channel avatar from YouTube:', error);
+        console.log('Could not fetch channel avatar:', error);
     }
     
-    // Fallback: use first video thumbnail if no channel avatar found
-    if (!channelThumbUrl) {
-        channelThumbUrl = getThumbnailUrl(latestVideo);
-    }
-    
-    // Create fullscreen channel page that COMPLETELY replaces the view
+    // Create fullscreen channel page that COMPLETELY replaces everything
     const modal = document.createElement('div');
     modal.className = 'channel-page-fullscreen';
     modal.innerHTML = `
@@ -52,7 +39,10 @@ async function openChannelPage(channelId, channelName) {
             
             <div class="channel-header-section">
                 <div class="channel-avatar-large">
-                    ${channelThumbUrl ? `<img src="${channelThumbUrl}" alt="${channelName}" onerror="this.onerror=null; this.style.display='none'; this.parentElement.innerHTML='<div class=\'channel-avatar-fallback\'>${channelName.substring(0, 2).toUpperCase()}</div>'">` : `<div class="channel-avatar-fallback">${channelName.substring(0, 2).toUpperCase()}</div>`}
+                    ${channelAvatarUrl 
+                        ? `<img src="${channelAvatarUrl}" alt="${channelName}" onerror="this.onerror=null; this.style.display='none'; this.parentElement.innerHTML='<div class=\'channel-avatar-fallback\'>${channelName.substring(0, 2).toUpperCase()}</div>';">` 
+                        : `<div class="channel-avatar-fallback">${channelName.substring(0, 2).toUpperCase()}</div>`
+                    }
                 </div>
                 <div class="channel-header-content">
                     <h1 class="channel-title-large">${channelName}</h1>
@@ -175,7 +165,7 @@ function renderChannelPageVideos() {
     });
 }
 
-// Create video card for channel page (without channel name, since we're already on the channel page)
+// Create video card for channel page (without channel name)
 function createChannelVideoCard(video, index) {
     const card = document.createElement('div');
     card.className = 'video-card';
