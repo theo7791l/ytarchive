@@ -175,8 +175,7 @@ function getChannelsWithStats() {
             channelsMap[video.channel_id] = {
                 id: video.channel_id,
                 name: video.channel,
-                videos: [],
-                thumbnail: getThumbnailUrl(video)
+                videos: []
             };
         }
         
@@ -192,8 +191,19 @@ function getChannelsWithStats() {
     }));
 }
 
-// Render Channels View
-function renderChannelsView() {
+// Fetch channel avatar from backend
+async function fetchChannelAvatar(channelId) {
+    try {
+        const response = await apiCall(`/api/channel/${channelId}/avatar`);
+        return response.avatar_url || null;
+    } catch (error) {
+        console.error(`Error fetching avatar for ${channelId}:`, error);
+        return null;
+    }
+}
+
+// Render Channels View with REAL YouTube avatars
+async function renderChannelsView() {
     const channels = getChannelsWithStats();
     const grid = document.getElementById('library-grid');
     
@@ -212,20 +222,31 @@ function renderChannelsView() {
     
     filteredChannels.sort((a, b) => b.videoCount - a.videoCount);
     
+    grid.innerHTML = '<div class="channels-loading">Chargement des chaînes...</div>';
+    
+    // Fetch all avatars in parallel
+    const channelsWithAvatars = await Promise.all(
+        filteredChannels.map(async (channel) => {
+            const avatarUrl = await fetchChannelAvatar(channel.id);
+            return { ...channel, avatarUrl };
+        })
+    );
+    
     grid.innerHTML = '';
     
-    filteredChannels.forEach(channel => {
+    channelsWithAvatars.forEach(channel => {
         const card = document.createElement('div');
         card.className = 'channel-overview-card';
         card.onclick = () => openChannelPage(channel.id, channel.name);
         
-        const thumbHtml = channel.thumbnail 
-            ? `<img src="${channel.thumbnail}" alt="${channel.name}">` 
-            : `<div class="channel-no-thumb">${channel.name.substring(0, 2).toUpperCase()}</div>`;
+        // Use REAL YouTube avatar or fallback to first letters
+        const avatarHtml = channel.avatarUrl 
+            ? `<img src="${channel.avatarUrl}" alt="${channel.name}" onerror="this.style.display='none'; this.parentElement.innerHTML='<div class=\'channel-avatar-fallback\'>${channel.name.substring(0, 2).toUpperCase()}</div>';">`
+            : `<div class="channel-avatar-fallback">${channel.name.substring(0, 2).toUpperCase()}</div>`;
         
         card.innerHTML = `
-            <div class="channel-overview-thumb">
-                ${thumbHtml}
+            <div class="channel-overview-avatar">
+                ${avatarHtml}
             </div>
             <div class="channel-overview-info">
                 <h3 class="channel-overview-name">${channel.name}</h3>
@@ -300,9 +321,9 @@ function getThumbnailUrl(video) {
 }
 
 // Render Library
-function renderLibrary() {
+async function renderLibrary() {
     if (currentView === 'channels') {
-        renderChannelsView();
+        await renderChannelsView();
         return;
     }
     
