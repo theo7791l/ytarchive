@@ -16,7 +16,7 @@
         <div class="nav-menu">
             <a href="#" class="nav-link active" data-view="library">Bibliothèque</a>
             <a href="#" class="nav-link" data-view="download">Télécharger</a>
-            <a href="/channels" class="nav-link">Chaînes</a>
+            <a href="#" class="nav-link" data-view="channels">Chaînes</a>
         </div>
         <div class="nav-user">
             <div class="profile-dropdown">
@@ -144,6 +144,111 @@
                 </ul>
             </div>
         </div>
+
+        <!-- Channels View -->
+        <div id="channels-view" class="view">
+            <div class="view-header">
+                <h2>Mes Chaînes YouTube</h2>
+                <p class="view-description">Gérez vos chaînes suivies et téléchargez automatiquement les nouvelles vidéos</p>
+            </div>
+
+            <!-- Stats Overview -->
+            <div class="stats-overview" id="statsOverview">
+                <div class="stat-card">
+                    <div class="stat-icon">📺</div>
+                    <div class="stat-content">
+                        <span class="stat-value" id="totalChannels">0</span>
+                        <span class="stat-label">Chaînes suivies</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">🎬</div>
+                    <div class="stat-content">
+                        <span class="stat-value" id="totalVideos">0</span>
+                        <span class="stat-label">Vidéos téléchargées</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">⚡</div>
+                    <div class="stat-content">
+                        <span class="stat-value" id="activeChannels">0</span>
+                        <span class="stat-label">Auto-download actif</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Channels Grid -->
+            <div id="channels-list" class="channels-grid"></div>
+
+            <!-- Empty State -->
+            <div class="empty-state" id="emptyStateChannels" style="display: none;">
+                <div class="empty-icon">📺</div>
+                <h2>Aucune chaîne suivie</h2>
+                <p>Ajoutez votre première chaîne YouTube pour commencer à télécharger automatiquement les vidéos</p>
+                <button class="btn-primary" onclick="openAddChannelModal()">
+                    Ajouter une chaîne
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- FAB Floating Action Button (visible seulement dans channels-view) -->
+    <button class="fab-add-channel" id="fab-add-channel" onclick="openAddChannelModal()" style="display: none;">
+        <span class="fab-icon">+</span>
+        <span class="fab-text">Ajouter</span>
+    </button>
+
+    <!-- Add Channel Modal -->
+    <div id="add-channel-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Ajouter une chaîne YouTube</h2>
+                <button class="modal-close" onclick="closeAddChannelModal()">×</button>
+            </div>
+            <form class="modal-form" id="add-channel-form">
+                <div class="form-group">
+                    <label for="channel-url">URL de la chaîne</label>
+                    <input 
+                        type="text" 
+                        id="channel-url" 
+                        placeholder="https://www.youtube.com/@nomdelachaine ou /channel/ID"
+                        required
+                    >
+                    <small class="form-hint">Entrez l'URL complète d'une chaîne YouTube</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="channel-quality">Qualité de téléchargement</label>
+                    <select id="channel-quality" required>
+                        <option value="best">Meilleure qualité disponible</option>
+                        <option value="1080p">1080p (Full HD)</option>
+                        <option value="720p" selected>720p (HD)</option>
+                        <option value="480p">480p</option>
+                        <option value="360p">360p</option>
+                    </select>
+                </div>
+
+                <div class="checkbox-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="auto-download" checked>
+                        <div class="checkbox-text">
+                            <strong>Téléchargement automatique</strong>
+                            <small>Télécharger automatiquement les nouvelles vidéos de cette chaîne</small>
+                        </div>
+                    </label>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary" onclick="closeAddChannelModal()">
+                        Annuler
+                    </button>
+                    <button type="submit" class="btn-primary">
+                        <span class="btn-text">Ajouter la chaîne</span>
+                        <span class="btn-loading" style="display: none;">Ajout en cours...</span>
+                    </button>
+                </div>
+            </form>
+        </div>
     </div>
 
     <script src="/static/js/app.js"></script>
@@ -226,6 +331,31 @@
             const menu = document.getElementById('profile-menu');
             if (!dropdown.contains(e.target)) {
                 menu.classList.remove('show');
+            }
+        });
+
+        // Modal functions
+        function openAddChannelModal() {
+            document.getElementById('add-channel-modal').style.display = 'flex';
+            document.getElementById('channel-url').focus();
+        }
+
+        function closeAddChannelModal() {
+            document.getElementById('add-channel-modal').style.display = 'none';
+            document.getElementById('add-channel-form').reset();
+        }
+
+        // Close modal on backdrop click
+        document.getElementById('add-channel-modal').addEventListener('click', (e) => {
+            if (e.target.id === 'add-channel-modal') {
+                closeAddChannelModal();
+            }
+        });
+
+        // ESC key to close modal
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeAddChannelModal();
             }
         });
         
