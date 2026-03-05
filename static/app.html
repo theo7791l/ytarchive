@@ -136,10 +136,10 @@
                 <h3>Informations</h3>
                 <ul>
                     <li>Toutes les vidéos sont automatiquement uploadées sur votre bucket Backblaze B2</li>
-                    <li>Le stockage local n'est utilisé que temporairement pendant le téléchargement</li>
+                    <li>Le serveur agit comme relais (streaming proxy) - zéro stockage local</li>
                     <li>Les vidéos sont streamées directement depuis B2 lors de la lecture</li>
                     <li>Vous devez configurer Backblaze B2 dans votre profil d'abord</li>
-                    <li>Taille moyenne des vidéos : 480p ~300MB, 720p ~600MB, 1080p ~1.5GB</li>
+                    <li>Support vidéos illimitées grâce au streaming par chunks</li>
                 </ul>
             </div>
         </div>
@@ -202,6 +202,7 @@
     </div>
 
     <script src="/static/js/app.js"></script>
+    <script src="/static/js/download.js"></script>
     <script>
         // Check B2 configuration on page load
         async function checkB2Configuration() {
