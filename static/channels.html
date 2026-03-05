@@ -40,24 +40,24 @@
             </button>
         </div>
 
-        <!-- Stats Overview -->
+        <!-- Stats Overview - SANS EMOJIS -->
         <div class="stats-overview" id="statsOverview">
             <div class="stat-card">
-                <div class="stat-icon">📺</div>
+                <div class="stat-icon">CH</div>
                 <div class="stat-content">
                     <span class="stat-value" id="totalChannels">0</span>
                     <span class="stat-label">Chaînes suivies</span>
                 </div>
             </div>
             <div class="stat-card">
-                <div class="stat-icon">🎬</div>
+                <div class="stat-icon">VD</div>
                 <div class="stat-content">
                     <span class="stat-value" id="totalVideos">0</span>
                     <span class="stat-label">Vidéos téléchargées</span>
                 </div>
             </div>
-            <div class="stat-card">
-                <div class="stat-icon">⚡</div>
+            <div class="stat-card" onclick="toggleAutoDownloadFilters()" style="cursor: pointer;">
+                <div class="stat-icon">DL</div>
                 <div class="stat-content">
                     <span class="stat-value" id="activeChannels">0</span>
                     <span class="stat-label">Auto-download actif</span>
@@ -72,7 +72,7 @@
 
         <!-- Empty State -->
         <div class="empty-state" id="emptyState" style="display: none;">
-            <div class="empty-icon">📺</div>
+            <div class="empty-icon">TV</div>
             <h2>Aucune chaîne suivie</h2>
             <p>Ajoutez votre première chaîne YouTube pour commencer à télécharger automatiquement les vidéos</p>
             <button class="btn-primary" onclick="openAddChannelModal()">
