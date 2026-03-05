@@ -110,6 +110,11 @@ function showToast(message, type = 'info') {
     }, 3000);
 }
 
+// Open channel page - REDIRECT to dedicated URL
+function openChannelPage(channelId, channelName) {
+    window.location.href = `/channel/${channelId}`;
+}
+
 // Load Library
 async function loadLibrary() {
     try {
