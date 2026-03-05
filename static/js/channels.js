@@ -2,6 +2,7 @@
 
 let channelsCache = [];
 let libraryCache = [];
+let showOnlyAutoDownload = false;
 
 // Auth helper
 function getToken() {
@@ -148,6 +149,23 @@ function updateStats() {
     document.getElementById('totalVideos').textContent = totalVideos;
 }
 
+// Toggle auto-download filter (FIX: fonction manquante)
+function toggleAutoDownloadFilters() {
+    showOnlyAutoDownload = !showOnlyAutoDownload;
+    renderChannels();
+    
+    const statCard = document.querySelector('.stat-card:last-child');
+    if (showOnlyAutoDownload) {
+        statCard.style.borderColor = '#667eea';
+        statCard.style.background = 'rgba(102, 126, 234, 0.15)';
+        showToast('Affichage: Chaînes avec auto-download uniquement', 'info');
+    } else {
+        statCard.style.borderColor = 'rgba(102, 126, 234, 0.3)';
+        statCard.style.background = 'rgba(26, 26, 46, 0.8)';
+        showToast('Affichage: Toutes les chaînes', 'info');
+    }
+}
+
 // Fetch channel avatar from backend
 async function fetchChannelAvatar(channelId) {
     try {
@@ -164,7 +182,12 @@ async function renderChannels() {
     const grid = document.getElementById('channelsGrid');
     const emptyState = document.getElementById('emptyState');
     
-    if (channelsCache.length === 0) {
+    // Filter channels based on toggle
+    const filteredChannels = showOnlyAutoDownload 
+        ? channelsCache.filter(c => c.auto_download)
+        : channelsCache;
+    
+    if (filteredChannels.length === 0) {
         grid.style.display = 'none';
         emptyState.style.display = 'block';
         return;
@@ -175,8 +198,8 @@ async function renderChannels() {
     grid.innerHTML = '';
     
     // Render each channel
-    for (let i = 0; i < channelsCache.length; i++) {
-        const channel = channelsCache[i];
+    for (let i = 0; i < filteredChannels.length; i++) {
+        const channel = filteredChannels[i];
         const card = await createChannelCard(channel, i);
         grid.appendChild(card);
     }
@@ -237,16 +260,16 @@ async function createChannelCard(channel, index) {
         
         <div class="channel-actions">
             <div class="auto-download-toggle ${channel.auto_download ? 'active' : ''}" onclick="toggleAutoDownload('${channel.id}', event)">
-                <span>Auto-download</span>
+                <span class="auto-download-text">Auto-download</span>
                 <div class="toggle-switch ${channel.auto_download ? 'active' : ''}">
                     <div class="toggle-slider"></div>
                 </div>
             </div>
             <button class="btn-channel-action" onclick="checkChannel('${channel.id}', event)" title="Vérifier les nouvelles vidéos">
-                🔄
+                ↻
             </button>
             <button class="btn-channel-action btn-delete" onclick="deleteChannel('${channel.id}', event)" title="Supprimer la chaîne">
-                🗑️
+                ×
             </button>
         </div>
     `;
