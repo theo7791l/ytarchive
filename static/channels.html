@@ -8,20 +8,35 @@
     <link rel="stylesheet" href="/static/css/channels.css">
 </head>
 <body>
-    <!-- Navbar -->
+    <!-- Navbar with proper user system -->
     <nav class="navbar">
-        <div class="nav-brand" onclick="location.href='/app'">
+        <div class="nav-brand" onclick="location.href='/app'" style="cursor: pointer;">
             <h1>YTArchive</h1>
         </div>
         <div class="nav-menu">
             <a href="/app" class="nav-link">Bibliothèque</a>
             <a href="/channels" class="nav-link active">Chaînes</a>
-            <a href="/profile" class="nav-link">Profil</a>
         </div>
         <div class="nav-user">
-            <div class="user-info">
-                <img src="" alt="Avatar" class="user-avatar" id="userAvatar" style="display: none;">
-                <span id="username">Chargement...</span>
+            <div class="profile-dropdown">
+                <a href="#" class="profile-link" id="profile-btn">
+                    <div class="user-avatar" id="user-avatar">
+                        <span id="avatar-letter">U</span>
+                    </div>
+                    <span id="username-display">User</span>
+                </a>
+                <div class="profile-menu" id="profile-menu">
+                    <a href="/profile" class="menu-item">
+                        <span class="menu-icon">P</span> Profil
+                    </a>
+                    <a href="/admin" class="menu-item" id="admin-link" style="display: none;">
+                        <span class="menu-icon">A</span> Administration
+                    </a>
+                    <div class="menu-divider"></div>
+                    <a href="#" class="menu-item logout-item" onclick="logout()">
+                        <span class="menu-icon">D</span> Déconnexion
+                    </a>
+                </div>
             </div>
         </div>
     </nav>
@@ -34,30 +49,26 @@
                 <h1 class="page-title">Mes Chaînes YouTube</h1>
                 <p class="page-subtitle">Gérez vos chaînes suivies et téléchargez automatiquement les nouvelles vidéos</p>
             </div>
-            <button class="btn-add-channel" onclick="openAddChannelModal()">
-                <span class="btn-icon">+</span>
-                Ajouter une chaîne
-            </button>
         </div>
 
-        <!-- Stats Overview - SANS EMOJIS -->
+        <!-- Stats Overview - FIXED ICONS -->
         <div class="stats-overview" id="statsOverview">
             <div class="stat-card">
-                <div class="stat-icon">CH</div>
+                <div class="stat-icon-badge">CH</div>
                 <div class="stat-content">
                     <span class="stat-value" id="totalChannels">0</span>
                     <span class="stat-label">Chaînes suivies</span>
                 </div>
             </div>
             <div class="stat-card">
-                <div class="stat-icon">VD</div>
+                <div class="stat-icon-badge">VID</div>
                 <div class="stat-content">
                     <span class="stat-value" id="totalVideos">0</span>
                     <span class="stat-label">Vidéos téléchargées</span>
                 </div>
             </div>
-            <div class="stat-card" onclick="toggleAutoDownloadFilters()" style="cursor: pointer;">
-                <div class="stat-icon">DL</div>
+            <div class="stat-card" onclick="toggleAutoDownloadFilters()" style="cursor: pointer;" title="Cliquer pour filtrer">
+                <div class="stat-icon-badge">DL</div>
                 <div class="stat-content">
                     <span class="stat-value" id="activeChannels">0</span>
                     <span class="stat-label">Auto-download actif</span>
@@ -72,7 +83,7 @@
 
         <!-- Empty State -->
         <div class="empty-state" id="emptyState" style="display: none;">
-            <div class="empty-icon">TV</div>
+            <div class="empty-icon">📺</div>
             <h2>Aucune chaîne suivie</h2>
             <p>Ajoutez votre première chaîne YouTube pour commencer à télécharger automatiquement les vidéos</p>
             <button class="btn-primary" onclick="openAddChannelModal()">
@@ -80,6 +91,12 @@
             </button>
         </div>
     </div>
+
+    <!-- FAB Button (bottom right) -->
+    <button class="fab-add-channel" onclick="openAddChannelModal()">
+        <span class="fab-icon">+</span>
+        <span class="fab-text">Ajouter</span>
+    </button>
 
     <!-- Add Channel Modal -->
     <div class="modal" id="addChannelModal" style="display: none;">
@@ -136,5 +153,77 @@
     </div>
 
     <script src="/static/js/channels.js"></script>
+    <script>
+        // User profile system
+        async function loadUserProfile() {
+            try {
+                const response = await fetch('/api/auth/me', {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+                
+                if (response.ok) {
+                    const user = await response.json();
+                    
+                    // Update username
+                    document.getElementById('username-display').textContent = user.username;
+                    
+                    // Update avatar
+                    const avatarDiv = document.getElementById('user-avatar');
+                    const avatarLetter = document.getElementById('avatar-letter');
+                    
+                    if (user.avatar) {
+                        // User has custom avatar
+                        avatarDiv.style.backgroundImage = `url('/avatars/${user.avatar}')`;
+                        avatarDiv.style.backgroundSize = 'cover';
+                        avatarDiv.style.backgroundPosition = 'center';
+                        avatarLetter.style.display = 'none';
+                    } else {
+                        // Show first letter
+                        const firstLetter = user.username.charAt(0).toUpperCase();
+                        avatarLetter.textContent = firstLetter;
+                        avatarLetter.style.display = 'flex';
+                    }
+                    
+                    // Show admin link if admin
+                    if (user.role === 'admin') {
+                        document.getElementById('admin-link').style.display = 'flex';
+                    }
+                } else {
+                    // Token invalid, redirect to login
+                    window.location.href = '/';
+                }
+            } catch (error) {
+                console.error('Error loading user profile:', error);
+                window.location.href = '/';
+            }
+        }
+        
+        function logout() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('username');
+            window.location.href = '/';
+        }
+        
+        // Profile dropdown toggle
+        document.getElementById('profile-btn').addEventListener('click', (e) => {
+            e.preventDefault();
+            const menu = document.getElementById('profile-menu');
+            menu.classList.toggle('show');
+        });
+        
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            const dropdown = document.querySelector('.profile-dropdown');
+            const menu = document.getElementById('profile-menu');
+            if (!dropdown.contains(e.target)) {
+                menu.classList.remove('show');
+            }
+        });
+        
+        // Load user profile on page load
+        loadUserProfile();
+    </script>
 </body>
 </html>
