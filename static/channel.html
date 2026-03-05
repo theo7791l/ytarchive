@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chaîne - YTArchive</title>
+    <link rel="stylesheet" href="/static/css/app.css">
+    <link rel="stylesheet" href="/static/css/channel-page.css">
+</head>
+<body>
+    <div class="channel-page-fullscreen" style="display: flex;">
+        <div class="channel-page-wrapper">
+            <button class="channel-back-btn" onclick="window.history.back()">
+                <span class="back-arrow">←</span> Retour à la bibliothèque
+            </button>
+            
+            <div class="channel-header-section" id="channelHeader">
+                <!-- Dynamically loaded -->
+            </div>
+            
+            <div class="channel-controls-section">
+                <input type="text" id="channel-search-input" placeholder="Rechercher dans cette chaîne..." class="channel-search-field">
+                <select id="channel-sort-select" class="channel-sort-field">
+                    <option value="date-desc">Plus récent</option>
+                    <option value="date-asc">Plus ancien</option>
+                    <option value="title-asc">Titre (A-Z)</option>
+                    <option value="title-desc">Titre (Z-A)</option>
+                    <option value="views-desc">Plus de vues</option>
+                    <option value="views-asc">Moins de vues</option>
+                    <option value="duration-desc">Plus long</option>
+                    <option value="duration-asc">Plus court</option>
+                </select>
+            </div>
+            
+            <div id="channel-videos-grid" class="channel-videos-grid">
+                <!-- Videos loaded dynamically -->
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/channel-individual.js"></script>
+</body>
+</html>
