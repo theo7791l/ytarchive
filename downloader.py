@@ -65,19 +65,16 @@ async def download_video(url: str, quality: str = "best", progress_callback: Opt
     print(f"  Minimum height required: {min_height}p" if min_height > 0 else "  Best available quality")
     print("="*60)
     
-    # First, extract info without format restriction to see what's available
-    # Use only web client to avoid PO Token issues
+    # Configuration for info extraction
     ydl_opts_info = {
         'quiet': False,
         'no_warnings': False,
         'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'extractor_args': {
             'youtube': {
-                'player_client': ['web'],  # Only use web client, not android
-                'skip': ['dash', 'hls']  # Skip DASH/HLS to get direct formats
+                'player_client': ['web'],
             }
         },
-        # Add headers to bypass restrictions
         'http_headers': {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
@@ -111,7 +108,32 @@ async def download_video(url: str, quality: str = "best", progress_callback: Opt
         # Extract info to see available formats
         print("\nExtracting video information...")
         ydl_info = yt_dlp.YoutubeDL(ydl_opts_info)
-        info = await loop.run_in_executor(None, lambda: ydl_info.extract_info(url, download=False))
+        
+        try:
+            info = await loop.run_in_executor(None, lambda: ydl_info.extract_info(url, download=False))
+        except yt_dlp.utils.DownloadError as e:
+            error_str = str(e)
+            print(f"\nExtraction error: {error_str}")
+            
+            # Parse the error to give user-friendly messages
+            if "Only images are available" in error_str or "n challenge solving failed" in error_str:
+                user_msg = (
+                    "Cette vidéo est protégée par YouTube et ne peut pas être téléchargée. "
+                    "Raisons possibles : restriction géographique, restriction d'âge, vidéo privée, "
+                    "ou protection YouTube avancée. Essayez avec une autre vidéo."
+                )
+            elif "Sign in to confirm your age" in error_str or "age" in error_str.lower():
+                user_msg = "Cette vidéo a une restriction d'âge et ne peut pas être téléchargée sans authentification."
+            elif "Private video" in error_str:
+                user_msg = "Cette vidéo est privée et n'est pas accessible."
+            elif "Video unavailable" in error_str:
+                user_msg = "Cette vidéo n'est pas disponible (supprimée, bloquée dans votre région, ou privée)."
+            elif "Requested format is not available" in error_str:
+                user_msg = "Aucun format vidéo disponible pour cette vidéo. Elle est probablement bloquée ou protégée."
+            else:
+                user_msg = f"Impossible d'extraire les informations de la vidéo : {error_str}"
+            
+            return (False, user_msg)
         
         if info is None:
             return (False, "Could not extract video information")
@@ -128,8 +150,14 @@ async def download_video(url: str, quality: str = "best", progress_callback: Opt
         # Check available formats
         formats = info.get('formats', [])
         
+        if not formats:
+            return (False, "Aucun format disponible pour cette vidéo. Elle est probablement protégée ou bloquée.")
+        
         # Filter video formats with height info
         video_formats = [f for f in formats if f.get('vcodec') != 'none' and f.get('height')]
+        
+        if not video_formats:
+            return (False, "Aucun format vidéo disponible (seulement audio ou images). Cette vidéo est probablement protégée.")
         
         print(f"\nDEBUG: Found {len(formats)} total formats, {len(video_formats)} video formats")
         
@@ -200,7 +228,6 @@ async def download_video(url: str, quality: str = "best", progress_callback: Opt
             'extractor_args': {
                 'youtube': {
                     'player_client': ['web'],
-                    'skip': ['dash', 'hls']
                 }
             },
             'http_headers': {
