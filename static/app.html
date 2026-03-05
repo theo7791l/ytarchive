@@ -87,6 +87,11 @@
                     <option value="duration-asc">Durée (Plus courte)</option>
                 </select>
                 
+                <button id="btn-sync-b2" class="btn-sync-b2" onclick="syncB2Library()" title="Synchroniser avec B2">
+                    <span class="sync-icon">↻</span>
+                    <span class="sync-text">Sync B2</span>
+                </button>
+                
                 <div class="view-toggle">
                     <button id="grid-view" class="view-btn active" title="Vue Grille">Grille</button>
                     <button id="list-view" class="view-btn" title="Vue Liste">Liste</button>
@@ -255,6 +260,136 @@
     <script src="/static/js/download.js"></script>
     <script src="/static/js/player.js"></script>
     <script>
+        // B2 Sync function
+        async function syncB2Library() {
+            const btn = document.getElementById('btn-sync-b2');
+            const icon = btn.querySelector('.sync-icon');
+            const text = btn.querySelector('.sync-text');
+            
+            // Disable button and add loading state
+            btn.disabled = true;
+            icon.style.animation = 'spin 1s linear infinite';
+            text.textContent = 'Sync...';
+            
+            try {
+                const response = await fetch('/api/b2/sync', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    
+                    // Show success notification
+                    showToast(`Sync B2 terminé : ${result.added} vidéos ajoutées, ${result.skipped} ignorées`, 'success');
+                    
+                    // Reload library if videos were added
+                    if (result.added > 0 && typeof loadLibrary === 'function') {
+                        loadLibrary();
+                    }
+                } else {
+                    const error = await response.json();
+                    showToast(`Erreur sync B2: ${error.detail || 'Erreur inconnue'}`, 'error');
+                }
+            } catch (error) {
+                console.error('B2 sync error:', error);
+                showToast('Erreur lors de la synchronisation B2', 'error');
+            } finally {
+                // Re-enable button
+                btn.disabled = false;
+                icon.style.animation = '';
+                text.textContent = 'Sync B2';
+            }
+        }
+        
+        // Toast notification helper
+        function showToast(message, type = 'info') {
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type} show`;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 300);
+            }, 4000);
+        }
+        
+        // Add spin animation for sync icon
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes spin {
+                from { transform: rotate(0deg); }
+                to { transform: rotate(360deg); }
+            }
+            
+            .btn-sync-b2 {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                padding: 10px 16px;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                border: none;
+                border-radius: 8px;
+                color: white;
+                font-weight: 600;
+                cursor: pointer;
+                transition: all 0.3s ease;
+                font-size: 14px;
+            }
+            
+            .btn-sync-b2:hover:not(:disabled) {
+                transform: translateY(-2px);
+                box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+            }
+            
+            .btn-sync-b2:disabled {
+                opacity: 0.6;
+                cursor: not-allowed;
+            }
+            
+            .sync-icon {
+                font-size: 16px;
+                display: inline-block;
+            }
+            
+            .toast {
+                position: fixed;
+                bottom: 20px;
+                right: 20px;
+                padding: 16px 24px;
+                border-radius: 8px;
+                color: white;
+                font-weight: 500;
+                z-index: 10000;
+                opacity: 0;
+                transform: translateY(20px);
+                transition: all 0.3s ease;
+                max-width: 400px;
+            }
+            
+            .toast.show {
+                opacity: 1;
+                transform: translateY(0);
+            }
+            
+            .toast-success {
+                background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            }
+            
+            .toast-error {
+                background: linear-gradient(135deg, #eb3349 0%, #f45c43 100%);
+            }
+            
+            .toast-info {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            }
+        `;
+        document.head.appendChild(style);
+        
         // Check B2 configuration on page load
         async function checkB2Configuration() {
             try {
@@ -301,6 +436,10 @@
                         downloadBtn.disabled = true;
                         downloadBtn.title = 'Configurez Backblaze B2 d\'abord';
                         downloadBtn.textContent = 'Configurer B2 d\'abord';
+                        
+                        // Hide B2 sync button if not configured
+                        const syncBtn = document.getElementById('btn-sync-b2');
+                        if (syncBtn) syncBtn.style.display = 'none';
                     }
                 }
             } catch (error) {
@@ -371,7 +510,7 @@
                 
                 // Activate correct nav link and view
                 const navLink = document.querySelector(`[data-view="${hash}"]`);
-                const viewEl = document.getElementById(`${hash}-view`);
+                const viewEl = document.getElementById(`${hash}-view`)`);
                 
                 if (navLink) navLink.classList.add('active');
                 if (viewEl) viewEl.classList.add('active');
