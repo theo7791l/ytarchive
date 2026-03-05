@@ -16,6 +16,7 @@ class B2Storage:
         self.api_url = None
         self.authorization_token = None
         self.download_url = None
+        self.account_id = None  # FIX: Ajout de account_id
         
         # Upload URL caching
         self.upload_url = None
@@ -35,7 +36,8 @@ class B2Storage:
                     auth=aiohttp.BasicAuth(self.key_id, self.application_key)
                 ) as response:
                     if response.status != 200:
-                        print(f"B2 Authorization failed: {response.status}")
+                        error_text = await response.text()
+                        print(f"B2 Authorization failed: {response.status} - {error_text}")
                         return False
                     
                     data = await response.json()
@@ -43,6 +45,9 @@ class B2Storage:
                     self.authorization_token = data['authorizationToken']
                     self.api_url = data['apiUrl']
                     self.download_url = data['downloadUrl']
+                    self.account_id = data['accountId']  # FIX: Stockage de accountId
+                    
+                    print(f"B2 Authorized successfully. Account ID: {self.account_id}")
                     
                     # Get bucket ID
                     bucket_info = await self._get_bucket_id()
@@ -51,10 +56,13 @@ class B2Storage:
                         return False
                     
                     self.bucket_id = bucket_info['bucketId']
+                    print(f"Bucket found. Bucket ID: {self.bucket_id}")
                     return True
         
         except Exception as e:
             print(f"B2 Authorization error: {e}")
+            import traceback
+            print(traceback.format_exc())
             return False
     
     async def _get_bucket_id(self) -> Optional[dict]:
@@ -67,11 +75,13 @@ class B2Storage:
                         'Authorization': self.authorization_token
                     },
                     json={
-                        'accountId': self.key_id.split(':')[0] if ':' in self.key_id else self.key_id[:12],
+                        'accountId': self.account_id,  # FIX: Utilisation de self.account_id
                         'bucketName': self.bucket_name
                     }
                 ) as response:
                     if response.status != 200:
+                        error_text = await response.text()
+                        print(f"Failed to list buckets: {response.status} - {error_text}")
                         return None
                     
                     data = await response.json()
@@ -85,6 +95,8 @@ class B2Storage:
         
         except Exception as e:
             print(f"Error getting bucket ID: {e}")
+            import traceback
+            print(traceback.format_exc())
             return None
     
     async def get_upload_url(self) -> bool:
@@ -101,25 +113,34 @@ class B2Storage:
                     }
                 ) as response:
                     if response.status != 200:
-                        print(f"Failed to get upload URL: {response.status}")
+                        error_text = await response.text()
+                        print(f"Failed to get upload URL: {response.status} - {error_text}")
                         return False
                     
                     data = await response.json()
                     self.upload_url = data['uploadUrl']
                     self.upload_auth_token = data['authorizationToken']
+                    print(f"Upload URL obtained: {self.upload_url[:50]}...")
                     return True
         
         except Exception as e:
             print(f"Error getting upload URL: {e}")
+            import traceback
+            print(traceback.format_exc())
             return False
     
     async def upload_file(self, file_path: str, b2_filename: str, progress_callback: Optional[Callable] = None) -> Tuple[bool, Optional[str]]:
         """Upload file to B2"""
         try:
+            if not os.path.exists(file_path):
+                print(f"File not found: {file_path}")
+                return (False, None)
+            
             # Calculate SHA1
             sha1 = hashlib.sha1()
             file_size = os.path.getsize(file_path)
             
+            print(f"Calculating SHA1 for {file_path} ({file_size} bytes)...")
             with open(file_path, 'rb') as f:
                 while True:
                     chunk = f.read(8192)
@@ -128,8 +149,10 @@ class B2Storage:
                     sha1.update(chunk)
             
             sha1_hash = sha1.hexdigest()
+            print(f"SHA1: {sha1_hash}")
             
             # Read file content
+            print(f"Reading file content...")
             with open(file_path, 'rb') as f:
                 file_content = f.read()
             
@@ -142,6 +165,8 @@ class B2Storage:
             elif b2_filename.lower().endswith('.webp'):
                 content_type = 'image/webp'
             
+            print(f"Uploading to B2: {b2_filename} ({content_type})")
+            
             # Upload to B2
             async with aiohttp.ClientSession() as session:
                 async with session.post(
@@ -153,7 +178,8 @@ class B2Storage:
                         'Content-Length': str(file_size),
                         'X-Bz-Content-Sha1': sha1_hash
                     },
-                    data=file_content
+                    data=file_content,
+                    timeout=aiohttp.ClientTimeout(total=3600)  # FIX: Ajout timeout 1h pour gros fichiers
                 ) as response:
                     if response.status not in [200, 201]:
                         error_text = await response.text()
@@ -163,10 +189,13 @@ class B2Storage:
                     data = await response.json()
                     file_id = data['fileId']
                     
+                    print(f"Upload successful! File ID: {file_id}")
                     return (True, file_id)
         
         except Exception as e:
             print(f"B2 Upload error: {e}")
+            import traceback
+            print(traceback.format_exc())
             return (False, None)
     
     async def get_download_url(self, b2_filename: str, duration_seconds: int = 3600) -> Optional[str]:
@@ -185,7 +214,8 @@ class B2Storage:
                     }
                 ) as response:
                     if response.status != 200:
-                        print(f"Failed to get download authorization: {response.status}")
+                        error_text = await response.text()
+                        print(f"Failed to get download authorization: {response.status} - {error_text}")
                         return None
                     
                     data = await response.json()
@@ -197,6 +227,8 @@ class B2Storage:
         
         except Exception as e:
             print(f"Error generating download URL: {e}")
+            import traceback
+            print(traceback.format_exc())
             return None
     
     async def delete_file(self, file_id: str, file_name: str) -> bool:
@@ -213,10 +245,18 @@ class B2Storage:
                         'fileName': file_name
                     }
                 ) as response:
-                    return response.status == 200
+                    if response.status == 200:
+                        print(f"File deleted: {file_name}")
+                        return True
+                    else:
+                        error_text = await response.text()
+                        print(f"Failed to delete file: {response.status} - {error_text}")
+                        return False
         
         except Exception as e:
             print(f"Error deleting file: {e}")
+            import traceback
+            print(traceback.format_exc())
             return False
     
     async def list_files(self, prefix: str = "", max_files: int = 100) -> list:
@@ -235,6 +275,8 @@ class B2Storage:
                     }
                 ) as response:
                     if response.status != 200:
+                        error_text = await response.text()
+                        print(f"Failed to list files: {response.status} - {error_text}")
                         return []
                     
                     data = await response.json()
@@ -242,6 +284,8 @@ class B2Storage:
         
         except Exception as e:
             print(f"Error listing files: {e}")
+            import traceback
+            print(traceback.format_exc())
             return []
 
 
@@ -261,4 +305,6 @@ async def test_b2_credentials(key_id: str, application_key: str, bucket_name: st
         return (True, "B2 credentials are valid!")
     
     except Exception as e:
-        return (False, f"Error: {str(e)}")
+        import traceback
+        error_detail = traceback.format_exc()
+        return (False, f"Error: {str(e)}\n{error_detail}")
