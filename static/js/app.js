@@ -92,6 +92,7 @@ function formatTotalDuration(totalSeconds) {
 
 // Library State
 let libraryCache = [];
+let channelsCache = [];
 let currentView = 'grid';
 let currentFilter = 'all';
 let currentSort = 'date-desc';
@@ -113,6 +114,219 @@ function showToast(message, type = 'info') {
 // Open channel page - REDIRECT to dedicated URL
 function openChannelPage(channelId, channelName) {
     window.location.href = `/channel/${channelId}`;
+}
+
+// Load Channels (for channels-view tab)
+async function loadChannels() {
+    try {
+        // Load channels from API
+        channelsCache = await apiCall('/api/channels');
+        
+        // Load library for video counts
+        libraryCache = await apiCall('/api/library');
+        
+        // Update stats
+        updateChannelsStats();
+        
+        // Render channels
+        await renderChannelsList();
+        
+        // Show FAB
+        const fabBtn = document.getElementById('fab-add-channel');
+        if (fabBtn) {
+            fabBtn.style.display = 'flex';
+        }
+    } catch (error) {
+        console.error('Error loading channels:', error);
+        showToast('Échec du chargement des chaînes: ' + error.message, 'error');
+    }
+}
+
+// Update channels stats
+function updateChannelsStats() {
+    const totalChannels = channelsCache.length;
+    const activeChannels = channelsCache.filter(c => c.auto_download).length;
+    const totalVideos = libraryCache.length;
+    
+    const totalChannelsEl = document.getElementById('totalChannels');
+    const activeChannelsEl = document.getElementById('activeChannels');
+    const totalVideosEl = document.getElementById('totalVideos');
+    
+    if (totalChannelsEl) totalChannelsEl.textContent = totalChannels;
+    if (activeChannelsEl) activeChannelsEl.textContent = activeChannels;
+    if (totalVideosEl) totalVideosEl.textContent = totalVideos;
+}
+
+// Fetch channel avatar from backend
+async function fetchChannelAvatar(channelId) {
+    try {
+        const response = await apiCall(`/api/channel/${channelId}/avatar`);
+        return response.avatar_url || null;
+    } catch (error) {
+        console.error(`Error fetching avatar for ${channelId}:`, error);
+        return null;
+    }
+}
+
+// Render channels list in channels-view
+async function renderChannelsList() {
+    const grid = document.getElementById('channels-list');
+    const emptyState = document.getElementById('emptyStateChannels');
+    
+    if (channelsCache.length === 0) {
+        grid.style.display = 'none';
+        if (emptyState) emptyState.style.display = 'block';
+        return;
+    }
+    
+    grid.style.display = 'grid';
+    if (emptyState) emptyState.style.display = 'none';
+    grid.innerHTML = '<div class="channels-loading">Chargement des chaînes...</div>';
+    
+    // Fetch all avatars in parallel
+    const channelsWithData = await Promise.all(
+        channelsCache.map(async (channel) => {
+            const avatarUrl = await fetchChannelAvatar(channel.id);
+            const videoCount = libraryCache.filter(v => v.channel_id === channel.id).length;
+            const totalDuration = libraryCache
+                .filter(v => v.channel_id === channel.id)
+                .reduce((sum, v) => sum + (v.duration || 0), 0);
+            
+            return { ...channel, avatarUrl, videoCount, totalDuration };
+        })
+    );
+    
+    grid.innerHTML = '';
+    
+    channelsWithData.forEach((channel, index) => {
+        const card = document.createElement('div');
+        card.className = 'channel-card';
+        card.style.setProperty('--i', index);
+        
+        const avatarHtml = channel.avatarUrl 
+            ? `<img src="${channel.avatarUrl}" alt="${channel.name}" onerror="this.style.display='none'; this.parentElement.innerHTML='<div class=\'channel-avatar-fallback\'>${channel.name.substring(0, 2).toUpperCase()}</div>';">`
+            : `<div class="channel-avatar-fallback">${channel.name.substring(0, 2).toUpperCase()}</div>`;
+        
+        const formatDurationShort = (seconds) => {
+            const h = Math.floor(seconds / 3600);
+            const m = Math.floor((seconds % 3600) / 60);
+            if (h > 0) return `${h}h ${m}m`;
+            return `${m}m`;
+        };
+        
+        card.innerHTML = `
+            <div class="channel-card-header">
+                <div class="channel-avatar">
+                    ${avatarHtml}
+                </div>
+                <div class="channel-info">
+                    <h3 class="channel-name">${channel.name}</h3>
+                    <div class="channel-meta">
+                        <span><strong>${channel.videoCount}</strong> vidéo${channel.videoCount > 1 ? 's' : ''}</span>
+                        <span>•</span>
+                        <span>Qualité: <strong>${channel.quality}</strong></span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="channel-stats">
+                <div class="stat-item-small">
+                    <span class="value">${channel.videoCount}</span>
+                    <span class="label">Vidéos</span>
+                </div>
+                <div class="stat-item-small">
+                    <span class="value">${formatDurationShort(channel.totalDuration)}</span>
+                    <span class="label">Durée</span>
+                </div>
+            </div>
+            
+            <div class="channel-actions">
+                <div class="auto-download-toggle ${channel.auto_download ? 'active' : ''}" onclick="toggleAutoDownload('${channel.id}', event)">
+                    <span>Auto-download</span>
+                    <div class="toggle-switch ${channel.auto_download ? 'active' : ''}">
+                        <div class="toggle-slider"></div>
+                    </div>
+                </div>
+                <button class="btn-channel-action" onclick="checkChannel('${channel.id}', event)" title="Vérifier les nouvelles vidéos">
+                    🔄
+                </button>
+                <button class="btn-channel-action btn-delete" onclick="deleteChannel('${channel.id}', event)" title="Supprimer la chaîne">
+                    🗑️
+                </button>
+            </div>
+        `;
+        
+        grid.appendChild(card);
+    });
+}
+
+// Toggle auto-download
+async function toggleAutoDownload(channelId, event) {
+    event.stopPropagation();
+    
+    const channel = channelsCache.find(c => c.id === channelId);
+    if (!channel) return;
+    
+    const newValue = !channel.auto_download;
+    
+    try {
+        await apiCall(`/api/channels/${channelId}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ auto_download: newValue })
+        });
+        
+        channel.auto_download = newValue;
+        updateChannelsStats();
+        await renderChannelsList();
+        
+        showToast(
+            newValue ? 'Téléchargement automatique activé' : 'Téléchargement automatique désactivé',
+            'success'
+        );
+    } catch (error) {
+        showToast('Erreur lors de la mise à jour', 'error');
+    }
+}
+
+// Check channel for new videos
+async function checkChannel(channelId, event) {
+    event.stopPropagation();
+    
+    try {
+        await apiCall(`/api/channels/${channelId}/check`, { method: 'POST' });
+        showToast('Vérification en cours...', 'info');
+        
+        // Reload after 5 seconds
+        setTimeout(() => {
+            loadChannels();
+        }, 5000);
+    } catch (error) {
+        showToast('Erreur lors de la vérification', 'error');
+    }
+}
+
+// Delete channel
+async function deleteChannel(channelId, event) {
+    event.stopPropagation();
+    
+    const channel = channelsCache.find(c => c.id === channelId);
+    if (!channel) return;
+    
+    if (!confirm(`Êtes-vous sûr de vouloir supprimer la chaîne "${channel.name}" ?\n\nCela ne supprimera pas les vidéos déjà téléchargées.`)) {
+        return;
+    }
+    
+    try {
+        await apiCall(`/api/channels/${channelId}`, { method: 'DELETE' });
+        
+        channelsCache = channelsCache.filter(c => c.id !== channelId);
+        updateChannelsStats();
+        await renderChannelsList();
+        
+        showToast('Chaîne supprimée', 'success');
+    } catch (error) {
+        showToast('Erreur lors de la suppression', 'error');
+    }
 }
 
 // Load Library
@@ -191,149 +405,77 @@ function getChannelsWithStats() {
     }));
 }
 
-// Fetch channel avatar from backend
-async function fetchChannelAvatar(channelId) {
-    try {
-        const response = await apiCall(`/api/channel/${channelId}/avatar`);
-        return response.avatar_url || null;
-    } catch (error) {
-        console.error(`Error fetching avatar for ${channelId}:`, error);
-        return null;
-    }
-}
-
 // Modal functions for adding channel
 function openAddChannelModal() {
-    const existingModal = document.getElementById('add-channel-modal');
-    if (existingModal) {
-        existingModal.style.display = 'flex';
-        return;
+    const modal = document.getElementById('add-channel-modal');
+    if (modal) {
+        modal.style.display = 'flex';
+        document.getElementById('channel-url').focus();
     }
-    
-    const modal = document.createElement('div');
-    modal.id = 'add-channel-modal';
-    modal.className = 'modal';
-    modal.style.display = 'flex';
-    
-    modal.innerHTML = `
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Ajouter une chaîne YouTube</h2>
-                <button class="modal-close" onclick="closeAddChannelModal()">×</button>
-            </div>
-            <form id="add-channel-form" class="modal-form">
-                <div class="form-group">
-                    <label for="new-channel-url">URL de la chaîne</label>
-                    <input 
-                        type="text" 
-                        id="new-channel-url" 
-                        placeholder="https://www.youtube.com/@nomdelachaine"
-                        required
-                    >
-                    <small class="form-hint">Entrez l'URL complète d'une chaîne YouTube</small>
-                </div>
-
-                <div class="form-group">
-                    <label for="new-channel-quality">Qualité de téléchargement</label>
-                    <select id="new-channel-quality" required>
-                        <option value="best">Meilleure qualité disponible</option>
-                        <option value="1080p">1080p (Full HD)</option>
-                        <option value="720p" selected>720p (HD)</option>
-                        <option value="480p">480p</option>
-                        <option value="360p">360p</option>
-                    </select>
-                </div>
-
-                <div class="form-group checkbox-group">
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="new-channel-auto" checked>
-                        <span class="checkbox-custom"></span>
-                        <span class="checkbox-text">
-                            <strong>Téléchargement automatique</strong>
-                            <small>Télécharger automatiquement les nouvelles vidéos</small>
-                        </span>
-                    </label>
-                </div>
-
-                <div class="modal-actions">
-                    <button type="button" class="btn-secondary" onclick="closeAddChannelModal()">
-                        Annuler
-                    </button>
-                    <button type="submit" class="btn-primary">
-                        <span class="btn-text">Ajouter la chaîne</span>
-                        <span class="btn-loading" style="display: none;">Ajout...</span>
-                    </button>
-                </div>
-            </form>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    
-    // Form submission
-    document.getElementById('add-channel-form').addEventListener('submit', handleAddChannel);
-    
-    // Close on backdrop click
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            closeAddChannelModal();
-        }
-    });
 }
 
 function closeAddChannelModal() {
     const modal = document.getElementById('add-channel-modal');
     if (modal) {
         modal.style.display = 'none';
+        const form = document.getElementById('add-channel-form');
+        if (form) form.reset();
     }
 }
 
-async function handleAddChannel(e) {
-    e.preventDefault();
+// Handle add channel form submission
+document.addEventListener('DOMContentLoaded', () => {
+    const form = document.getElementById('add-channel-form');
     
-    const form = e.target;
-    const submitBtn = form.querySelector('button[type="submit"]');
-    const btnText = submitBtn.querySelector('.btn-text');
-    const btnLoading = submitBtn.querySelector('.btn-loading');
-    
-    const channelUrl = document.getElementById('new-channel-url').value.trim();
-    const quality = document.getElementById('new-channel-quality').value;
-    const autoDownload = document.getElementById('new-channel-auto').checked;
-    
-    if (!channelUrl.includes('youtube.com')) {
-        showToast('URL YouTube invalide', 'error');
-        return;
-    }
-    
-    submitBtn.disabled = true;
-    btnText.style.display = 'none';
-    btnLoading.style.display = 'inline-block';
-    
-    try {
-        await apiCall('/api/channels', {
-            method: 'POST',
-            body: JSON.stringify({
-                channel_url: channelUrl,
-                quality: quality,
-                auto_download: autoDownload
-            })
+    if (form) {
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const submitBtn = form.querySelector('button[type="submit"]');
+            const btnText = submitBtn.querySelector('.btn-text');
+            const btnLoading = submitBtn.querySelector('.btn-loading');
+            
+            const channelUrl = document.getElementById('channel-url').value.trim();
+            const quality = document.getElementById('channel-quality').value;
+            const autoDownload = document.getElementById('auto-download').checked;
+            
+            if (!channelUrl.includes('youtube.com')) {
+                showToast('URL YouTube invalide', 'error');
+                return;
+            }
+            
+            submitBtn.disabled = true;
+            btnText.style.display = 'none';
+            btnLoading.style.display = 'inline-block';
+            
+            try {
+                const newChannel = await apiCall('/api/channels', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        channel_url: channelUrl,
+                        quality: quality,
+                        auto_download: autoDownload
+                    })
+                });
+                
+                channelsCache.push(newChannel);
+                updateChannelsStats();
+                await renderChannelsList();
+                
+                closeAddChannelModal();
+                showToast('Chaîne ajoutée avec succès !', 'success');
+            } catch (error) {
+                showToast(error.message || 'Erreur lors de l\'ajout de la chaîne', 'error');
+            } finally {
+                submitBtn.disabled = false;
+                btnText.style.display = 'inline-block';
+                btnLoading.style.display = 'none';
+            }
         });
-        
-        showToast('Chaîne ajoutée avec succès !', 'success');
-        closeAddChannelModal();
-        
-        // Reload library to show new channel
-        await loadLibrary();
-    } catch (error) {
-        showToast(error.message || 'Erreur lors de l\'ajout', 'error');
-    } finally {
-        submitBtn.disabled = false;
-        btnText.style.display = 'inline-block';
-        btnLoading.style.display = 'none';
     }
-}
+});
 
-// Render Channels View with REAL YouTube avatars + Add button
+// Render Channels View with REAL YouTube avatars (for tri par chaînes dans library)
 async function renderChannelsView() {
     const channels = getChannelsWithStats();
     const grid = document.getElementById('library-grid');
@@ -342,19 +484,12 @@ async function renderChannelsView() {
     
     // Add floating action button
     let fabBtn = document.getElementById('fab-add-channel');
-    if (!fabBtn) {
-        fabBtn = document.createElement('button');
-        fabBtn.id = 'fab-add-channel';
-        fabBtn.className = 'fab-add-channel';
-        fabBtn.innerHTML = '<span class="fab-icon">+</span><span class="fab-text">Ajouter une chaîne</span>';
-        fabBtn.onclick = openAddChannelModal;
-        document.querySelector('.container').appendChild(fabBtn);
-    } else {
-        fabBtn.style.display = 'flex';
+    if (fabBtn) {
+        fabBtn.style.display = 'none'; // Hidden in library channels view
     }
     
     if (channels.length === 0) {
-        grid.innerHTML = '<p class="empty-state">Aucune chaîne trouvée.<br>Cliquez sur le bouton + pour ajouter votre première chaîne.</p>';
+        grid.innerHTML = '<p class="empty-state">Aucune chaîne trouvée.</p>';
         return;
     }
     
@@ -469,7 +604,7 @@ async function renderLibrary() {
     // Hide FAB button when not in channels view
     const fabBtn = document.getElementById('fab-add-channel');
     if (fabBtn) {
-        fabBtn.style.display = currentView === 'channels' ? 'flex' : 'none';
+        fabBtn.style.display = 'none';
     }
     
     if (currentView === 'channels') {
