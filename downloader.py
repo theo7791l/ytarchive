@@ -133,6 +133,7 @@ async def download_video(url: str, quality: str = "best", progress_callback: Opt
             else:
                 user_msg = f"Impossible d'extraire les informations de la vidéo : {error_str}"
             
+            print(f"\n❌ USER ERROR MESSAGE: {user_msg}\n")
             return (False, user_msg)
         
         if info is None:
@@ -178,7 +179,7 @@ async def download_video(url: str, quality: str = "best", progress_callback: Opt
         if min_height > 0:
             if max_available < min_height:
                 error_msg = f"Qualité {quality} ({min_height}p) non disponible. Maximum disponible : {max_available}p. Veuillez choisir une qualité inférieure."
-                print(f"\nERROR: {error_msg}")
+                print(f"\n❌ USER ERROR MESSAGE: {error_msg}\n")
                 return (False, error_msg)
             
             # Find best format that meets minimum requirement
@@ -189,7 +190,7 @@ async def download_video(url: str, quality: str = "best", progress_callback: Opt
                 print(f"  \u2705 Found suitable quality: {target_height}p (requested minimum: {min_height}p)")
             else:
                 error_msg = f"Aucun format ne correspond \u00e0 {quality} (min {min_height}p). Maximum disponible : {max_available}p"
-                print(f"\nERROR: {error_msg}")
+                print(f"\n❌ USER ERROR MESSAGE: {error_msg}\n")
                 return (False, error_msg)
         
         # Build format string based on what's actually available
