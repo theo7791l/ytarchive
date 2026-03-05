@@ -71,6 +71,10 @@ async def root():
 async def app_page():
     return FileResponse("static/app.html")
 
+@app.get("/channels")
+async def channels_page():
+    return FileResponse("static/channels.html")
+
 @app.get("/profile")
 async def profile_page():
     return FileResponse("static/profile.html")
@@ -546,6 +550,7 @@ async def startup_event():
     print("   - Avatar upload system")
     print("   - Admin panel at /admin")
     print("   - User profiles at /profile")
+    print("   - 📺 Channels management at /channels")
     print("   - ☁️  Backblaze B2 cloud storage")
     print("   - 🎬 Separate video+audio streaming (1080p films 3h+)")
     
