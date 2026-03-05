@@ -27,10 +27,33 @@ navLinks.forEach(link => {
         views.forEach(v => v.classList.remove('active'));
         document.getElementById(`${viewName}-view`).classList.add('active');
         
-        if (viewName === 'library') loadLibrary();
-        if (viewName === 'channels') loadChannels();
+        // Load data based on view
+        if (viewName === 'library') {
+            loadLibrary();
+            hideFAB();
+        } else if (viewName === 'channels') {
+            loadChannels();
+            showFAB();
+        } else if (viewName === 'download') {
+            hideFAB();
+        }
     });
 });
+
+// FAB management
+function showFAB() {
+    const fab = document.getElementById('fab-add-channel');
+    if (fab) {
+        fab.style.display = 'flex';
+    }
+}
+
+function hideFAB() {
+    const fab = document.getElementById('fab-add-channel');
+    if (fab) {
+        fab.style.display = 'none';
+    }
+}
 
 // API helper
 async function apiCall(endpoint, options = {}) {
@@ -119,11 +142,18 @@ function openChannelPage(channelId, channelName) {
 // Load Channels (for channels-view tab)
 async function loadChannels() {
     try {
+        showToast('Chargement des chaînes...', 'info');
+        
         // Load channels from API
-        channelsCache = await apiCall('/api/channels');
+        const channelsData = await apiCall('/api/channels');
+        channelsCache = channelsData || [];
         
         // Load library for video counts
-        libraryCache = await apiCall('/api/library');
+        const libraryData = await apiCall('/api/library');
+        libraryCache = libraryData || [];
+        
+        console.log('Loaded channels:', channelsCache.length);
+        console.log('Loaded videos:', libraryCache.length);
         
         // Update stats
         updateChannelsStats();
@@ -131,11 +161,6 @@ async function loadChannels() {
         // Render channels
         await renderChannelsList();
         
-        // Show FAB
-        const fabBtn = document.getElementById('fab-add-channel');
-        if (fabBtn) {
-            fabBtn.style.display = 'flex';
-        }
     } catch (error) {
         console.error('Error loading channels:', error);
         showToast('Échec du chargement des chaînes: ' + error.message, 'error');
@@ -172,6 +197,8 @@ async function fetchChannelAvatar(channelId) {
 async function renderChannelsList() {
     const grid = document.getElementById('channels-list');
     const emptyState = document.getElementById('emptyStateChannels');
+    
+    if (!grid) return;
     
     if (channelsCache.length === 0) {
         grid.style.display = 'none';
@@ -333,7 +360,7 @@ async function deleteChannel(channelId, event) {
 async function loadLibrary() {
     try {
         const library = await apiCall('/api/library');
-        libraryCache = library;
+        libraryCache = library || [];
         
         updateStats();
         updateChannelFilter();
@@ -349,9 +376,13 @@ function updateStats() {
     const uniqueChannels = new Set(libraryCache.map(v => v.channel_id)).size;
     const totalDuration = libraryCache.reduce((sum, v) => sum + (v.duration || 0), 0);
     
-    document.getElementById('total-videos').textContent = `${totalVideos} vidéo${totalVideos !== 1 ? 's' : ''}`;
-    document.getElementById('total-channels').textContent = `${uniqueChannels} chaîne${uniqueChannels !== 1 ? 's' : ''}`;
-    document.getElementById('total-duration').textContent = formatTotalDuration(totalDuration);
+    const totalVideosEl = document.getElementById('total-videos');
+    const totalChannelsEl = document.getElementById('total-channels');
+    const totalDurationEl = document.getElementById('total-duration');
+    
+    if (totalVideosEl) totalVideosEl.textContent = `${totalVideos} vidéo${totalVideos !== 1 ? 's' : ''}`;
+    if (totalChannelsEl) totalChannelsEl.textContent = `${uniqueChannels} chaîne${uniqueChannels !== 1 ? 's' : ''}`;
+    if (totalDurationEl) totalDurationEl.textContent = formatTotalDuration(totalDuration);
 }
 
 // Update Channel Filter Dropdown
@@ -364,6 +395,8 @@ function updateChannelFilter() {
     });
     
     const filterSelect = document.getElementById('channel-filter');
+    if (!filterSelect) return;
+    
     filterSelect.innerHTML = '<option value="all">Toutes les chaînes</option>';
     
     Object.entries(channels)
@@ -410,7 +443,8 @@ function openAddChannelModal() {
     const modal = document.getElementById('add-channel-modal');
     if (modal) {
         modal.style.display = 'flex';
-        document.getElementById('channel-url').focus();
+        const urlInput = document.getElementById('channel-url');
+        if (urlInput) urlInput.focus();
     }
 }
 
@@ -424,69 +458,62 @@ function closeAddChannelModal() {
 }
 
 // Handle add channel form submission
-document.addEventListener('DOMContentLoaded', () => {
-    const form = document.getElementById('add-channel-form');
-    
-    if (form) {
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
+const addChannelForm = document.getElementById('add-channel-form');
+if (addChannelForm) {
+    addChannelForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        const btnText = submitBtn.querySelector('.btn-text');
+        const btnLoading = submitBtn.querySelector('.btn-loading');
+        
+        const channelUrl = document.getElementById('channel-url').value.trim();
+        const quality = document.getElementById('channel-quality').value;
+        const autoDownload = document.getElementById('auto-download').checked;
+        
+        if (!channelUrl.includes('youtube.com')) {
+            showToast('URL YouTube invalide', 'error');
+            return;
+        }
+        
+        submitBtn.disabled = true;
+        btnText.style.display = 'none';
+        btnLoading.style.display = 'inline-block';
+        
+        try {
+            const newChannel = await apiCall('/api/channels', {
+                method: 'POST',
+                body: JSON.stringify({
+                    channel_url: channelUrl,
+                    quality: quality,
+                    auto_download: autoDownload
+                })
+            });
             
-            const submitBtn = form.querySelector('button[type="submit"]');
-            const btnText = submitBtn.querySelector('.btn-text');
-            const btnLoading = submitBtn.querySelector('.btn-loading');
+            channelsCache.push(newChannel);
+            updateChannelsStats();
+            await renderChannelsList();
             
-            const channelUrl = document.getElementById('channel-url').value.trim();
-            const quality = document.getElementById('channel-quality').value;
-            const autoDownload = document.getElementById('auto-download').checked;
-            
-            if (!channelUrl.includes('youtube.com')) {
-                showToast('URL YouTube invalide', 'error');
-                return;
-            }
-            
-            submitBtn.disabled = true;
-            btnText.style.display = 'none';
-            btnLoading.style.display = 'inline-block';
-            
-            try {
-                const newChannel = await apiCall('/api/channels', {
-                    method: 'POST',
-                    body: JSON.stringify({
-                        channel_url: channelUrl,
-                        quality: quality,
-                        auto_download: autoDownload
-                    })
-                });
-                
-                channelsCache.push(newChannel);
-                updateChannelsStats();
-                await renderChannelsList();
-                
-                closeAddChannelModal();
-                showToast('Chaîne ajoutée avec succès !', 'success');
-            } catch (error) {
-                showToast(error.message || 'Erreur lors de l\'ajout de la chaîne', 'error');
-            } finally {
-                submitBtn.disabled = false;
-                btnText.style.display = 'inline-block';
-                btnLoading.style.display = 'none';
-            }
-        });
-    }
-});
+            closeAddChannelModal();
+            showToast('Chaîne ajoutée avec succès !', 'success');
+        } catch (error) {
+            showToast(error.message || 'Erreur lors de l\'ajout de la chaîne', 'error');
+        } finally {
+            submitBtn.disabled = false;
+            btnText.style.display = 'inline-block';
+            btnLoading.style.display = 'none';
+        }
+    });
+}
 
 // Render Channels View with REAL YouTube avatars (for tri par chaînes dans library)
 async function renderChannelsView() {
     const channels = getChannelsWithStats();
     const grid = document.getElementById('library-grid');
     
-    grid.className = 'channels-overview-grid';
+    if (!grid) return;
     
-    // Add floating action button
-    let fabBtn = document.getElementById('fab-add-channel');
-    if (fabBtn) {
-        fabBtn.style.display = 'none'; // Hidden in library channels view
-    }
+    grid.className = 'channels-overview-grid';
     
     if (channels.length === 0) {
         grid.innerHTML = '<p class="empty-state">Aucune chaîne trouvée.</p>';
@@ -513,9 +540,10 @@ async function renderChannelsView() {
     
     grid.innerHTML = '';
     
-    channelsWithAvatars.forEach(channel => {
+    channelsWithAvatars.forEach((channel, index) => {
         const card = document.createElement('div');
         card.className = 'channel-overview-card';
+        card.style.setProperty('--i', index);
         card.onclick = () => openChannelPage(channel.id, channel.name);
         
         // Use REAL YouTube avatar or fallback to first letters
@@ -601,12 +629,6 @@ function getThumbnailUrl(video) {
 
 // Render Library
 async function renderLibrary() {
-    // Hide FAB button when not in channels view
-    const fabBtn = document.getElementById('fab-add-channel');
-    if (fabBtn) {
-        fabBtn.style.display = 'none';
-    }
-    
     if (currentView === 'channels') {
         await renderChannelsView();
         return;
@@ -614,6 +636,8 @@ async function renderLibrary() {
     
     const filtered = getFilteredAndSorted();
     const grid = document.getElementById('library-grid');
+    
+    if (!grid) return;
     
     grid.className = currentView === 'grid' ? 'video-grid' : 'video-list';
     
@@ -832,44 +856,62 @@ function createVideoListItem(video, index) {
 }
 
 // Event Listeners for Filters
-document.getElementById('search').addEventListener('input', (e) => {
-    currentSearch = e.target.value;
-    renderLibrary();
-});
+const searchInput = document.getElementById('search');
+if (searchInput) {
+    searchInput.addEventListener('input', (e) => {
+        currentSearch = e.target.value;
+        renderLibrary();
+    });
+}
 
-document.getElementById('channel-filter').addEventListener('change', (e) => {
-    currentFilter = e.target.value;
-    renderLibrary();
-});
+const channelFilter = document.getElementById('channel-filter');
+if (channelFilter) {
+    channelFilter.addEventListener('change', (e) => {
+        currentFilter = e.target.value;
+        renderLibrary();
+    });
+}
 
-document.getElementById('sort-by').addEventListener('change', (e) => {
-    currentSort = e.target.value;
-    renderLibrary();
-});
+const sortBy = document.getElementById('sort-by');
+if (sortBy) {
+    sortBy.addEventListener('change', (e) => {
+        currentSort = e.target.value;
+        renderLibrary();
+    });
+}
 
-document.getElementById('grid-view').addEventListener('click', () => {
-    currentView = 'grid';
-    document.getElementById('grid-view').classList.add('active');
-    document.getElementById('list-view').classList.remove('active');
-    document.getElementById('channels-view-btn').classList.remove('active');
-    renderLibrary();
-});
+const gridViewBtn = document.getElementById('grid-view');
+if (gridViewBtn) {
+    gridViewBtn.addEventListener('click', () => {
+        currentView = 'grid';
+        gridViewBtn.classList.add('active');
+        document.getElementById('list-view').classList.remove('active');
+        document.getElementById('channels-view-btn').classList.remove('active');
+        renderLibrary();
+    });
+}
 
-document.getElementById('list-view').addEventListener('click', () => {
-    currentView = 'list';
-    document.getElementById('list-view').classList.add('active');
-    document.getElementById('grid-view').classList.remove('active');
-    document.getElementById('channels-view-btn').classList.remove('active');
-    renderLibrary();
-});
+const listViewBtn = document.getElementById('list-view');
+if (listViewBtn) {
+    listViewBtn.addEventListener('click', () => {
+        currentView = 'list';
+        listViewBtn.classList.add('active');
+        document.getElementById('grid-view').classList.remove('active');
+        document.getElementById('channels-view-btn').classList.remove('active');
+        renderLibrary();
+    });
+}
 
-document.getElementById('channels-view-btn').addEventListener('click', () => {
-    currentView = 'channels';
-    document.getElementById('channels-view-btn').classList.add('active');
-    document.getElementById('grid-view').classList.remove('active');
-    document.getElementById('list-view').classList.remove('active');
-    renderLibrary();
-});
+const channelsViewBtn = document.getElementById('channels-view-btn');
+if (channelsViewBtn) {
+    channelsViewBtn.addEventListener('click', () => {
+        currentView = 'channels';
+        channelsViewBtn.classList.add('active');
+        document.getElementById('grid-view').classList.remove('active');
+        document.getElementById('list-view').classList.remove('active');
+        renderLibrary();
+    });
+}
 
 // Close modal with ESC key
 document.addEventListener('keydown', (e) => {
