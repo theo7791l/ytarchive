@@ -31,7 +31,8 @@ function switchToView(viewName) {
         hideFAB();
     } else if (viewName === 'channels') {
         loadChannels();
-        showFAB();
+        // Ensure FAB is shown - use setTimeout to ensure DOM is ready
+        setTimeout(() => showFAB(), 100);
     } else if (viewName === 'download') {
         hideFAB();
     }
@@ -66,13 +67,17 @@ navLinks.forEach(link => {
 function showFAB() {
     const fab = document.getElementById('fab-add-channel');
     if (fab) {
+        console.log('Showing FAB button');
         fab.style.display = 'flex';
+    } else {
+        console.error('FAB button not found!');
     }
 }
 
 function hideFAB() {
     const fab = document.getElementById('fab-add-channel');
     if (fab) {
+        console.log('Hiding FAB button');
         fab.style.display = 'none';
     }
 }
@@ -183,6 +188,9 @@ async function loadChannels() {
         // Render channels
         await renderChannelsList();
         
+        // Show FAB button after render
+        setTimeout(() => showFAB(), 100);
+        
         showToast(`Chargement terminé: ${channelsCache.length} chaînes trouvées`, 'success');
         
     } catch (error) {
@@ -221,6 +229,7 @@ async function fetchChannelAvatar(channelId) {
 async function renderChannelsList() {
     const grid = document.getElementById('channels-list');
     const emptyState = document.getElementById('emptyStateChannels');
+    const statsOverview = document.getElementById('statsOverview');
     
     if (!grid) {
         console.error('channels-list element not found');
@@ -229,11 +238,13 @@ async function renderChannelsList() {
     
     if (channelsCache.length === 0) {
         grid.style.display = 'none';
+        if (statsOverview) statsOverview.style.display = 'none';
         if (emptyState) emptyState.style.display = 'flex';
         return;
     }
     
     grid.style.display = 'grid';
+    if (statsOverview) statsOverview.style.display = 'grid';
     if (emptyState) emptyState.style.display = 'none';
     grid.innerHTML = '<div class="channels-loading">Chargement des chaînes...</div>';
     
@@ -257,9 +268,15 @@ async function renderChannelsList() {
         card.className = 'channel-card';
         card.style.setProperty('--i', index);
         
-        const avatarHtml = channel.avatarUrl 
-            ? `<img src="${channel.avatarUrl}" alt="${channel.name}" onerror="this.style.display='none'; this.parentElement.innerHTML='<div class=\'channel-avatar-fallback\'>${channel.name.substring(0, 2).toUpperCase()}</div>';">`
-            : `<div class="channel-avatar-fallback">${channel.name.substring(0, 2).toUpperCase()}</div>`;
+        // Build avatar HTML with proper error handling
+        let avatarHtml;
+        if (channel.avatarUrl) {
+            avatarHtml = `<img src="${channel.avatarUrl}" alt="${channel.name}" 
+                style="width: 100%; height: 100%; object-fit: cover; display: block;" 
+                onerror="this.style.display='none'; this.parentElement.innerHTML='<div class=\'channel-avatar-fallback\'>${channel.name.substring(0, 2).toUpperCase()}</div>';">`;
+        } else {
+            avatarHtml = `<div class="channel-avatar-fallback">${channel.name.substring(0, 2).toUpperCase()}</div>`;
+        }
         
         const formatDurationShort = (seconds) => {
             const h = Math.floor(seconds / 3600);
