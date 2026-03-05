@@ -65,33 +65,40 @@ async def download_video(url: str, quality: str = "best", progress_callback: Opt
     print(f"  Minimum height required: {min_height}p" if min_height > 0 else "  Best available quality")
     print("="*60)
     
-    # Detect available browser for cookie extraction
-    # Try browsers in order of popularity
-    browsers_to_try = ['chrome', 'firefox', 'edge', 'chromium', 'brave', 'opera']
+    # Try to detect available browser for cookie extraction
+    # But don't fail if no browser is found
+    browsers_to_try = ['chrome', 'firefox', 'edge', 'chromium']
     selected_browser = None
     
+    print("\nTrying to find browser cookies...")
     for browser in browsers_to_try:
         try:
             # Test if browser cookies are accessible
             test_opts = {
                 'quiet': True,
                 'no_warnings': True,
-                'cookiesfrombrowser': (browser, None, None, None)
+                'extract_flat': True,  # Don't actually extract, just test
             }
+            # Try to add cookies
+            test_opts['cookiesfrombrowser'] = (browser, None, None, None)
             test_ydl = yt_dlp.YoutubeDL(test_opts)
-            # If no exception, browser is available
+            
+            # Try to prepare cookies (this will fail if browser not found)
+            # We don't actually use this, just test if it works
             selected_browser = browser
-            print(f"\n✅ Found browser: {browser}")
-            print(f"   Using cookies from {browser} to bypass YouTube restrictions")
+            print(f"✅ Found browser: {browser}")
+            print(f"   Will use cookies from {browser} to bypass YouTube restrictions")
             break
-        except Exception:
+        except Exception as e:
+            # Browser not found or cookies not accessible
             continue
     
     if not selected_browser:
-        print("\n⚠️  Warning: No browser cookies found")
-        print("   YouTube may block some videos. Install Chrome or Firefox for best results.")
+        print("⚠️  No browser cookies found")
+        print("   Downloading without cookies (may fail on protected videos)")
+        print("   To fix: Install Chrome/Firefox on the server and sign in to YouTube")
     
-    # Configuration for info extraction with cookies
+    # Configuration for info extraction
     ydl_opts_info = {
         'quiet': False,
         'no_warnings': False,
@@ -109,9 +116,12 @@ async def download_video(url: str, quality: str = "best", progress_callback: Opt
         }
     }
     
-    # Add cookies if browser found
+    # Add cookies only if browser found
     if selected_browser:
-        ydl_opts_info['cookiesfrombrowser'] = (selected_browser, None, None, None)
+        try:
+            ydl_opts_info['cookiesfrombrowser'] = (selected_browser, None, None, None)
+        except Exception as e:
+            print(f"Warning: Failed to set cookies: {e}")
     
     video_file_path = None
     thumbnail_file_path = None
@@ -145,17 +155,23 @@ async def download_video(url: str, quality: str = "best", progress_callback: Opt
             error_str = str(e)
             print(f"\nExtraction error: {error_str}")
             
-            # Parse the error to give user-friendly messages
-            if "Only images are available" in error_str or "n challenge solving failed" in error_str:
+            # Don't show cookie error to user - give helpful message instead
+            if "could not find chrome cookies" in error_str.lower() or "could not find firefox cookies" in error_str.lower():
+                user_msg = (
+                    "Cette vidéo est protégée par YouTube et nécessite une authentification. "
+                    "Le serveur n'a pas de navigateur installé pour fournir les cookies. "
+                    "Essayez avec une vidéo publique non protégée."
+                )
+            elif "Only images are available" in error_str or "n challenge solving failed" in error_str:
                 user_msg = (
                     "Cette vidéo est protégée par YouTube et ne peut pas être téléchargée. "
                     "YouTube détecte l'application comme un bot. "
-                    "Assurez-vous d'être connecté à YouTube dans votre navigateur Chrome ou Firefox."
+                    "Essayez avec une vidéo publique différente."
                 )
             elif "Sign in" in error_str or "bot" in error_str.lower():
                 user_msg = (
-                    "YouTube vous demande de vous connecter pour confirmer que vous n'êtes pas un bot. "
-                    "Connectez-vous à YouTube dans votre navigateur Chrome ou Firefox, puis réessayez."
+                    "YouTube demande une authentification pour cette vidéo. "
+                    "Essayez avec une vidéo publique non protégée."
                 )
             elif "age" in error_str.lower():
                 user_msg = "Cette vidéo a une restriction d'âge et ne peut pas être téléchargée sans authentification."
@@ -164,9 +180,9 @@ async def download_video(url: str, quality: str = "best", progress_callback: Opt
             elif "Video unavailable" in error_str:
                 user_msg = "Cette vidéo n'est pas disponible (supprimée, bloquée dans votre région, ou privée)."
             elif "Requested format is not available" in error_str:
-                user_msg = "Aucun format vidéo disponible. YouTube bloque probablement l'accès. Connectez-vous à YouTube dans votre navigateur."
+                user_msg = "Aucun format vidéo disponible. Cette vidéo est probablement protégée ou bloquée."
             else:
-                user_msg = f"Impossible d'extraire les informations de la vidéo : {error_str}"
+                user_msg = f"Impossible d'extraire les informations de la vidéo. Essayez avec une vidéo différente."
             
             print(f"\n❌ USER ERROR MESSAGE: {user_msg}\n")
             return (False, user_msg)
@@ -246,7 +262,7 @@ async def download_video(url: str, quality: str = "best", progress_callback: Opt
         if progress_callback:
             await progress_callback('starting', f'Downloading: {title}')
         
-        # Now download with the selected format (with cookies)
+        # Now download with the selected format
         ydl_opts_download = {
             'format': format_string,
             'outtmpl': os.path.join(VIDEOS_DIR, '%(id)s.%(ext)s'),
@@ -274,9 +290,12 @@ async def download_video(url: str, quality: str = "best", progress_callback: Opt
             }
         }
         
-        # Add cookies to download opts
+        # Add cookies to download opts if available
         if selected_browser:
-            ydl_opts_download['cookiesfrombrowser'] = (selected_browser, None, None, None)
+            try:
+                ydl_opts_download['cookiesfrombrowser'] = (selected_browser, None, None, None)
+            except Exception as e:
+                print(f"Warning: Failed to set cookies for download: {e}")
         
         print(f"\n\u2705 Starting download...\n")
         ydl_download = yt_dlp.YoutubeDL(ydl_opts_download)
