@@ -1,17 +1,46 @@
 import os
 import asyncio
 import aiohttp
-import tempfile
+import hashlib
 from datetime import datetime
 from typing import Optional, Callable
 import traceback
 from pytubefix import YouTube
-import io
 
 VIDEOS_DIR = "videos"
 
+class StreamingUploader:
+    """Streaming uploader - reads and uploads simultaneously"""
+    def __init__(self, url: str, chunk_size: int = 1024 * 1024):
+        self.url = url
+        self.chunk_size = chunk_size
+        self.chunks = []
+        self.sha1 = hashlib.sha1()
+        self.total_size = 0
+    
+    async def stream_and_collect(self):
+        """Stream from YouTube, collect chunks for upload"""
+        async with aiohttp.ClientSession() as session:
+            async with session.get(self.url) as response:
+                if response.status != 200:
+                    raise Exception(f"Failed to download: {response.status}")
+                
+                async for chunk in response.content.iter_chunked(self.chunk_size):
+                    self.chunks.append(chunk)
+                    self.sha1.update(chunk)
+                    self.total_size += len(chunk)
+                    yield chunk
+    
+    def get_data(self):
+        """Get complete data for upload"""
+        return b''.join(self.chunks)
+    
+    def get_sha1(self):
+        """Get SHA1 hash"""
+        return self.sha1.hexdigest()
+
 async def download_video_pytubefix(url: str, quality: str = "best", progress_callback: Optional[Callable] = None, username: str = None):
-    """Stream video+audio DIRECTLY to B2 without local storage"""
+    """Stream video DIRECTLY to B2 - ZERO local storage"""
     os.makedirs(VIDEOS_DIR, exist_ok=True)
     
     from auth import get_user_b2_credentials
@@ -31,9 +60,10 @@ async def download_video_pytubefix(url: str, quality: str = "best", progress_cal
     target_quality = quality_map.get(quality, "highest")
     
     print("="*60)
-    print(f"PYTUBEFIX DOWNLOADER (Direct B2 Streaming)")
+    print(f"STREAMING PROXY MODE (Zero Storage)")
     print(f"  Quality: {quality}")
-    print(f"  Mode: ZERO local storage - UNLIMITED size")
+    print(f"  Mode: Direct relay YouTube -> B2")
+    print(f"  Max size: UNLIMITED")
     print("="*60)
     
     thumbnail_file_path = None
@@ -90,6 +120,7 @@ async def download_video_pytubefix(url: str, quality: str = "best", progress_cal
             print(f"Selected: {video_stream.resolution} ({video_stream.filesize_mb:.1f}MB)")
             if audio_stream:
                 print(f"Audio: {audio_stream.filesize_mb:.1f}MB")
+                print(f"Mode: Streaming proxy (relais)")
             
             return {
                 'yt': yt,
@@ -115,55 +146,66 @@ async def download_video_pytubefix(url: str, quality: str = "best", progress_cal
         if not await b2.authorize():
             return (False, "B2 auth failed")
         
-        print(f"\nStreaming to B2...")
+        await b2.get_upload_url()
+        
+        print(f"\n🔄 Streaming video (proxy mode)...")
         
         if progress_callback:
             await progress_callback('downloading', 'Streaming video...')
         
         b2_video = f"videos/{username}/{yt.video_id}_video.mp4" if use_separate else f"videos/{username}/{yt.video_id}.mp4"
         
-        async with aiohttp.ClientSession() as session:
-            async with session.get(video_stream.url) as response:
-                if response.status != 200:
-                    return (False, f"Failed: {response.status}")
-                
-                await b2.get_upload_url()
-                
-                video_data = io.BytesIO()
-                downloaded = 0
-                last_log = 0
-                
-                async for chunk in response.content.iter_chunked(1024 * 1024):
-                    video_data.write(chunk)
-                    downloaded += len(chunk)
-                    
-                    if downloaded - last_log >= 50*1024*1024:
-                        progress = (downloaded / video_stream.filesize) * 100
-                        print(f"  {downloaded/(1024*1024):.0f}MB / {video_stream.filesize_mb:.0f}MB")
-                        last_log = downloaded
-                        
-                        if progress_callback:
-                            await progress_callback('downloading', f'{progress:.0f}%', percent=f"{progress:.0f}%")
+        # Stream video
+        uploader = StreamingUploader(video_stream.url)
+        
+        downloaded = 0
+        last_log = 0
+        
+        async for chunk in uploader.stream_and_collect():
+            downloaded += len(chunk)
+            
+            if downloaded - last_log >= 50*1024*1024:
+                progress = (downloaded / video_stream.filesize) * 100
+                print(f"  Relayed: {downloaded/(1024*1024):.0f}MB / {video_stream.filesize_mb:.0f}MB")
+                last_log = downloaded
                 
                 if progress_callback:
-                    await progress_callback('uploading', 'Uploading to B2...')
-                
-                print(f"\nUploading to B2...")
-                
-                with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as tmp:
-                    tmp.write(video_data.getvalue())
-                    tmp_video_path = tmp.name
-                
-                await b2.get_upload_url()
-                success, vid_id = await b2.upload_file(tmp_video_path, b2_video, progress_callback)
-                
-                os.remove(tmp_video_path)
-                
-                if not success:
-                    return (False, "Upload failed")
-                
-                print(f"\u2705 Video uploaded")
+                    await progress_callback('downloading', f'{progress:.0f}%', percent=f"{progress:.0f}%")
         
+        print(f"\n✅ Video streamed ({uploader.total_size/(1024*1024):.1f}MB)")
+        
+        if progress_callback:
+            await progress_callback('uploading', 'Uploading to B2...')
+        
+        print(f"Uploading to B2...")
+        
+        # Upload to B2
+        video_data = uploader.get_data()
+        sha1_hash = uploader.get_sha1()
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                b2.upload_url,
+                headers={
+                    'Authorization': b2.upload_auth_token,
+                    'X-Bz-File-Name': b2_video,
+                    'Content-Type': 'video/mp4',
+                    'Content-Length': str(uploader.total_size),
+                    'X-Bz-Content-Sha1': sha1_hash
+                },
+                data=video_data,
+                timeout=aiohttp.ClientTimeout(total=3600)
+            ) as response:
+                if response.status not in [200, 201]:
+                    error_text = await response.text()
+                    return (False, f"B2 upload failed: {response.status}")
+                
+                result = await response.json()
+                vid_id = result['fileId']
+        
+        print(f"✅ Video uploaded")
+        
+        # Stream audio if separate
         audio_id = None
         b2_audio = None
         
@@ -171,31 +213,43 @@ async def download_video_pytubefix(url: str, quality: str = "best", progress_cal
             if progress_callback:
                 await progress_callback('downloading', 'Streaming audio...')
             
-            print(f"\nStreaming audio...")
+            print(f"\n🔄 Streaming audio...")
             
             b2_audio = f"videos/{username}/{yt.video_id}_audio.m4a"
             
+            audio_uploader = StreamingUploader(audio_stream.url)
+            
+            async for chunk in audio_uploader.stream_and_collect():
+                pass
+            
+            print(f"✅ Audio streamed ({audio_uploader.total_size/(1024*1024):.1f}MB)")
+            
+            print(f"Uploading audio to B2...")
+            
+            await b2.get_upload_url()
+            
+            audio_data = audio_uploader.get_data()
+            audio_sha1 = audio_uploader.get_sha1()
+            
             async with aiohttp.ClientSession() as session:
-                async with session.get(audio_stream.url) as response:
-                    if response.status == 200:
-                        audio_data = io.BytesIO()
-                        async for chunk in response.content.iter_chunked(1024 * 1024):
-                            audio_data.write(chunk)
-                        
-                        print(f"Uploading audio...")
-                        
-                        with tempfile.NamedTemporaryFile(delete=False, suffix='.m4a') as tmp:
-                            tmp.write(audio_data.getvalue())
-                            tmp_audio_path = tmp.name
-                        
-                        await b2.get_upload_url()
-                        success, audio_id = await b2.upload_file(tmp_audio_path, b2_audio, None)
-                        
-                        os.remove(tmp_audio_path)
-                        
-                        if success:
-                            print(f"\u2705 Audio uploaded")
+                async with session.post(
+                    b2.upload_url,
+                    headers={
+                        'Authorization': b2.upload_auth_token,
+                        'X-Bz-File-Name': b2_audio,
+                        'Content-Type': 'audio/mp4',
+                        'Content-Length': str(audio_uploader.total_size),
+                        'X-Bz-Content-Sha1': audio_sha1
+                    },
+                    data=audio_data,
+                    timeout=aiohttp.ClientTimeout(total=3600)
+                ) as response:
+                    if response.status in [200, 201]:
+                        result = await response.json()
+                        audio_id = result['fileId']
+                        print(f"✅ Audio uploaded")
         
+        # Thumbnail (small, OK)
         try:
             import requests
             r = requests.get(yt.thumbnail_url, timeout=10)
@@ -215,9 +269,9 @@ async def download_video_pytubefix(url: str, quality: str = "best", progress_cal
             os.remove(thumbnail_file_path)
         
         if progress_callback:
-            await progress_callback('completed', f'\u2705 {yt.title}')
+            await progress_callback('completed', f'✅ {yt.title}')
         
-        print("\n\u2705 SUCCESS")
+        print("\n✅ SUCCESS - Streaming proxy mode")
         
         return (True, {
             'id': yt.video_id,
@@ -246,7 +300,7 @@ async def download_video_pytubefix(url: str, quality: str = "best", progress_cal
         })
     
     except Exception as e:
-        print(f"\n\u274c Error: {e}")
+        print(f"\n❌ Error: {e}")
         print(traceback.format_exc())
         if thumbnail_file_path and os.path.exists(thumbnail_file_path):
             os.remove(thumbnail_file_path)
