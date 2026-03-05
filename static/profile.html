@@ -340,7 +340,7 @@
                         <button class="btn-remove-avatar" id="remove-avatar-btn" style="display: none;">
                             ❌ Supprimer
                         </button>
-                        <p class="avatar-hint">PNG, JPG ou GIF - Max 2 MB</p>
+                        <p class="avatar-hint">PNG, JPG, GIF ou WEBP - Max 5 MB</p>
                     </div>
                 </div>
 
@@ -500,39 +500,60 @@
                     window.location.href = '/';
                 }
             } catch (error) {
+                console.error('Profile load error:', error);
                 showToast('Erreur de chargement du profil', 'error');
             }
         }
 
-        // Avatar upload
+        // Avatar upload - FIX: Change 'avatar' to 'file' to match FastAPI parameter
         document.getElementById('avatar-input').addEventListener('change', async (e) => {
             const file = e.target.files[0];
             if (!file) return;
 
-            if (file.size > 2 * 1024 * 1024) {
-                showToast('Image trop grande (max 2 MB)', 'error');
+            // Check file size (5 MB max)
+            if (file.size > 5 * 1024 * 1024) {
+                showToast('Image trop grande (max 5 MB)', 'error');
+                e.target.value = '';  // Reset input
+                return;
+            }
+
+            // Check file type
+            const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+            if (!allowedTypes.includes(file.type)) {
+                showToast('Type de fichier non autorisé (JPG, PNG, GIF, WEBP seulement)', 'error');
+                e.target.value = '';  // Reset input
                 return;
             }
 
             const formData = new FormData();
-            formData.append('avatar', file);
+            formData.append('file', file);  // FIX: Changed from 'avatar' to 'file'
 
             try {
                 showToast('Upload en cours...', 'info');
                 const response = await fetch(`${API_URL}/api/auth/me/avatar`, {
                     method: 'POST',
-                    headers: { 'Authorization': `Bearer ${token}` },
+                    headers: { 'Authorization': `Bearer ${token}` },  // Only auth header, no Content-Type for FormData
                     body: formData
                 });
 
                 if (response.ok) {
+                    const data = await response.json();
                     showToast('Avatar mis à jour !', 'success');
-                    setTimeout(() => loadProfile(), 500);
+                    console.log('Avatar uploaded:', data);
+                    setTimeout(() => {
+                        e.target.value = '';  // Reset input
+                        loadProfile();
+                    }, 500);
                 } else {
-                    showToast('Échec de l\'upload', 'error');
+                    const errorData = await response.json();
+                    console.error('Upload error:', errorData);
+                    showToast(errorData.detail || 'Échec de l\'upload', 'error');
+                    e.target.value = '';  // Reset input
                 }
             } catch (error) {
-                showToast('Erreur d\'upload', 'error');
+                console.error('Upload exception:', error);
+                showToast('Erreur d\'upload: ' + error.message, 'error');
+                e.target.value = '';  // Reset input
             }
         });
 
@@ -550,10 +571,12 @@
                     showToast('Avatar supprimé', 'success');
                     loadProfile();
                 } else {
-                    showToast('Échec de la suppression', 'error');
+                    const errorData = await response.json();
+                    showToast(errorData.detail || 'Échec de la suppression', 'error');
                 }
             } catch (error) {
-                showToast('Erreur', 'error');
+                console.error('Delete error:', error);
+                showToast('Erreur: ' + error.message, 'error');
             }
         });
 
@@ -573,9 +596,11 @@
                 if (response.ok) {
                     showToast('Profil mis à jour !', 'success');
                 } else {
-                    showToast('Échec de la mise à jour', 'error');
+                    const errorData = await response.json();
+                    showToast(errorData.detail || 'Échec de la mise à jour', 'error');
                 }
             } catch (error) {
+                console.error('Update error:', error);
                 showToast('Erreur de mise à jour', 'error');
             }
         });
@@ -613,6 +638,7 @@
                     showToast(data.detail || 'Échec de la configuration B2', 'error');
                 }
             } catch (error) {
+                console.error('B2 config error:', error);
                 showToast('Erreur de configuration B2', 'error');
             }
         });
@@ -636,9 +662,11 @@
                     document.getElementById('b2-bucket-name').value = '';
                     setTimeout(() => loadProfile(), 1000);
                 } else {
-                    showToast('Échec de la suppression', 'error');
+                    const errorData = await response.json();
+                    showToast(errorData.detail || 'Échec de la suppression', 'error');
                 }
             } catch (error) {
+                console.error('B2 delete error:', error);
                 showToast('Erreur', 'error');
             }
         });
@@ -678,6 +706,7 @@
                     showToast(data.detail || 'Échec du changement', 'error');
                 }
             } catch (error) {
+                console.error('Password change error:', error);
                 showToast('Erreur', 'error');
             }
         });
