@@ -4,7 +4,6 @@ from datetime import datetime
 from typing import Optional, Callable
 import traceback
 from pytubefix import YouTube
-from pytubefix.cli import on_progress
 
 VIDEOS_DIR = "videos"
 
@@ -38,6 +37,7 @@ async def download_video_pytubefix(url: str, quality: str = "best", progress_cal
     print(f"PYTUBEFIX DOWNLOADER")
     print(f"  Requested quality: {quality}")
     print(f"  Using pytubefix (alternative API)")
+    print(f"  ⚠️  Low disk mode: Upload video-only (no merge)")
     print("="*60)
     
     video_file_path = None
@@ -63,26 +63,7 @@ async def download_video_pytubefix(url: str, quality: str = "best", progress_cal
         if progress_callback:
             await progress_callback('starting', 'Connecting with pytubefix...')
         
-        # Create YouTube object
         print(f"\nConnecting to YouTube...")
-        
-        def progress_func(stream, chunk, bytes_remaining):
-            """Progress callback for pytubefix"""
-            if progress_callback:
-                total_size = stream.filesize
-                bytes_downloaded = total_size - bytes_remaining
-                percent = (bytes_downloaded / total_size) * 100
-                
-                try:
-                    asyncio.create_task(progress_callback(
-                        'downloading',
-                        f'Downloading... {percent:.1f}%',
-                        percent=f"{percent:.1f}%",
-                        speed="N/A",
-                        eta="N/A"
-                    ))
-                except:
-                    pass
         
         loop = asyncio.get_event_loop()
         
@@ -90,7 +71,6 @@ async def download_video_pytubefix(url: str, quality: str = "best", progress_cal
         def download_sync():
             yt = YouTube(
                 url,
-                on_progress_callback=progress_func,
                 use_oauth=False,
                 allow_oauth_cache=False
             )
@@ -102,7 +82,7 @@ async def download_video_pytubefix(url: str, quality: str = "best", progress_cal
             print(f"Duration: {yt.length}s")
             
             # Get available streams
-            streams = yt.streams.filter(progressive=False, file_extension='mp4')
+            streams = yt.streams.filter(progressive=True, file_extension='mp4')
             
             # Get available resolutions
             available_resolutions = sorted(
@@ -111,41 +91,40 @@ async def download_video_pytubefix(url: str, quality: str = "best", progress_cal
                 reverse=True
             )
             
-            print(f"\nAvailable resolutions: {available_resolutions}")
+            print(f"\nAvailable resolutions (progressive): {available_resolutions}")
             
-            # Select stream based on quality
+            # Select stream based on quality (progressive = video + audio in one file)
             if quality == "best" or target_quality == "highest":
-                # Get highest resolution video + audio
-                video_stream = streams.filter(only_video=True).order_by('resolution').desc().first()
-                audio_stream = yt.streams.filter(only_audio=True).order_by('abr').desc().first()
+                stream = streams.order_by('resolution').desc().first()
             else:
                 # Try to get requested quality
-                video_stream = streams.filter(only_video=True, res=target_quality).first()
-                audio_stream = yt.streams.filter(only_audio=True).order_by('abr').desc().first()
+                stream = streams.filter(res=target_quality).first()
                 
                 # Fallback to highest if requested quality not available
-                if not video_stream:
+                if not stream:
                     print(f"\n⚠️  {target_quality} not available, using highest quality")
-                    video_stream = streams.filter(only_video=True).order_by('resolution').desc().first()
+                    stream = streams.order_by('resolution').desc().first()
             
-            if not video_stream or not audio_stream:
-                return None, "No suitable streams found"
+            if not stream:
+                # Fallback: try adaptive streams (higher quality but needs merge)
+                print("\n⚠️  No progressive streams, trying adaptive (video-only)...")
+                adaptive_streams = yt.streams.filter(progressive=False, file_extension='mp4', only_video=True)
+                stream = adaptive_streams.order_by('resolution').desc().first()
+                
+                if not stream:
+                    return None, "No suitable streams found"
             
-            print(f"\nSelected stream: {video_stream.resolution} (video) + {audio_stream.abr} (audio)")
+            print(f"\nSelected stream: {stream.resolution} ({stream.mime_type})")
+            print(f"File size: ~{stream.filesize_mb:.1f}MB")
             
             # Download video
-            print(f"\nDownloading video stream...")
-            video_path = video_stream.download(
+            print(f"\nDownloading video...")
+            video_path = stream.download(
                 output_path=VIDEOS_DIR,
-                filename=f"{yt.video_id}_video.mp4"
+                filename=f"{yt.video_id}.mp4"
             )
             
-            # Download audio
-            print(f"Downloading audio stream...")
-            audio_path = audio_stream.download(
-                output_path=VIDEOS_DIR,
-                filename=f"{yt.video_id}_audio.mp4"
-            )
+            print(f"✅ Downloaded: {video_path}")
             
             # Download thumbnail
             thumbnail_path = None
@@ -163,7 +142,6 @@ async def download_video_pytubefix(url: str, quality: str = "best", progress_cal
             
             return {
                 'video_path': video_path,
-                'audio_path': audio_path,
                 'thumbnail_path': thumbnail_path,
                 'video_id': yt.video_id,
                 'title': yt.title,
@@ -173,7 +151,7 @@ async def download_video_pytubefix(url: str, quality: str = "best", progress_cal
                 'views': yt.views,
                 'description': yt.description,
                 'publish_date': yt.publish_date.isoformat() if yt.publish_date else None,
-                'resolution': video_stream.resolution
+                'resolution': stream.resolution
             }, None
         
         # Execute download
@@ -186,47 +164,13 @@ async def download_video_pytubefix(url: str, quality: str = "best", progress_cal
             return (False, "Download failed")
         
         video_file_path = result['video_path']
-        audio_path = result['audio_path']
         thumbnail_file_path = result['thumbnail_path']
         
-        # Merge video and audio with ffmpeg
-        if progress_callback:
-            await progress_callback('processing', 'Merging video and audio...')
-        
-        print("\nMerging video and audio with ffmpeg...")
-        
-        final_video_path = os.path.join(VIDEOS_DIR, f"{result['video_id']}.mp4")
-        
-        def merge_sync():
-            import subprocess
-            cmd = [
-                'ffmpeg',
-                '-i', video_file_path,
-                '-i', audio_path,
-                '-c:v', 'copy',
-                '-c:a', 'aac',
-                '-y',
-                final_video_path
-            ]
-            subprocess.run(cmd, check=True, capture_output=True)
-        
-        try:
-            await loop.run_in_executor(None, merge_sync)
-            print(f"Merge complete: {final_video_path}")
-            
-            # Remove temp files
-            os.remove(video_file_path)
-            os.remove(audio_path)
-            
-            video_file_path = final_video_path
-        except Exception as e:
-            print(f"Merge failed: {e}")
-            # Use video-only if merge fails
-            final_video_path = video_file_path
-        
-        # Upload to B2
+        # Upload to B2 IMMEDIATELY to save disk space
         if progress_callback:
             await progress_callback('uploading', 'Uploading to Backblaze B2...')
+        
+        print("\nUploading to B2...")
         
         try:
             from b2_storage import B2Storage
@@ -248,11 +192,18 @@ async def download_video_pytubefix(url: str, quality: str = "best", progress_cal
             # Upload video
             b2_video_filename = f"videos/{username}/{result['video_id']}.mp4"
             print(f"Uploading video to B2: {b2_video_filename}")
-            success, video_file_id = await b2.upload_file(final_video_path, b2_video_filename, progress_callback)
+            success, video_file_id = await b2.upload_file(video_file_path, b2_video_filename, progress_callback)
             
             if not success:
                 cleanup_local_files()
                 return (False, "Failed to upload video to B2")
+            
+            print(f"✅ Video uploaded. File ID: {video_file_id}")
+            
+            # Delete video file immediately to free disk space
+            if os.path.exists(video_file_path):
+                os.remove(video_file_path)
+                print(f"Freed disk space: removed {video_file_path}")
             
             # Upload thumbnail
             thumbnail_file_id = None
@@ -266,8 +217,9 @@ async def download_video_pytubefix(url: str, quality: str = "best", progress_cal
                 
                 if success_thumb:
                     thumbnail_url = await b2.get_download_url(b2_thumbnail_filename, duration_seconds=604800)
+                    print(f"✅ Thumbnail uploaded")
             
-            # Cleanup local files
+            # Cleanup remaining files
             cleanup_local_files()
             
             if progress_callback:
