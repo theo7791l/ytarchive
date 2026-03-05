@@ -256,9 +256,12 @@
         </div>
     </div>
 
+    <!-- Scripts - Load in correct order -->
     <script src="/static/js/app.js"></script>
+    <script src="/static/js/channels.js"></script>
     <script src="/static/js/download.js"></script>
     <script src="/static/js/player.js"></script>
+    
     <script>
         // B2 Sync function
         async function syncB2Library() {
@@ -324,68 +327,6 @@
             @keyframes spin {
                 from { transform: rotate(0deg); }
                 to { transform: rotate(360deg); }
-            }
-            
-            .btn-sync-b2 {
-                display: flex;
-                align-items: center;
-                gap: 8px;
-                padding: 10px 16px;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                border: none;
-                border-radius: 8px;
-                color: white;
-                font-weight: 600;
-                cursor: pointer;
-                transition: all 0.3s ease;
-                font-size: 14px;
-            }
-            
-            .btn-sync-b2:hover:not(:disabled) {
-                transform: translateY(-2px);
-                box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-            }
-            
-            .btn-sync-b2:disabled {
-                opacity: 0.6;
-                cursor: not-allowed;
-            }
-            
-            .sync-icon {
-                font-size: 16px;
-                display: inline-block;
-            }
-            
-            .toast {
-                position: fixed;
-                bottom: 20px;
-                right: 20px;
-                padding: 16px 24px;
-                border-radius: 8px;
-                color: white;
-                font-weight: 500;
-                z-index: 10000;
-                opacity: 0;
-                transform: translateY(20px);
-                transition: all 0.3s ease;
-                max-width: 400px;
-            }
-            
-            .toast.show {
-                opacity: 1;
-                transform: translateY(0);
-            }
-            
-            .toast-success {
-                background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
-            }
-            
-            .toast-error {
-                background: linear-gradient(135deg, #eb3349 0%, #f45c43 100%);
-            }
-            
-            .toast-info {
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             }
         `;
         document.head.appendChild(style);
