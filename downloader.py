@@ -33,17 +33,6 @@ async def download_video(url: str, quality: str = "best", progress_callback: Opt
     
     min_height = quality_min_height.get(quality, 0)
     
-    # QUALITY MAP - More aggressive filtering to force minimum quality
-    quality_map = {
-        "best": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best",
-        "2160p": "bestvideo[height>=2160][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height>=2160]+bestaudio/best[height>=2160]",
-        "1440p": "bestvideo[height>=1440][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height>=1440]+bestaudio/best[height>=1440]",
-        "1080p": "bestvideo[height>=1080][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height>=1080]+bestaudio/best[height>=1080]",
-        "720p": "bestvideo[height>=720][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height>=720]+bestaudio/best[height>=720]",
-        "480p": "bestvideo[height>=480][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height>=480]+bestaudio/best[height>=480]",
-        "360p": "bestvideo[height>=360][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height>=360]+bestaudio/best[height>=360]"
-    }
-    
     def progress_hook(d):
         """Progress hook for yt-dlp"""
         if not progress_callback:
@@ -70,29 +59,16 @@ async def download_video(url: str, quality: str = "best", progress_callback: Opt
         except Exception as e:
             print(f"Progress hook error: {e}")
     
-    # Get format string for selected quality
-    format_string = quality_map.get(quality, quality_map["best"])
-    
     print("="*60)
     print(f"QUALITY SELECTION:")
     print(f"  Requested quality: {quality}")
-    print(f"  Minimum height required: {min_height}p")
-    print(f"  Format string: {format_string}")
+    print(f"  Minimum height required: {min_height}p" if min_height > 0 else "  Best available quality")
     print("="*60)
     
-    ydl_opts = {
-        'format': format_string,
-        'outtmpl': os.path.join(VIDEOS_DIR, '%(id)s.%(ext)s'),
-        'writethumbnail': True,
-        'writesubtitles': False,
+    # First, extract info without format restriction to see what's available
+    ydl_opts_info = {
         'quiet': False,
         'no_warnings': False,
-        'progress_hooks': [progress_hook],
-        'merge_output_format': 'mp4',
-        'postprocessors': [{
-            'key': 'FFmpegVideoConvertor',
-            'preferedformat': 'mp4',
-        }],
         'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'extractor_args': {'youtube': {'player_client': ['android', 'web']}},
     }
@@ -119,9 +95,10 @@ async def download_video(url: str, quality: str = "best", progress_callback: Opt
     try:
         loop = asyncio.get_event_loop()
         
-        # Extract info in executor
-        ydl = yt_dlp.YoutubeDL(ydl_opts)
-        info = await loop.run_in_executor(None, lambda: ydl.extract_info(url, download=False))
+        # Extract info to see available formats
+        print("\nExtracting video information...")
+        ydl_info = yt_dlp.YoutubeDL(ydl_opts_info)
+        info = await loop.run_in_executor(None, lambda: ydl_info.extract_info(url, download=False))
         
         if info is None:
             return (False, "Could not extract video information")
@@ -135,36 +112,47 @@ async def download_video(url: str, quality: str = "best", progress_callback: Opt
         description = info.get('description', '')
         view_count = info.get('view_count', 0)
         
-        # Check available formats BEFORE downloading
+        # Check available formats
         formats = info.get('formats', [])
-        available_heights = [f.get('height', 0) for f in formats if f.get('height')]
+        
+        # Filter video formats with height info
+        video_formats = [f for f in formats if f.get('vcodec') != 'none' and f.get('height')]
+        available_heights = sorted(set([f['height'] for f in video_formats]), reverse=True)
         max_available = max(available_heights) if available_heights else 0
         
         print(f"\nAVAILABLE FORMATS:")
         print(f"  Maximum resolution available: {max_available}p")
-        print(f"  All available heights: {sorted(set(available_heights), reverse=True)}")
+        print(f"  All available heights: {available_heights}")
         
         # Check if requested quality is available
-        if min_height > 0 and max_available < min_height:
-            error_msg = f"Requested quality {quality} ({min_height}p) not available. Maximum available: {max_available}p"
-            print(f"\nERROR: {error_msg}")
-            return (False, error_msg)
+        if min_height > 0:
+            if max_available < min_height:
+                error_msg = f"Qualité {quality} ({min_height}p) non disponible. Maximum disponible : {max_available}p. Veuillez choisir une qualité inférieure."
+                print(f"\nERROR: {error_msg}")
+                return (False, error_msg)
+            
+            # Find best format that meets minimum requirement
+            suitable_heights = [h for h in available_heights if h >= min_height]
+            if suitable_heights:
+                target_height = min(suitable_heights)  # Get closest to requested quality
+                print(f"\nQUALITY CHECK:")
+                print(f"  ✅ Found suitable quality: {target_height}p (requested minimum: {min_height}p)")
+            else:
+                error_msg = f"Aucun format ne correspond à {quality} (min {min_height}p). Maximum disponible : {max_available}p"
+                print(f"\nERROR: {error_msg}")
+                return (False, error_msg)
         
-        # Get format that will be selected
-        selected_format = info.get('format_id', 'unknown')
-        selected_height = info.get('height', 0)
+        # Build format string based on what's actually available
+        if quality == "best" or min_height == 0:
+            format_string = "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best"
+        else:
+            # Select best format that meets minimum requirement
+            format_string = f"bestvideo[height>={min_height}][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height>={min_height}]+bestaudio/best[height>={min_height}]"
         
-        print(f"\nSELECTED FORMAT:")
-        print(f"  Format ID: {selected_format}")
-        print(f"  Selected height: {selected_height}p")
-        
-        # Verify selected format meets minimum requirement
-        if min_height > 0 and selected_height < min_height:
-            error_msg = f"yt-dlp selected {selected_height}p but you requested {quality} (min {min_height}p). This video doesn't have {quality} available."
-            print(f"\nERROR: {error_msg}")
-            return (False, error_msg)
-        
-        print(f"\n✅ Quality check passed! Proceeding with download...\n")
+        print(f"\nDOWNLOAD CONFIG:")
+        print(f"  Format string: {format_string}")
+        print(f"  Title: {title}")
+        print(f"  Channel: {channel}")
         
         if upload_date and len(upload_date) == 8:
             upload_date = f"{upload_date[:4]}-{upload_date[4:6]}-{upload_date[6:]}"
@@ -172,8 +160,27 @@ async def download_video(url: str, quality: str = "best", progress_callback: Opt
         if progress_callback:
             await progress_callback('starting', f'Downloading: {title}')
         
-        # Download in executor
-        await loop.run_in_executor(None, lambda: ydl.download([url]))
+        # Now download with the selected format
+        ydl_opts_download = {
+            'format': format_string,
+            'outtmpl': os.path.join(VIDEOS_DIR, '%(id)s.%(ext)s'),
+            'writethumbnail': True,
+            'writesubtitles': False,
+            'quiet': False,
+            'no_warnings': False,
+            'progress_hooks': [progress_hook],
+            'merge_output_format': 'mp4',
+            'postprocessors': [{
+                'key': 'FFmpegVideoConvertor',
+                'preferedformat': 'mp4',
+            }],
+            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'extractor_args': {'youtube': {'player_client': ['android', 'web']}},
+        }
+        
+        print(f"\n✅ Starting download...\n")
+        ydl_download = yt_dlp.YoutubeDL(ydl_opts_download)
+        await loop.run_in_executor(None, lambda: ydl_download.download([url]))
         
         # Find files
         video_file = None
@@ -278,11 +285,11 @@ async def download_video(url: str, quality: str = "best", progress_callback: Opt
                 'view_count': view_count,
                 'video_file': b2_video_filename,
                 'thumbnail_file': b2_thumbnail_filename,
-                'thumbnail_url': thumbnail_url,  # URL signée de la miniature
+                'thumbnail_url': thumbnail_url,
                 'b2_video_file_id': video_file_id,
                 'b2_thumbnail_file_id': thumbnail_file_id,
                 'quality': quality,
-                'actual_height': selected_height,  # Store actual resolution
+                'actual_height': max_available,  # Store actual max resolution
                 'downloaded_at': datetime.now().isoformat(),
                 'url': url,
                 'storage': 'b2',
