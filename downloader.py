@@ -66,11 +66,24 @@ async def download_video(url: str, quality: str = "best", progress_callback: Opt
     print("="*60)
     
     # First, extract info without format restriction to see what's available
+    # Use only web client to avoid PO Token issues
     ydl_opts_info = {
         'quiet': False,
         'no_warnings': False,
         'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'extractor_args': {'youtube': {'player_client': ['android', 'web']}},
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['web'],  # Only use web client, not android
+                'skip': ['dash', 'hls']  # Skip DASH/HLS to get direct formats
+            }
+        },
+        # Add headers to bypass restrictions
+        'http_headers': {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-us,en;q=0.5',
+            'Sec-Fetch-Mode': 'navigate',
+        }
     }
     
     video_file_path = None
@@ -117,6 +130,15 @@ async def download_video(url: str, quality: str = "best", progress_callback: Opt
         
         # Filter video formats with height info
         video_formats = [f for f in formats if f.get('vcodec') != 'none' and f.get('height')]
+        
+        print(f"\nDEBUG: Found {len(formats)} total formats, {len(video_formats)} video formats")
+        
+        # Show some format details for debugging
+        if video_formats:
+            print("\nSample formats:")
+            for f in video_formats[:5]:  # Show first 5
+                print(f"  - {f.get('format_id')}: {f.get('height')}p, codec: {f.get('vcodec')}, ext: {f.get('ext')}")
+        
         available_heights = sorted(set([f['height'] for f in video_formats]), reverse=True)
         max_available = max(available_heights) if available_heights else 0
         
@@ -136,9 +158,9 @@ async def download_video(url: str, quality: str = "best", progress_callback: Opt
             if suitable_heights:
                 target_height = min(suitable_heights)  # Get closest to requested quality
                 print(f"\nQUALITY CHECK:")
-                print(f"  ✅ Found suitable quality: {target_height}p (requested minimum: {min_height}p)")
+                print(f"  \u2705 Found suitable quality: {target_height}p (requested minimum: {min_height}p)")
             else:
-                error_msg = f"Aucun format ne correspond à {quality} (min {min_height}p). Maximum disponible : {max_available}p"
+                error_msg = f"Aucun format ne correspond \u00e0 {quality} (min {min_height}p). Maximum disponible : {max_available}p"
                 print(f"\nERROR: {error_msg}")
                 return (False, error_msg)
         
@@ -175,10 +197,21 @@ async def download_video(url: str, quality: str = "best", progress_callback: Opt
                 'preferedformat': 'mp4',
             }],
             'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'extractor_args': {'youtube': {'player_client': ['android', 'web']}},
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['web'],
+                    'skip': ['dash', 'hls']
+                }
+            },
+            'http_headers': {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'en-us,en;q=0.5',
+                'Sec-Fetch-Mode': 'navigate',
+            }
         }
         
-        print(f"\n✅ Starting download...\n")
+        print(f"\n\u2705 Starting download...\n")
         ydl_download = yt_dlp.YoutubeDL(ydl_opts_download)
         await loop.run_in_executor(None, lambda: ydl_download.download([url]))
         
@@ -204,7 +237,7 @@ async def download_video(url: str, quality: str = "best", progress_callback: Opt
             cleanup_local_files()
             return (False, "Video file not found after download")
         
-        print(f"\n✅ Download successful: {video_file}")
+        print(f"\n\u2705 Download successful: {video_file}")
         
         # ========================================
         # UPLOAD TO BACKBLAZE B2
