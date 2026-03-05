@@ -8,31 +8,48 @@ import traceback
 VIDEOS_DIR = "videos"
 
 async def download_video(url: str, quality: str = "best", progress_callback: Optional[Callable] = None, username: str = None):
-    """Download a video trying pytubefix first, then yt-dlp as fallback"""
+    """Download a video trying streaming first, then pytubefix, then yt-dlp as fallback"""
     
     print("="*60)
-    print(f"MULTI-DOWNLOADER SYSTEM")
-    print(f"  Strategy: Try pytubefix first (better bypass), fallback to yt-dlp")
+    print(f"MULTI-DOWNLOADER SYSTEM (3 strategies)")
+    print(f"  1. Streaming (zero disk usage) - BEST")
+    print(f"  2. Pytubefix (low disk usage)")
+    print(f"  3. yt-dlp (fallback)")
     print(f"  Requested quality: {quality}")
     print("="*60)
     
-    # Try pytubefix first (better at bypassing YouTube protections)
-    print("\n➡️  Attempt 1: Using pytubefix (alternative API)")
+    # Strategy 1: Try streaming download (BEST - no disk usage)
+    print("\n➡️  Attempt 1: Streaming downloader (zero disk)")
+    try:
+        from streaming_downloader import download_video_streaming
+        success, result = await download_video_streaming(url, quality, progress_callback, username)
+        
+        if success:
+            print("\n✅ SUCCESS with streaming downloader!")
+            return (True, result)
+        else:
+            print(f"\n⚠️  Streaming failed: {result}")
+            print("\n➡️  Attempt 2: Trying pytubefix...")
+    except Exception as e:
+        print(f"\n⚠️  Streaming error: {e}")
+        print("\n➡️  Attempt 2: Trying pytubefix...")
+    
+    # Strategy 2: Try pytubefix (low disk usage)
     try:
         from downloader_pytubefix import download_video_pytubefix
         success, result = await download_video_pytubefix(url, quality, progress_callback, username)
         
         if success:
-            print("\n\u2705 SUCCESS with pytubefix!")
+            print("\n✅ SUCCESS with pytubefix!")
             return (True, result)
         else:
             print(f"\n⚠️  pytubefix failed: {result}")
-            print("\n➡️  Attempt 2: Falling back to yt-dlp...")
+            print("\n➡️  Attempt 3: Falling back to yt-dlp...")
     except Exception as e:
         print(f"\n⚠️  pytubefix error: {e}")
-        print("\n➡️  Attempt 2: Falling back to yt-dlp...")
+        print("\n➡️  Attempt 3: Falling back to yt-dlp...")
     
-    # Fallback to yt-dlp if pytubefix failed
+    # Strategy 3: Fallback to yt-dlp
     return await download_video_ytdlp(url, quality, progress_callback, username)
 
 async def download_video_ytdlp(url: str, quality: str = "best", progress_callback: Optional[Callable] = None, username: str = None):
@@ -87,12 +104,11 @@ async def download_video_ytdlp(url: str, quality: str = "best", progress_callbac
         except Exception as e:
             print(f"Progress hook error: {e}")
     
-    print("\nYT-DLP DOWNLOADER")
+    print("\nYT-DLP DOWNLOADER (Last resort)")
     print(f"  Requested quality: {quality}")
     print(f"  Minimum height: {min_height}p" if min_height > 0 else "  Best available quality")
     
-    print("\n⚠️  Cookies disabled (server environment)")
-    print("   Downloading without cookies")
+    print("\n⚠️  Warning: yt-dlp may use significant disk space")
     
     # Configuration for info extraction WITHOUT cookies
     ydl_opts_info = {
@@ -144,27 +160,10 @@ async def download_video_ytdlp(url: str, quality: str = "best", progress_callbac
             error_str = str(e)
             print(f"\nExtraction error: {error_str}")
             
-            # Give helpful user messages
-            if "Only images are available" in error_str or "n challenge solving failed" in error_str:
-                user_msg = (
-                    "Cette vidéo est protégée par YouTube. Aucun downloader n'a réussi. "
-                    "Essayez avec une vidéo publique différente (vidéo musicale ancienne, gaming populaire, tutoriel)."
-                )
-            elif "Sign in" in error_str or "bot" in error_str.lower():
-                user_msg = (
-                    "YouTube demande une authentification. "
-                    "Essayez avec une vidéo publique populaire et ancienne (ex: Gangnam Style, Despacito)."
-                )
-            elif "age" in error_str.lower():
-                user_msg = "Cette vidéo a une restriction d'âge et ne peut pas être téléchargée."
-            elif "Private video" in error_str:
-                user_msg = "Cette vidéo est privée et n'est pas accessible."
-            elif "Video unavailable" in error_str:
-                user_msg = "Cette vidéo n'est pas disponible (supprimée, bloquée, ou privée)."
-            elif "Requested format is not available" in error_str:
-                user_msg = "Aucun format vidéo disponible. Cette vidéo est protégée."
-            else:
-                user_msg = f"Échec des 2 downloaders. Cette vidéo est probablement trop protégée. Essayez une autre vidéo."
+            user_msg = (
+                "Tous les downloaders ont échoué. Cette vidéo est probablement trop protégée. "
+                "Essayez avec une vidéo publique ancienne (ex: Gangnam Style, Despacito, vidéos musicales populaires)."
+            )
             
             print(f"\n❌ USER ERROR MESSAGE: {user_msg}\n")
             return (False, user_msg)
@@ -191,38 +190,18 @@ async def download_video_ytdlp(url: str, quality: str = "best", progress_callbac
         video_formats = [f for f in formats if f.get('vcodec') != 'none' and f.get('height')]
         
         if not video_formats:
-            return (False, "Aucun format vidéo disponible (seulement audio ou images).")
-        
-        print(f"\nDEBUG: Found {len(formats)} total formats, {len(video_formats)} video formats")
-        
-        # Show some format details
-        if video_formats:
-            print("\nSample formats:")
-            for f in video_formats[:5]:
-                print(f"  - {f.get('format_id')}: {f.get('height')}p, codec: {f.get('vcodec')}, ext: {f.get('ext')}")
+            return (False, "Aucun format vidéo disponible.")
         
         available_heights = sorted(set([f['height'] for f in video_formats]), reverse=True)
         max_available = max(available_heights) if available_heights else 0
         
-        print(f"\nAVAILABLE FORMATS:")
-        print(f"  Maximum resolution: {max_available}p")
-        print(f"  All heights: {available_heights}")
+        print(f"\nAvailable: {available_heights}")
+        print(f"Maximum: {max_available}p")
         
         # Check if requested quality is available
         if min_height > 0:
             if max_available < min_height:
-                error_msg = f"Qualité {quality} non disponible. Maximum : {max_available}p. Choisissez une qualité inférieure."
-                print(f"\n❌ USER ERROR MESSAGE: {error_msg}\n")
-                return (False, error_msg)
-            
-            # Find best format that meets requirement
-            suitable_heights = [h for h in available_heights if h >= min_height]
-            if suitable_heights:
-                target_height = min(suitable_heights)
-                print(f"\n✅ Found: {target_height}p (requested: {min_height}p)")
-            else:
-                error_msg = f"Aucun format ≥ {quality}. Maximum : {max_available}p"
-                print(f"\n❌ {error_msg}\n")
+                error_msg = f"Qualité {quality} non disponible. Maximum : {max_available}p."
                 return (False, error_msg)
         
         # Build format string
@@ -230,11 +209,6 @@ async def download_video_ytdlp(url: str, quality: str = "best", progress_callbac
             format_string = "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best"
         else:
             format_string = f"bestvideo[height>={min_height}][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height>={min_height}]+bestaudio/best[height>={min_height}]"
-        
-        print(f"\nDOWNLOAD CONFIG:")
-        print(f"  Format: {format_string}")
-        print(f"  Title: {title}")
-        print(f"  Channel: {channel}")
         
         if upload_date and len(upload_date) == 8:
             upload_date = f"{upload_date[:4]}-{upload_date[4:6]}-{upload_date[6:]}"
@@ -313,7 +287,7 @@ async def download_video_ytdlp(url: str, quality: str = "best", progress_callbac
             
             if not await b2.authorize():
                 cleanup_local_files()
-                return (False, "Failed to authorize with Backblaze B2")
+                return (False, "Failed to authorize with B2")
             
             if not await b2.get_upload_url():
                 cleanup_local_files()
