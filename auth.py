@@ -9,6 +9,7 @@ import bcrypt
 from typing import Optional, List
 import shutil
 import uuid
+import aiofiles
 
 router = APIRouter()
 security = HTTPBearer()
@@ -228,35 +229,70 @@ async def delete_b2_credentials(user: dict = Depends(verify_token)):
 
 @router.post("/me/avatar")
 async def upload_avatar(file: UploadFile = File(...), user: dict = Depends(verify_token)):
-    users = load_users()
-    username = user["username"]
+    """Upload avatar for current user"""
+    try:
+        users = load_users()
+        username = user["username"]
+        
+        if username not in users:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Validate file type
+        allowed_types = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"]
+        if file.content_type not in allowed_types:
+            raise HTTPException(status_code=400, detail=f"File type not allowed. Allowed: {', '.join(allowed_types)}")
+        
+        # Read file content
+        content = await file.read()
+        
+        # Validate file size (max 5MB)
+        max_size = 5 * 1024 * 1024  # 5 MB
+        if len(content) > max_size:
+            raise HTTPException(status_code=400, detail=f"File too large. Maximum size: 5 MB")
+        
+        if len(content) == 0:
+            raise HTTPException(status_code=400, detail="File is empty")
+        
+        # Delete old avatar if exists
+        old_avatar = users[username].get("avatar")
+        if old_avatar:
+            old_path = os.path.join(AVATARS_DIR, old_avatar)
+            if os.path.exists(old_path):
+                try:
+                    os.remove(old_path)
+                    print(f"Deleted old avatar: {old_path}")
+                except Exception as e:
+                    print(f"Warning: Could not delete old avatar: {e}")
+        
+        # Generate filename
+        ext = file.filename.split(".")[-1].lower() if "." in file.filename else "jpg"
+        # Validate extension
+        allowed_extensions = ["jpg", "jpeg", "png", "gif", "webp"]
+        if ext not in allowed_extensions:
+            ext = "jpg"
+        
+        filename = f"{username}_{uuid.uuid4().hex[:8]}.{ext}"
+        filepath = os.path.join(AVATARS_DIR, filename)
+        
+        # Save file using async write
+        async with aiofiles.open(filepath, "wb") as f:
+            await f.write(content)
+        
+        print(f"Avatar saved: {filepath} ({len(content)} bytes)")
+        
+        # Update user record
+        users[username]["avatar"] = filename
+        save_users(users)
+        
+        return {"status": "success", "avatar": filename, "url": f"/avatars/{filename}"}
     
-    if username not in users:
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    # Validate file type
-    if not file.content_type.startswith("image/"):
-        raise HTTPException(status_code=400, detail="File must be an image")
-    
-    # Delete old avatar if exists
-    old_avatar = users[username].get("avatar")
-    if old_avatar:
-        old_path = os.path.join(AVATARS_DIR, old_avatar)
-        if os.path.exists(old_path):
-            os.remove(old_path)
-    
-    # Save new avatar
-    ext = file.filename.split(".")[-1] if "." in file.filename else "jpg"
-    filename = f"{username}_{uuid.uuid4().hex[:8]}.{ext}"
-    filepath = os.path.join(AVATARS_DIR, filename)
-    
-    with open(filepath, "wb") as f:
-        shutil.copyfileobj(file.file, f)
-    
-    users[username]["avatar"] = filename
-    save_users(users)
-    
-    return {"avatar": filename}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Avatar upload error: {e}")
+        import traceback
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Failed to upload avatar: {str(e)}")
 
 @router.delete("/me/avatar")
 async def delete_avatar(user: dict = Depends(verify_token)):
