@@ -12,31 +12,53 @@ function logout() {
     window.location.href = '/';
 }
 
-// View switching
-const navLinks = document.querySelectorAll('.nav-link');
-const views = document.querySelectorAll('.view');
+// View switching with hash support
+function switchToView(viewName) {
+    // Remove active from all nav links and views
+    document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    
+    // Activate correct nav link and view
+    const navLink = document.querySelector(`[data-view="${viewName}"]`);
+    const viewEl = document.getElementById(`${viewName}-view`);
+    
+    if (navLink) navLink.classList.add('active');
+    if (viewEl) viewEl.classList.add('active');
+    
+    // Load data based on view
+    if (viewName === 'library') {
+        loadLibrary();
+        hideFAB();
+    } else if (viewName === 'channels') {
+        loadChannels();
+        showFAB();
+    } else if (viewName === 'download') {
+        hideFAB();
+    }
+}
 
+// Handle hash navigation
+function handleHashNavigation() {
+    const hash = window.location.hash.substring(1) || 'library';
+    const validViews = ['library', 'download', 'channels'];
+    
+    if (validViews.includes(hash)) {
+        switchToView(hash);
+    } else {
+        window.location.hash = '#library';
+    }
+}
+
+// Listen to hash changes
+window.addEventListener('hashchange', handleHashNavigation);
+
+// Nav links
+const navLinks = document.querySelectorAll('.nav-link');
 navLinks.forEach(link => {
     link.addEventListener('click', (e) => {
         e.preventDefault();
         const viewName = link.dataset.view;
-        
-        navLinks.forEach(l => l.classList.remove('active'));
-        link.classList.add('active');
-        
-        views.forEach(v => v.classList.remove('active'));
-        document.getElementById(`${viewName}-view`).classList.add('active');
-        
-        // Load data based on view
-        if (viewName === 'library') {
-            loadLibrary();
-            hideFAB();
-        } else if (viewName === 'channels') {
-            loadChannels();
-            showFAB();
-        } else if (viewName === 'download') {
-            hideFAB();
-        }
+        window.location.hash = `#${viewName}`;
     });
 });
 
@@ -142,7 +164,7 @@ function openChannelPage(channelId, channelName) {
 // Load Channels (for channels-view tab)
 async function loadChannels() {
     try {
-        showToast('Chargement des chaînes...', 'info');
+        console.log('Loading channels view...');
         
         // Load channels from API
         const channelsData = await apiCall('/api/channels');
@@ -160,6 +182,8 @@ async function loadChannels() {
         
         // Render channels
         await renderChannelsList();
+        
+        showToast(`Chargement terminé: ${channelsCache.length} chaînes trouvées`, 'success');
         
     } catch (error) {
         console.error('Error loading channels:', error);
@@ -198,11 +222,14 @@ async function renderChannelsList() {
     const grid = document.getElementById('channels-list');
     const emptyState = document.getElementById('emptyStateChannels');
     
-    if (!grid) return;
+    if (!grid) {
+        console.error('channels-list element not found');
+        return;
+    }
     
     if (channelsCache.length === 0) {
         grid.style.display = 'none';
-        if (emptyState) emptyState.style.display = 'block';
+        if (emptyState) emptyState.style.display = 'flex';
         return;
     }
     
@@ -278,7 +305,7 @@ async function renderChannelsList() {
                     🔄
                 </button>
                 <button class="btn-channel-action btn-delete" onclick="deleteChannel('${channel.id}', event)" title="Supprimer la chaîne">
-                    🗑️
+                    ×
                 </button>
             </div>
         `;
@@ -920,5 +947,5 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
-// Initial load
-loadLibrary();
+// Initial load - handle hash from URL
+handleHashNavigation();
