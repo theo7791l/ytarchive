@@ -10,6 +10,7 @@ import jwt
 from typing import Optional, List
 import asyncio
 from collections import defaultdict
+import subprocess
 
 from downloader import download_video
 from scheduler import start_scheduler, check_channel_updates, get_channel_info
@@ -91,6 +92,76 @@ async def health_check():
         "channels": len(load_json(CHANNELS_FILE)),
         "users": len(users)
     }
+
+@app.get("/api/channel/{channel_id}/avatar")
+async def get_channel_avatar(channel_id: str, user: dict = Depends(verify_token)):
+    """Get YouTube channel avatar using yt-dlp"""
+    try:
+        # Use yt-dlp to get channel info
+        cmd = [
+            'yt-dlp',
+            '--dump-json',
+            '--playlist-items', '0',  # Don't download any videos
+            f'https://www.youtube.com/channel/{channel_id}'
+        ]
+        
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+        
+        if result.returncode == 0 and result.stdout:
+            try:
+                data = json.loads(result.stdout.split('\n')[0])  # First line is channel JSON
+                
+                # Extract channel thumbnail
+                avatar_url = None
+                
+                # Try different thumbnail fields
+                if 'thumbnails' in data and data['thumbnails']:
+                    # Get highest quality thumbnail
+                    avatar_url = data['thumbnails'][-1]['url']
+                elif 'thumbnail' in data:
+                    avatar_url = data['thumbnail']
+                
+                if avatar_url:
+                    return {"avatar_url": avatar_url}
+            except json.JSONDecodeError:
+                pass
+        
+        # Fallback: try to get from first video
+        library = load_json(LIBRARY_FILE)
+        video = next((v for v in library if v.get('channel_id') == channel_id and v.get('owner') == user['username']), None)
+        
+        if video:
+            # Try to get channel thumbnail from video info
+            cmd = [
+                'yt-dlp',
+                '--dump-json',
+                '--skip-download',
+                f'https://www.youtube.com/watch?v={video["id"]}'
+            ]
+            
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+            
+            if result.returncode == 0 and result.stdout:
+                try:
+                    data = json.loads(result.stdout)
+                    
+                    # Get channel thumbnail from uploader
+                    if 'channel_thumbnails' in data and data['channel_thumbnails']:
+                        avatar_url = data['channel_thumbnails'][-1]['url']
+                        return {"avatar_url": avatar_url}
+                    elif 'uploader_thumbnails' in data and data['uploader_thumbnails']:
+                        avatar_url = data['uploader_thumbnails'][-1]['url']
+                        return {"avatar_url": avatar_url}
+                except json.JSONDecodeError:
+                    pass
+        
+        return {"avatar_url": None}
+    
+    except subprocess.TimeoutExpired:
+        return {"avatar_url": None}
+    except Exception as e:
+        print(f"Error getting channel avatar: {e}")
+        return {"avatar_url": None}
 
 @app.get("/api/library")
 async def get_library(user: dict = Depends(verify_token)):
