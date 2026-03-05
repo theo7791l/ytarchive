@@ -75,6 +75,11 @@ async def app_page():
 async def channels_page():
     return FileResponse("static/channels.html")
 
+@app.get("/channel/{channel_id}")
+async def channel_page(channel_id: str):
+    """Individual channel page with dedicated URL"""
+    return FileResponse("static/channel.html")
+
 @app.get("/profile")
 async def profile_page():
     return FileResponse("static/profile.html")
@@ -551,6 +556,7 @@ async def startup_event():
     print("   - Admin panel at /admin")
     print("   - User profiles at /profile")
     print("   - 📺 Channels management at /channels")
+    print("   - 🎞️ Individual channel pages at /channel/{id}")
     print("   - ☁️  Backblaze B2 cloud storage")
     print("   - 🎬 Separate video+audio streaming (1080p films 3h+)")
     
