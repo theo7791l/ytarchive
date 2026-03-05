@@ -3,6 +3,7 @@ import hashlib
 import os
 from typing import Optional, Tuple, Callable
 import json
+import asyncio
 
 class B2Storage:
     """Backblaze B2 Storage Manager for async operations"""
@@ -16,7 +17,7 @@ class B2Storage:
         self.api_url = None
         self.authorization_token = None
         self.download_url = None
-        self.account_id = None  # FIX: Ajout de account_id
+        self.account_id = None
         
         # Upload URL caching
         self.upload_url = None
@@ -45,7 +46,7 @@ class B2Storage:
                     self.authorization_token = data['authorizationToken']
                     self.api_url = data['apiUrl']
                     self.download_url = data['downloadUrl']
-                    self.account_id = data['accountId']  # FIX: Stockage de accountId
+                    self.account_id = data['accountId']
                     
                     print(f"B2 Authorized successfully. Account ID: {self.account_id}")
                     
@@ -75,7 +76,7 @@ class B2Storage:
                         'Authorization': self.authorization_token
                     },
                     json={
-                        'accountId': self.account_id,  # FIX: Utilisation de self.account_id
+                        'accountId': self.account_id,
                         'bucketName': self.bucket_name
                     }
                 ) as response:
@@ -129,32 +130,43 @@ class B2Storage:
             print(traceback.format_exc())
             return False
     
+    async def _calculate_sha1_streaming(self, file_path: str) -> str:
+        """Calculate SHA1 hash by streaming file in chunks"""
+        sha1 = hashlib.sha1()
+        
+        # Read file in chunks to avoid loading everything in memory
+        with open(file_path, 'rb') as f:
+            while True:
+                chunk = f.read(65536)  # 64KB chunks
+                if not chunk:
+                    break
+                sha1.update(chunk)
+        
+        return sha1.hexdigest()
+    
+    async def _file_generator(self, file_path: str, chunk_size: int = 65536):
+        """Generator to read file in chunks"""
+        with open(file_path, 'rb') as f:
+            while True:
+                chunk = f.read(chunk_size)
+                if not chunk:
+                    break
+                yield chunk
+    
     async def upload_file(self, file_path: str, b2_filename: str, progress_callback: Optional[Callable] = None) -> Tuple[bool, Optional[str]]:
-        """Upload file to B2"""
+        """Upload file to B2 using streaming to avoid OOM"""
         try:
             if not os.path.exists(file_path):
                 print(f"File not found: {file_path}")
                 return (False, None)
             
-            # Calculate SHA1
-            sha1 = hashlib.sha1()
             file_size = os.path.getsize(file_path)
+            print(f"Starting upload: {file_path} ({file_size / (1024*1024):.2f} MB)")
             
-            print(f"Calculating SHA1 for {file_path} ({file_size} bytes)...")
-            with open(file_path, 'rb') as f:
-                while True:
-                    chunk = f.read(8192)
-                    if not chunk:
-                        break
-                    sha1.update(chunk)
-            
-            sha1_hash = sha1.hexdigest()
+            # Calculate SHA1 in streaming mode
+            print(f"Calculating SHA1 hash...")
+            sha1_hash = await self._calculate_sha1_streaming(file_path)
             print(f"SHA1: {sha1_hash}")
-            
-            # Read file content
-            print(f"Reading file content...")
-            with open(file_path, 'rb') as f:
-                file_content = f.read()
             
             # Determine content type
             content_type = 'video/mp4'
@@ -167,30 +179,32 @@ class B2Storage:
             
             print(f"Uploading to B2: {b2_filename} ({content_type})")
             
-            # Upload to B2
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    self.upload_url,
-                    headers={
-                        'Authorization': self.upload_auth_token,
-                        'X-Bz-File-Name': b2_filename,
-                        'Content-Type': content_type,
-                        'Content-Length': str(file_size),
-                        'X-Bz-Content-Sha1': sha1_hash
-                    },
-                    data=file_content,
-                    timeout=aiohttp.ClientTimeout(total=3600)  # FIX: Ajout timeout 1h pour gros fichiers
-                ) as response:
-                    if response.status not in [200, 201]:
-                        error_text = await response.text()
-                        print(f"B2 Upload failed: {response.status} - {error_text}")
-                        return (False, None)
-                    
-                    data = await response.json()
-                    file_id = data['fileId']
-                    
-                    print(f"Upload successful! File ID: {file_id}")
-                    return (True, file_id)
+            # Open file for streaming
+            with open(file_path, 'rb') as file_handle:
+                # Upload to B2 with streaming
+                async with aiohttp.ClientSession() as session:
+                    async with session.post(
+                        self.upload_url,
+                        headers={
+                            'Authorization': self.upload_auth_token,
+                            'X-Bz-File-Name': b2_filename,
+                            'Content-Type': content_type,
+                            'Content-Length': str(file_size),
+                            'X-Bz-Content-Sha1': sha1_hash
+                        },
+                        data=file_handle,  # Stream directly from file handle
+                        timeout=aiohttp.ClientTimeout(total=7200)  # 2h timeout
+                    ) as response:
+                        if response.status not in [200, 201]:
+                            error_text = await response.text()
+                            print(f"B2 Upload failed: {response.status} - {error_text}")
+                            return (False, None)
+                        
+                        data = await response.json()
+                        file_id = data['fileId']
+                        
+                        print(f"✓ Upload successful! File ID: {file_id}")
+                        return (True, file_id)
         
         except Exception as e:
             print(f"B2 Upload error: {e}")
