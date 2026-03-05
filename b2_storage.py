@@ -1,7 +1,7 @@
 import aiohttp
 import hashlib
 import os
-from typing import Optional, Tuple, Callable, AsyncIterator
+from typing import Optional, Tuple, Callable, AsyncIterator, List, Dict
 import json
 import asyncio
 from collections import deque
@@ -87,6 +87,58 @@ class B2Storage:
         except Exception as e:
             print(f"Error getting bucket ID: {e}")
             return None
+    
+    async def list_files(self, prefix: str = "", max_files: int = 10000) -> List[Dict]:
+        """List files in B2 bucket with pagination support"""
+        try:
+            all_files = []
+            next_file_name = None
+            next_file_id = None
+            
+            while True:
+                request_data = {
+                    'bucketId': self.bucket_id,
+                    'maxFileCount': min(max_files - len(all_files), 10000)
+                }
+                
+                if prefix:
+                    request_data['prefix'] = prefix
+                
+                if next_file_name:
+                    request_data['startFileName'] = next_file_name
+                    request_data['startFileId'] = next_file_id
+                
+                async with aiohttp.ClientSession() as session:
+                    async with session.post(
+                        f"{self.api_url}/b2api/v2/b2_list_file_names",
+                        headers={'Authorization': self.authorization_token},
+                        json=request_data
+                    ) as response:
+                        if response.status != 200:
+                            error = await response.text()
+                            print(f"Failed to list files: {error}")
+                            return all_files
+                        
+                        data = await response.json()
+                        files = data.get('files', [])
+                        all_files.extend(files)
+                        
+                        # Check pagination
+                        next_file_name = data.get('nextFileName')
+                        next_file_id = data.get('nextFileId')
+                        
+                        # Stop if no more files or reached max
+                        if not next_file_name or len(all_files) >= max_files:
+                            break
+            
+            print(f"✅ Listed {len(all_files)} files from B2")
+            return all_files
+        
+        except Exception as e:
+            print(f"Error listing files: {e}")
+            import traceback
+            print(traceback.format_exc())
+            return []
     
     async def get_upload_url(self) -> bool:
         """Get upload URL and token"""
