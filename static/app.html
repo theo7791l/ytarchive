@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="/static/css/app.css">
     <link rel="stylesheet" href="/static/css/list-view.css">
     <link rel="stylesheet" href="/static/css/player.css">
+    <link rel="stylesheet" href="/static/css/channel-page.css">
 </head>
 <body>
     <nav class="navbar">
@@ -90,6 +91,7 @@
                 <div class="view-toggle">
                     <button id="grid-view" class="view-btn active" title="Vue Grille">▦</button>
                     <button id="list-view" class="view-btn" title="Vue Liste">☰</button>
+                    <button id="channels-view-btn" class="view-btn" title="Tri par Chaînes">🎥</button>
                 </div>
             </div>
 
@@ -204,6 +206,7 @@
     <script src="/static/js/app.js"></script>
     <script src="/static/js/download.js"></script>
     <script src="/static/js/channels.js"></script>
+    <script src="/static/js/channel-page.js"></script>
     <script>
         // Check B2 configuration on page load
         async function checkB2Configuration() {
