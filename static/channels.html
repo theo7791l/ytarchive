@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chaînes - YTArchive</title>
+    <link rel="stylesheet" href="/static/css/app.css">
+    <link rel="stylesheet" href="/static/css/channels.css">
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar">
+        <div class="nav-brand" onclick="location.href='/app'">
+            <h1>YTArchive</h1>
+        </div>
+        <div class="nav-menu">
+            <a href="/app" class="nav-link">Bibliothèque</a>
+            <a href="/channels" class="nav-link active">Chaînes</a>
+            <a href="/profile" class="nav-link">Profil</a>
+            <div class="user-info">
+                <img src="" alt="Avatar" class="user-avatar" id="userAvatar">
+                <span id="username">Utilisateur</span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Container -->
+    <div class="channels-container">
+        <!-- Header Section -->
+        <div class="channels-header">
+            <div class="header-content">
+                <h1 class="page-title">Mes Chaînes YouTube</h1>
+                <p class="page-subtitle">Gérez vos chaînes suivies et téléchargez automatiquement les nouvelles vidéos</p>
+            </div>
+            <button class="btn-add-channel" onclick="openAddChannelModal()">
+                <span class="btn-icon">+</span>
+                Ajouter une chaîne
+            </button>
+        </div>
+
+        <!-- Stats Overview -->
+        <div class="stats-overview" id="statsOverview">
+            <div class="stat-card">
+                <div class="stat-icon">📺</div>
+                <div class="stat-content">
+                    <span class="stat-value" id="totalChannels">0</span>
+                    <span class="stat-label">Chaînes suivies</span>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">🎬</div>
+                <div class="stat-content">
+                    <span class="stat-value" id="totalVideos">0</span>
+                    <span class="stat-label">Vidéos téléchargées</span>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">⚡</div>
+                <div class="stat-content">
+                    <span class="stat-value" id="activeChannels">0</span>
+                    <span class="stat-label">Auto-download actif</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Channels Grid -->
+        <div class="channels-grid" id="channelsGrid">
+            <!-- Channels will be dynamically loaded here -->
+        </div>
+
+        <!-- Empty State -->
+        <div class="empty-state" id="emptyState" style="display: none;">
+            <div class="empty-icon">📺</div>
+            <h2>Aucune chaîne suivie</h2>
+            <p>Ajoutez votre première chaîne YouTube pour commencer à télécharger automatiquement les vidéos</p>
+            <button class="btn-primary" onclick="openAddChannelModal()">
+                Ajouter une chaîne
+            </button>
+        </div>
+    </div>
+
+    <!-- Add Channel Modal -->
+    <div class="modal" id="addChannelModal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Ajouter une chaîne YouTube</h2>
+                <button class="modal-close" onclick="closeAddChannelModal()">×</button>
+            </div>
+            <form class="modal-form" id="addChannelForm">
+                <div class="form-group">
+                    <label for="channelUrl">URL de la chaîne</label>
+                    <input 
+                        type="text" 
+                        id="channelUrl" 
+                        placeholder="https://www.youtube.com/@nomdelachaine ou /channel/ID"
+                        required
+                    >
+                    <small class="form-hint">Entrez l'URL complète d'une chaîne YouTube</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="quality">Qualité de téléchargement</label>
+                    <select id="quality" required>
+                        <option value="best">Meilleure qualité disponible</option>
+                        <option value="1080p">1080p (Full HD)</option>
+                        <option value="720p" selected>720p (HD)</option>
+                        <option value="480p">480p</option>
+                        <option value="360p">360p</option>
+                    </select>
+                </div>
+
+                <div class="form-group checkbox-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="autoDownload" checked>
+                        <span class="checkbox-custom"></span>
+                        <span class="checkbox-text">
+                            <strong>Téléchargement automatique</strong>
+                            <small>Télécharger automatiquement les nouvelles vidéos de cette chaîne</small>
+                        </span>
+                    </label>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary" onclick="closeAddChannelModal()">
+                        Annuler
+                    </button>
+                    <button type="submit" class="btn-primary">
+                        <span class="btn-text">Ajouter la chaîne</span>
+                        <span class="btn-loading" style="display: none;">Ajout en cours...</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="/static/js/channels.js"></script>
+</body>
+</html>
