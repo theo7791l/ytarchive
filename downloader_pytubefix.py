@@ -8,10 +8,10 @@ import traceback
 from pytubefix import YouTube
 
 VIDEOS_DIR = "videos"
-CHUNK_SIZE = 50 * 1024 * 1024  # 50MB chunks
+MAX_VIDEO_SIZE = 500 * 1024 * 1024  # 500MB max pour éviter crash (750MB serveur)
 
 async def download_video_pytubefix(url: str, quality: str = "best", progress_callback: Optional[Callable] = None, username: str = None):
-    """Download video using pytubefix with chunked download + progressive merge"""
+    """Download video using pytubefix with size checks for large videos"""
     os.makedirs(VIDEOS_DIR, exist_ok=True)
     
     from auth import get_user_b2_credentials
@@ -31,10 +31,9 @@ async def download_video_pytubefix(url: str, quality: str = "best", progress_cal
     target_quality = quality_map.get(quality, "highest")
     
     print("="*60)
-    print(f"PYTUBEFIX DOWNLOADER (Chunked + Merge)")
-    print(f"  Quality: {quality}")
-    print(f"  Chunk size: 50MB")
-    print(f"  Strategy: Chunked download + ffmpeg merge")
+    print(f"PYTUBEFIX DOWNLOADER (Smart Size Management)")
+    print(f"  Requested: {quality}")
+    print(f"  Max safe size: 500MB (for 750MB server)")
     print("="*60)
     
     video_file_path = None
@@ -58,62 +57,93 @@ async def download_video_pytubefix(url: str, quality: str = "best", progress_cal
         
         loop = asyncio.get_event_loop()
         
-        # Get video info
+        # Get video info and find safe stream
         def get_info():
             yt = YouTube(url, use_oauth=False, allow_oauth_cache=False)
             
             print(f"\nVideo: {yt.title}")
             print(f"Channel: {yt.author}")
-            print(f"Duration: {yt.length}s")
+            print(f"Duration: {yt.length}s ({yt.length//60}min {yt.length%60}s)")
             
-            # Try progressive first
+            # Get all streams
             progressive = yt.streams.filter(progressive=True, file_extension='mp4')
             adaptive_video = yt.streams.filter(progressive=False, only_video=True, file_extension='mp4')
             adaptive_audio = yt.streams.filter(progressive=False, only_audio=True)
             
-            prog_res = sorted(set([s.resolution for s in progressive if s.resolution]), key=lambda x: int(x.replace('p', '')), reverse=True)
-            adapt_res = sorted(set([s.resolution for s in adaptive_video if s.resolution]), key=lambda x: int(x.replace('p', '')), reverse=True)
+            # Find best audio
+            best_audio = adaptive_audio.order_by('abr').desc().first() if adaptive_audio else None
+            audio_size = best_audio.filesize if best_audio else 0
             
-            print(f"\nProgressive (with audio): {prog_res}")
-            print(f"Adaptive (video-only): {adapt_res}")
+            print(f"\nChecking sizes for safe download...")
             
-            # Select streams
-            video_stream = None
-            audio_stream = None
+            # Try to find a stream that fits
+            selected_stream = None
+            selected_audio = None
             use_adaptive = False
             
-            # Check if requested quality is in progressive
-            if target_quality in prog_res or (target_quality == "highest" and prog_res):
-                if target_quality == "highest":
-                    video_stream = progressive.order_by('resolution').desc().first()
-                else:
-                    video_stream = progressive.filter(res=target_quality).first()
-                print(f"\n✅ Using progressive {video_stream.resolution} (with audio)")
-            else:
-                # Use adaptive
-                if target_quality == "highest":
-                    video_stream = adaptive_video.order_by('resolution').desc().first()
-                elif target_quality in adapt_res:
-                    video_stream = adaptive_video.filter(res=target_quality).first()
-                else:
-                    video_stream = adaptive_video.order_by('resolution').desc().first()
-                
-                audio_stream = adaptive_audio.order_by('abr').desc().first() if adaptive_audio else None
-                use_adaptive = True
-                print(f"\n✅ Using adaptive {video_stream.resolution} + audio")
+            # Priority order: try requested quality first, then downgrade
+            quality_order = ["1080p", "720p", "480p", "360p"]
             
-            if not video_stream:
-                return None, "No stream found"
+            if target_quality != "highest" and target_quality in quality_order:
+                start_idx = quality_order.index(target_quality)
+                quality_order = quality_order[start_idx:]
+            
+            # Try progressive first (simpler, has audio)
+            for res in quality_order:
+                stream = progressive.filter(res=res).first()
+                if stream:
+                    total_size = stream.filesize
+                    if total_size <= MAX_VIDEO_SIZE:
+                        selected_stream = stream
+                        print(f"\n✅ Progressive {res}: {total_size/(1024*1024):.1f}MB (with audio)")
+                        break
+                    else:
+                        print(f"   Progressive {res}: {total_size/(1024*1024):.1f}MB - TOO BIG, trying lower...")
+            
+            # If no progressive works, try adaptive
+            if not selected_stream:
+                for res in quality_order:
+                    stream = adaptive_video.filter(res=res).first()
+                    if stream:
+                        total_size = stream.filesize + audio_size
+                        # Add 50MB buffer for merge
+                        if total_size + 50*1024*1024 <= MAX_VIDEO_SIZE:
+                            selected_stream = stream
+                            selected_audio = best_audio
+                            use_adaptive = True
+                            print(f"\n✅ Adaptive {res}: {stream.filesize/(1024*1024):.1f}MB + {audio_size/(1024*1024):.1f}MB audio")
+                            break
+                        else:
+                            print(f"   Adaptive {res}: {total_size/(1024*1024):.1f}MB - TOO BIG, trying lower...")
+            
+            if not selected_stream:
+                # Last resort: get smallest available
+                selected_stream = progressive.order_by('resolution').first()
+                if not selected_stream:
+                    selected_stream = adaptive_video.order_by('resolution').first()
+                    selected_audio = best_audio
+                    use_adaptive = True
+                
+                if selected_stream:
+                    print(f"\n⚠️  Using lowest quality: {selected_stream.resolution}")
+            
+            if not selected_stream:
+                return None, "No suitable stream found"
+            
+            actual_quality = selected_stream.resolution
+            
+            if target_quality not in ["highest", "best"] and actual_quality != target_quality:
+                print(f"\n⚠️  Downgraded from {target_quality} to {actual_quality} (video too large for server)")
             
             return {
                 'yt': yt,
-                'video_stream': video_stream,
-                'audio_stream': audio_stream,
+                'video_stream': selected_stream,
+                'audio_stream': selected_audio,
                 'use_adaptive': use_adaptive,
-                'video_url': video_stream.url,
-                'audio_url': audio_stream.url if audio_stream else None,
-                'video_size': video_stream.filesize,
-                'audio_size': audio_stream.filesize if audio_stream else 0
+                'video_url': selected_stream.url,
+                'audio_url': selected_audio.url if selected_audio else None,
+                'video_size': selected_stream.filesize,
+                'audio_size': audio_size
             }, None
         
         info, error = await loop.run_in_executor(None, get_info)
@@ -128,32 +158,36 @@ async def download_video_pytubefix(url: str, quality: str = "best", progress_cal
         audio_size = info['audio_size']
         use_adaptive = info['use_adaptive']
         
-        print(f"Video size: ~{video_size/(1024*1024):.1f}MB")
+        print(f"\nStarting download...")
+        print(f"Video: {video_size/(1024*1024):.1f}MB")
         if audio_url:
-            print(f"Audio size: ~{audio_size/(1024*1024):.1f}MB")
+            print(f"Audio: {audio_size/(1024*1024):.1f}MB")
         
         # Download video by chunks
         video_file_path = os.path.join(VIDEOS_DIR, f"{yt.video_id}_video.mp4")
         
         if progress_callback:
-            await progress_callback('downloading', 'Downloading video in chunks...')
+            await progress_callback('downloading', 'Downloading video...')
         
-        print(f"\nDownloading video by 50MB chunks...")
+        print(f"\nDownloading video...")
         
         async with aiohttp.ClientSession() as session:
             async with session.get(video_url) as response:
                 if response.status != 200:
-                    return (False, f"Failed to download: {response.status}")
+                    return (False, f"Download failed: {response.status}")
                 
                 downloaded = 0
+                last_log = 0
                 with open(video_file_path, 'wb') as f:
-                    async for chunk in response.content.iter_chunked(1024 * 1024):  # 1MB at a time
+                    async for chunk in response.content.iter_chunked(1024 * 1024):  # 1MB
                         f.write(chunk)
                         downloaded += len(chunk)
                         
-                        if downloaded % (10 * 1024 * 1024) == 0:  # Log every 10MB
+                        # Log every 25MB
+                        if downloaded - last_log >= 25*1024*1024:
                             progress = (downloaded / video_size) * 100 if video_size else 0
-                            print(f"  Downloaded: {downloaded/(1024*1024):.1f}MB ({progress:.1f}%)")
+                            print(f"  {downloaded/(1024*1024):.0f}MB / {video_size/(1024*1024):.0f}MB ({progress:.0f}%)")
+                            last_log = downloaded
                             
                             if progress_callback:
                                 await progress_callback('downloading', f'Video: {progress:.0f}%', percent=f"{progress:.0f}%")
@@ -204,9 +238,9 @@ async def download_video_pytubefix(url: str, quality: str = "best", progress_cal
             
             await loop.run_in_executor(None, merge)
             
-            print(f"✅ Merge complete: {os.path.getsize(merged_file_path)/(1024*1024):.1f}MB")
+            print(f"✅ Merged: {os.path.getsize(merged_file_path)/(1024*1024):.1f}MB")
             
-            # Delete temp files immediately
+            # Delete temp files
             if os.path.exists(video_file_path):
                 os.remove(video_file_path)
                 print(f"Removed temp video")
@@ -250,7 +284,7 @@ async def download_video_pytubefix(url: str, quality: str = "best", progress_cal
             cleanup()
             return (False, "Upload failed")
         
-        print(f"✅ Uploaded. File ID: {vid_id}")
+        print(f"✅ Uploaded")
         
         # Free space
         if os.path.exists(final_video_path):
@@ -270,11 +304,9 @@ async def download_video_pytubefix(url: str, quality: str = "best", progress_cal
         cleanup()
         
         if progress_callback:
-            await progress_callback('completed', f'✅ Complete: {yt.title}')
+            await progress_callback('completed', f'✅ {yt.title}')
         
-        print("\n" + "="*60)
-        print("✅ SUCCESS - Video with audio!")
-        print("="*60)
+        print("\n✅ SUCCESS!")
         
         return (True, {
             'id': yt.video_id,
