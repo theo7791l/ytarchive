@@ -10,7 +10,7 @@
 </head>
 <body>
     <nav class="navbar">
-        <div class="nav-brand">
+        <div class="nav-brand" onclick="location.href='/app'" style="cursor: pointer;">
             <h1>YTArchive</h1>
         </div>
         <div class="nav-menu">
@@ -433,9 +433,11 @@
                         
                         // Disable download button
                         const downloadBtn = document.getElementById('download-btn');
-                        downloadBtn.disabled = true;
-                        downloadBtn.title = 'Configurez Backblaze B2 d\'abord';
-                        downloadBtn.textContent = 'Configurer B2 d\'abord';
+                        if (downloadBtn) {
+                            downloadBtn.disabled = true;
+                            downloadBtn.title = 'Configurez Backblaze B2 d\'abord';
+                            downloadBtn.textContent = 'Configurer B2 d\'abord';
+                        }
                         
                         // Hide B2 sync button if not configured
                         const syncBtn = document.getElementById('btn-sync-b2');
@@ -497,37 +499,6 @@
                 closeAddChannelModal();
             }
         });
-        
-        // Handle navigation with hash
-        function handleHashNavigation() {
-            const hash = window.location.hash.substring(1) || 'library';
-            const validViews = ['library', 'download', 'channels'];
-            
-            if (validViews.includes(hash)) {
-                // Remove active from all nav links and views
-                document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
-                document.querySelectorAll('.view').forEach(view => view.classList.remove('active'));
-                
-                // Activate correct nav link and view
-                const navLink = document.querySelector(`[data-view="${hash}"]`);
-                const viewEl = document.getElementById(`${hash}-view`)`);
-                
-                if (navLink) navLink.classList.add('active');
-                if (viewEl) viewEl.classList.add('active');
-                
-                // Show/hide FAB for channels view
-                const fab = document.getElementById('fab-add-channel');
-                if (fab) {
-                    fab.style.display = hash === 'channels' ? 'flex' : 'none';
-                }
-            }
-        }
-        
-        // Handle hash change
-        window.addEventListener('hashchange', handleHashNavigation);
-        
-        // Initial hash navigation
-        handleHashNavigation();
         
         // Check B2 on load
         checkB2Configuration();
