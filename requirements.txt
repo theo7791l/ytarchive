@@ -6,3 +6,4 @@ pyjwt
 bcrypt
 pydantic[email]
 aiohttp
+aiofiles
