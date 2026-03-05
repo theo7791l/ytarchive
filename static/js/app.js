@@ -202,15 +202,159 @@ async function fetchChannelAvatar(channelId) {
     }
 }
 
-// Render Channels View with REAL YouTube avatars
+// Modal functions for adding channel
+function openAddChannelModal() {
+    const existingModal = document.getElementById('add-channel-modal');
+    if (existingModal) {
+        existingModal.style.display = 'flex';
+        return;
+    }
+    
+    const modal = document.createElement('div');
+    modal.id = 'add-channel-modal';
+    modal.className = 'modal';
+    modal.style.display = 'flex';
+    
+    modal.innerHTML = `
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Ajouter une chaîne YouTube</h2>
+                <button class="modal-close" onclick="closeAddChannelModal()">×</button>
+            </div>
+            <form id="add-channel-form" class="modal-form">
+                <div class="form-group">
+                    <label for="new-channel-url">URL de la chaîne</label>
+                    <input 
+                        type="text" 
+                        id="new-channel-url" 
+                        placeholder="https://www.youtube.com/@nomdelachaine"
+                        required
+                    >
+                    <small class="form-hint">Entrez l'URL complète d'une chaîne YouTube</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="new-channel-quality">Qualité de téléchargement</label>
+                    <select id="new-channel-quality" required>
+                        <option value="best">Meilleure qualité disponible</option>
+                        <option value="1080p">1080p (Full HD)</option>
+                        <option value="720p" selected>720p (HD)</option>
+                        <option value="480p">480p</option>
+                        <option value="360p">360p</option>
+                    </select>
+                </div>
+
+                <div class="form-group checkbox-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="new-channel-auto" checked>
+                        <span class="checkbox-custom"></span>
+                        <span class="checkbox-text">
+                            <strong>Téléchargement automatique</strong>
+                            <small>Télécharger automatiquement les nouvelles vidéos</small>
+                        </span>
+                    </label>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary" onclick="closeAddChannelModal()">
+                        Annuler
+                    </button>
+                    <button type="submit" class="btn-primary">
+                        <span class="btn-text">Ajouter la chaîne</span>
+                        <span class="btn-loading" style="display: none;">Ajout...</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Form submission
+    document.getElementById('add-channel-form').addEventListener('submit', handleAddChannel);
+    
+    // Close on backdrop click
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            closeAddChannelModal();
+        }
+    });
+}
+
+function closeAddChannelModal() {
+    const modal = document.getElementById('add-channel-modal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
+async function handleAddChannel(e) {
+    e.preventDefault();
+    
+    const form = e.target;
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const btnText = submitBtn.querySelector('.btn-text');
+    const btnLoading = submitBtn.querySelector('.btn-loading');
+    
+    const channelUrl = document.getElementById('new-channel-url').value.trim();
+    const quality = document.getElementById('new-channel-quality').value;
+    const autoDownload = document.getElementById('new-channel-auto').checked;
+    
+    if (!channelUrl.includes('youtube.com')) {
+        showToast('URL YouTube invalide', 'error');
+        return;
+    }
+    
+    submitBtn.disabled = true;
+    btnText.style.display = 'none';
+    btnLoading.style.display = 'inline-block';
+    
+    try {
+        await apiCall('/api/channels', {
+            method: 'POST',
+            body: JSON.stringify({
+                channel_url: channelUrl,
+                quality: quality,
+                auto_download: autoDownload
+            })
+        });
+        
+        showToast('Chaîne ajoutée avec succès !', 'success');
+        closeAddChannelModal();
+        
+        // Reload library to show new channel
+        await loadLibrary();
+    } catch (error) {
+        showToast(error.message || 'Erreur lors de l\'ajout', 'error');
+    } finally {
+        submitBtn.disabled = false;
+        btnText.style.display = 'inline-block';
+        btnLoading.style.display = 'none';
+    }
+}
+
+// Render Channels View with REAL YouTube avatars + Add button
 async function renderChannelsView() {
     const channels = getChannelsWithStats();
     const grid = document.getElementById('library-grid');
     
     grid.className = 'channels-overview-grid';
     
+    // Add floating action button
+    let fabBtn = document.getElementById('fab-add-channel');
+    if (!fabBtn) {
+        fabBtn = document.createElement('button');
+        fabBtn.id = 'fab-add-channel';
+        fabBtn.className = 'fab-add-channel';
+        fabBtn.innerHTML = '<span class="fab-icon">+</span><span class="fab-text">Ajouter une chaîne</span>';
+        fabBtn.onclick = openAddChannelModal;
+        document.querySelector('.container').appendChild(fabBtn);
+    } else {
+        fabBtn.style.display = 'flex';
+    }
+    
     if (channels.length === 0) {
-        grid.innerHTML = '<p class="empty-state">Aucune chaîne trouvée.</p>';
+        grid.innerHTML = '<p class="empty-state">Aucune chaîne trouvée.<br>Cliquez sur le bouton + pour ajouter votre première chaîne.</p>';
         return;
     }
     
@@ -322,6 +466,12 @@ function getThumbnailUrl(video) {
 
 // Render Library
 async function renderLibrary() {
+    // Hide FAB button when not in channels view
+    const fabBtn = document.getElementById('fab-add-channel');
+    if (fabBtn) {
+        fabBtn.style.display = currentView === 'channels' ? 'flex' : 'none';
+    }
+    
     if (currentView === 'channels') {
         await renderChannelsView();
         return;
@@ -584,6 +734,13 @@ document.getElementById('channels-view-btn').addEventListener('click', () => {
     document.getElementById('grid-view').classList.remove('active');
     document.getElementById('list-view').classList.remove('active');
     renderLibrary();
+});
+
+// Close modal with ESC key
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        closeAddChannelModal();
+    }
 });
 
 // Initial load
