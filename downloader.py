@@ -8,6 +8,34 @@ import traceback
 VIDEOS_DIR = "videos"
 
 async def download_video(url: str, quality: str = "best", progress_callback: Optional[Callable] = None, username: str = None):
+    """Download a video trying pytubefix first, then yt-dlp as fallback"""
+    
+    print("="*60)
+    print(f"MULTI-DOWNLOADER SYSTEM")
+    print(f"  Strategy: Try pytubefix first (better bypass), fallback to yt-dlp")
+    print(f"  Requested quality: {quality}")
+    print("="*60)
+    
+    # Try pytubefix first (better at bypassing YouTube protections)
+    print("\n➡️  Attempt 1: Using pytubefix (alternative API)")
+    try:
+        from downloader_pytubefix import download_video_pytubefix
+        success, result = await download_video_pytubefix(url, quality, progress_callback, username)
+        
+        if success:
+            print("\n\u2705 SUCCESS with pytubefix!")
+            return (True, result)
+        else:
+            print(f"\n⚠️  pytubefix failed: {result}")
+            print("\n➡️  Attempt 2: Falling back to yt-dlp...")
+    except Exception as e:
+        print(f"\n⚠️  pytubefix error: {e}")
+        print("\n➡️  Attempt 2: Falling back to yt-dlp...")
+    
+    # Fallback to yt-dlp if pytubefix failed
+    return await download_video_ytdlp(url, quality, progress_callback, username)
+
+async def download_video_ytdlp(url: str, quality: str = "best", progress_callback: Optional[Callable] = None, username: str = None):
     """Download a video using yt-dlp and upload to Backblaze B2"""
     os.makedirs(VIDEOS_DIR, exist_ok=True)
     
@@ -59,19 +87,12 @@ async def download_video(url: str, quality: str = "best", progress_callback: Opt
         except Exception as e:
             print(f"Progress hook error: {e}")
     
-    print("="*60)
-    print(f"QUALITY SELECTION:")
+    print("\nYT-DLP DOWNLOADER")
     print(f"  Requested quality: {quality}")
-    print(f"  Minimum height required: {min_height}p" if min_height > 0 else "  Best available quality")
-    print("="*60)
-    
-    # Don't try to use cookies at all - causes issues in containers
-    # YouTube downloads will work for most public videos without cookies
-    selected_browser = None
+    print(f"  Minimum height: {min_height}p" if min_height > 0 else "  Best available quality")
     
     print("\n⚠️  Cookies disabled (server environment)")
     print("   Downloading without cookies")
-    print("   Works for most public YouTube videos")
     
     # Configuration for info extraction WITHOUT cookies
     ydl_opts_info = {
@@ -126,13 +147,13 @@ async def download_video(url: str, quality: str = "best", progress_callback: Opt
             # Give helpful user messages
             if "Only images are available" in error_str or "n challenge solving failed" in error_str:
                 user_msg = (
-                    "Cette vidéo est protégée par YouTube et ne peut pas être téléchargée. "
-                    "Essayez avec une vidéo publique différente (vidéo musicale, gaming, tutoriel, etc.)."
+                    "Cette vidéo est protégée par YouTube. Aucun downloader n'a réussi. "
+                    "Essayez avec une vidéo publique différente (vidéo musicale ancienne, gaming populaire, tutoriel)."
                 )
             elif "Sign in" in error_str or "bot" in error_str.lower():
                 user_msg = (
-                    "YouTube demande une authentification pour cette vidéo. "
-                    "Essayez avec une vidéo publique populaire et ancienne (moins de protections)."
+                    "YouTube demande une authentification. "
+                    "Essayez avec une vidéo publique populaire et ancienne (ex: Gangnam Style, Despacito)."
                 )
             elif "age" in error_str.lower():
                 user_msg = "Cette vidéo a une restriction d'âge et ne peut pas être téléchargée."
@@ -141,9 +162,9 @@ async def download_video(url: str, quality: str = "best", progress_callback: Opt
             elif "Video unavailable" in error_str:
                 user_msg = "Cette vidéo n'est pas disponible (supprimée, bloquée, ou privée)."
             elif "Requested format is not available" in error_str:
-                user_msg = "Aucun format vidéo disponible. Cette vidéo est probablement protégée."
+                user_msg = "Aucun format vidéo disponible. Cette vidéo est protégée."
             else:
-                user_msg = f"Impossible d'accéder à cette vidéo. Essayez avec une vidéo publique différente."
+                user_msg = f"Échec des 2 downloaders. Cette vidéo est probablement trop protégée. Essayez une autre vidéo."
             
             print(f"\n❌ USER ERROR MESSAGE: {user_msg}\n")
             return (False, user_msg)
@@ -164,56 +185,54 @@ async def download_video(url: str, quality: str = "best", progress_callback: Opt
         formats = info.get('formats', [])
         
         if not formats:
-            return (False, "Aucun format disponible pour cette vidéo. Elle est probablement protégée.")
+            return (False, "Aucun format disponible pour cette vidéo.")
         
         # Filter video formats with height info
         video_formats = [f for f in formats if f.get('vcodec') != 'none' and f.get('height')]
         
         if not video_formats:
-            return (False, "Aucun format vidéo disponible (seulement audio ou images). Cette vidéo est probablement protégée.")
+            return (False, "Aucun format vidéo disponible (seulement audio ou images).")
         
         print(f"\nDEBUG: Found {len(formats)} total formats, {len(video_formats)} video formats")
         
-        # Show some format details for debugging
+        # Show some format details
         if video_formats:
             print("\nSample formats:")
-            for f in video_formats[:5]:  # Show first 5
+            for f in video_formats[:5]:
                 print(f"  - {f.get('format_id')}: {f.get('height')}p, codec: {f.get('vcodec')}, ext: {f.get('ext')}")
         
         available_heights = sorted(set([f['height'] for f in video_formats]), reverse=True)
         max_available = max(available_heights) if available_heights else 0
         
         print(f"\nAVAILABLE FORMATS:")
-        print(f"  Maximum resolution available: {max_available}p")
-        print(f"  All available heights: {available_heights}")
+        print(f"  Maximum resolution: {max_available}p")
+        print(f"  All heights: {available_heights}")
         
         # Check if requested quality is available
         if min_height > 0:
             if max_available < min_height:
-                error_msg = f"Qualité {quality} ({min_height}p) non disponible. Maximum disponible : {max_available}p. Veuillez choisir une qualité inférieure."
+                error_msg = f"Qualité {quality} non disponible. Maximum : {max_available}p. Choisissez une qualité inférieure."
                 print(f"\n❌ USER ERROR MESSAGE: {error_msg}\n")
                 return (False, error_msg)
             
-            # Find best format that meets minimum requirement
+            # Find best format that meets requirement
             suitable_heights = [h for h in available_heights if h >= min_height]
             if suitable_heights:
-                target_height = min(suitable_heights)  # Get closest to requested quality
-                print(f"\nQUALITY CHECK:")
-                print(f"  \u2705 Found suitable quality: {target_height}p (requested minimum: {min_height}p)")
+                target_height = min(suitable_heights)
+                print(f"\n✅ Found: {target_height}p (requested: {min_height}p)")
             else:
-                error_msg = f"Aucun format ne correspond \u00e0 {quality} (min {min_height}p). Maximum disponible : {max_available}p"
-                print(f"\n❌ USER ERROR MESSAGE: {error_msg}\n")
+                error_msg = f"Aucun format ≥ {quality}. Maximum : {max_available}p"
+                print(f"\n❌ {error_msg}\n")
                 return (False, error_msg)
         
-        # Build format string based on what's actually available
+        # Build format string
         if quality == "best" or min_height == 0:
             format_string = "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best"
         else:
-            # Select best format that meets minimum requirement
             format_string = f"bestvideo[height>={min_height}][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height>={min_height}]+bestaudio/best[height>={min_height}]"
         
         print(f"\nDOWNLOAD CONFIG:")
-        print(f"  Format string: {format_string}")
+        print(f"  Format: {format_string}")
         print(f"  Title: {title}")
         print(f"  Channel: {channel}")
         
@@ -223,7 +242,7 @@ async def download_video(url: str, quality: str = "best", progress_callback: Opt
         if progress_callback:
             await progress_callback('starting', f'Downloading: {title}')
         
-        # Now download with the selected format
+        # Download with selected format
         ydl_opts_download = {
             'format': format_string,
             'outtmpl': os.path.join(VIDEOS_DIR, '%(id)s.%(ext)s'),
@@ -251,7 +270,7 @@ async def download_video(url: str, quality: str = "best", progress_callback: Opt
             }
         }
         
-        print(f"\n\u2705 Starting download...\n")
+        print(f"\n✅ Starting download...\n")
         ydl_download = yt_dlp.YoutubeDL(ydl_opts_download)
         await loop.run_in_executor(None, lambda: ydl_download.download([url]))
         
@@ -277,11 +296,9 @@ async def download_video(url: str, quality: str = "best", progress_callback: Opt
             cleanup_local_files()
             return (False, "Video file not found after download")
         
-        print(f"\n\u2705 Download successful: {video_file}")
+        print(f"\n✅ Download successful: {video_file}")
         
-        # ========================================
-        # UPLOAD TO BACKBLAZE B2
-        # ========================================
+        # Upload to B2
         if progress_callback:
             await progress_callback('uploading', 'Uploading to Backblaze B2...')
         
@@ -294,32 +311,28 @@ async def download_video(url: str, quality: str = "best", progress_callback: Opt
                 b2_creds["bucket_name"]
             )
             
-            # Authorize B2
             if not await b2.authorize():
                 cleanup_local_files()
-                return (False, "Failed to authorize with Backblaze B2. Check your credentials.")
+                return (False, "Failed to authorize with Backblaze B2")
             
-            # Get upload URL
             if not await b2.get_upload_url():
                 cleanup_local_files()
                 return (False, "Failed to get B2 upload URL")
             
-            # Upload video file
+            # Upload video
             video_ext = os.path.splitext(video_file)[1]
             b2_video_filename = f"videos/{username}/{video_id}{video_ext}"
             
-            print(f"Uploading video to B2: {b2_video_filename}")
+            print(f"Uploading to B2: {b2_video_filename}")
             success, video_file_id = await b2.upload_file(video_file, b2_video_filename, progress_callback)
             
             if not success or not video_file_id:
                 cleanup_local_files()
-                error_msg = "Failed to upload video to Backblaze B2. The video was not saved."
-                print(error_msg)
-                return (False, error_msg)
+                return (False, "Failed to upload video to B2")
             
-            print(f"Video uploaded successfully. File ID: {video_file_id}")
+            print(f"Video uploaded. File ID: {video_file_id}")
             
-            # Upload thumbnail if exists
+            # Upload thumbnail
             thumbnail_file_id = None
             b2_thumbnail_filename = None
             thumbnail_url = None
@@ -328,25 +341,18 @@ async def download_video(url: str, quality: str = "best", progress_callback: Opt
                 thumb_ext = os.path.splitext(thumbnail_file)[1]
                 b2_thumbnail_filename = f"thumbnails/{username}/{video_id}{thumb_ext}"
                 
-                # Get new upload URL for thumbnail
                 await b2.get_upload_url()
-                print(f"Uploading thumbnail to B2: {b2_thumbnail_filename}")
                 success_thumb, thumbnail_file_id = await b2.upload_file(thumbnail_file, b2_thumbnail_filename, progress_callback)
                 
                 if success_thumb:
-                    # Générer URL signée pour la miniature (durée 7 jours)
                     thumbnail_url = await b2.get_download_url(b2_thumbnail_filename, duration_seconds=604800)
-                    print(f"Thumbnail uploaded. Signed URL: {thumbnail_url}")
-                else:
-                    print(f"Warning: Failed to upload thumbnail for {video_id}")
             
-            # Delete local files after successful upload
             cleanup_local_files()
             
             if progress_callback:
                 await progress_callback('completed', f'Upload complete: {title}')
             
-            # Return video entry with B2 info
+            # Return video entry
             video_entry = {
                 'id': video_id,
                 'title': title,
@@ -362,20 +368,21 @@ async def download_video(url: str, quality: str = "best", progress_callback: Opt
                 'b2_video_file_id': video_file_id,
                 'b2_thumbnail_file_id': thumbnail_file_id,
                 'quality': quality,
-                'actual_height': max_available,  # Store actual max resolution
+                'actual_height': max_available,
                 'downloaded_at': datetime.now().isoformat(),
                 'url': url,
                 'storage': 'b2',
-                'owner': username
+                'owner': username,
+                'downloader': 'yt-dlp'
             }
             
             return (True, video_entry)
         
         except Exception as b2_error:
-            print(f"B2 Upload Error: {b2_error}")
+            print(f"B2 Error: {b2_error}")
             print(traceback.format_exc())
             cleanup_local_files()
-            return (False, f"B2 upload failed: {str(b2_error)}. Video was not saved.")
+            return (False, f"B2 upload failed: {str(b2_error)}")
         
     except Exception as e:
         error_msg = str(e)
