@@ -102,7 +102,7 @@ async def get_library(user: dict = Depends(verify_token)):
 
 @app.get("/api/video/{video_id}/stream")
 async def stream_video(video_id: str, user: dict = Depends(verify_token)):
-    """Get B2 streaming URL for video"""
+    """Get B2 streaming URLs for video (and audio if separate)"""
     library = load_json(LIBRARY_FILE)
     video = next((v for v in library if v['id'] == video_id), None)
     
@@ -122,7 +122,7 @@ async def stream_video(video_id: str, user: dict = Depends(verify_token)):
     if not b2_creds:
         raise HTTPException(status_code=400, detail="B2 not configured")
     
-    # Generate signed URL
+    # Generate signed URLs
     from b2_storage import B2Storage
     b2 = B2Storage(
         b2_creds["key_id"],
@@ -133,26 +133,34 @@ async def stream_video(video_id: str, user: dict = Depends(verify_token)):
     if not await b2.authorize():
         raise HTTPException(status_code=500, detail="Failed to authorize with B2")
     
-    # Get download URL (valid for 1 hour)
+    # Get video URL (valid for 1 hour)
     video_url = await b2.get_download_url(video['video_file'], duration_seconds=3600)
     
     if not video_url:
         raise HTTPException(status_code=500, detail="Failed to generate streaming URL")
     
-    # Also get thumbnail URL if exists
+    # Get audio URL if separate
+    audio_url = None
+    if video.get('is_separate') and video.get('audio_file'):
+        audio_url = await b2.get_download_url(video['audio_file'], duration_seconds=3600)
+        print(f"✅ Generated separate audio URL for {video_id}")
+    
+    # Get thumbnail URL if exists
     thumbnail_url = None
     if video.get('thumbnail_file'):
         thumbnail_url = await b2.get_download_url(video['thumbnail_file'], duration_seconds=3600)
     
     return {
         "video_url": video_url,
+        "audio_url": audio_url,  # NEW: separate audio URL
         "thumbnail_url": thumbnail_url,
+        "is_separate": video.get('is_separate', False),  # NEW
         "expires_in": 3600  # 1 hour
     }
 
 @app.delete("/api/library/{video_id}")
 async def delete_video(video_id: str, user: dict = Depends(verify_token)):
-    """Delete video from library and B2 storage"""
+    """Delete video from library and B2 storage (including separate audio)"""
     library = load_json(LIBRARY_FILE)
     video = next((v for v in library if v['id'] == video_id), None)
     
@@ -179,6 +187,11 @@ async def delete_video(video_id: str, user: dict = Depends(verify_token)):
                     # Delete video file
                     if video.get('b2_video_file_id'):
                         await b2.delete_file(video['b2_video_file_id'], video['video_file'])
+                    
+                    # Delete audio file if separate
+                    if video.get('is_separate') and video.get('b2_audio_file_id'):
+                        await b2.delete_file(video['b2_audio_file_id'], video['audio_file'])
+                        print(f"✅ Deleted separate audio file for {video_id}")
                     
                     # Delete thumbnail
                     if video.get('b2_thumbnail_file_id') and video.get('thumbnail_file'):
@@ -463,12 +476,14 @@ async def startup_event():
     print("   - Admin panel at /admin")
     print("   - User profiles at /profile")
     print("   - ☁️  Backblaze B2 cloud storage")
+    print("   - 🎬 Separate video+audio streaming (1080p films 3h+)")
     
     print("\n☁️  Backblaze B2:")
     print("   - Configure B2 in your profile")
     print("   - Videos stored in your personal B2 bucket")
     print("   - Automatic upload after download")
     print("   - Streaming directly from B2")
+    print("   - Separate video+audio for large files")
     
     print("="*60 + "\n")
     
