@@ -4,9 +4,10 @@ import os
 from typing import Optional, Tuple, Callable, AsyncIterator
 import json
 import asyncio
+from collections import deque
 
 class B2Storage:
-    """Backblaze B2 Storage Manager with Large File support"""
+    """Backblaze B2 Storage Manager with parallel uploads"""
     
     def __init__(self, key_id: str, application_key: str, bucket_name: str):
         self.key_id = key_id
@@ -108,10 +109,58 @@ class B2Storage:
             print(f"Error getting upload URL: {e}")
             return False
     
+    async def _upload_single_part(self, file_id: str, chunk: bytes, part_number: int) -> Optional[str]:
+        """Upload a single part (used in parallel)"""
+        try:
+            # Get upload part URL
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    f"{self.api_url}/b2api/v2/b2_get_upload_part_url",
+                    headers={'Authorization': self.authorization_token},
+                    json={'fileId': file_id},
+                    timeout=aiohttp.ClientTimeout(total=120)
+                ) as response:
+                    if response.status != 200:
+                        print(f"Failed to get upload part URL for part {part_number}")
+                        return None
+                    
+                    upload_data = await response.json()
+                    part_upload_url = upload_data['uploadUrl']
+                    part_auth_token = upload_data['authorizationToken']
+            
+            # Calculate SHA1
+            sha1 = hashlib.sha1(chunk).hexdigest()
+            
+            # Upload part
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    part_upload_url,
+                    headers={
+                        'Authorization': part_auth_token,
+                        'X-Bz-Part-Number': str(part_number),
+                        'Content-Length': str(len(chunk)),
+                        'X-Bz-Content-Sha1': sha1
+                    },
+                    data=chunk,
+                    timeout=aiohttp.ClientTimeout(total=3600)
+                ) as response:
+                    if response.status not in [200, 201]:
+                        error = await response.text()
+                        print(f"Failed to upload part {part_number}: {error}")
+                        return None
+                    
+                    print(f"✅ Part {part_number} uploaded ({len(chunk)/(1024*1024):.1f}MB)")
+                    return sha1
+        
+        except Exception as e:
+            print(f"Error uploading part {part_number}: {e}")
+            return None
+    
     async def upload_large_file_streaming(self, chunk_iterator: AsyncIterator[bytes], b2_filename: str, content_type: str = 'video/mp4', progress_callback: Optional[Callable] = None) -> Tuple[bool, Optional[str]]:
-        """Upload large file using multipart (no size/SHA1 needed upfront)"""
+        """Upload large file with PARALLEL chunk uploads (5 simultaneous)"""
         try:
             print(f"\n🚀 Starting Large File upload: {b2_filename}")
+            print(f"⚡ Parallel mode: 5 chunks simultaneous")
             
             # Start large file
             async with aiohttp.ClientSession() as session:
@@ -133,53 +182,43 @@ class B2Storage:
                     file_id = data['fileId']
                     print(f"✅ Large file started: {file_id}")
             
-            # Upload parts
+            # Collect and upload parts in parallel (batches of 5)
             part_sha1_array = []
             part_number = 1
+            pending_uploads = []
             
             async for chunk in chunk_iterator:
-                # Get upload part URL
-                async with aiohttp.ClientSession() as session:
-                    async with session.post(
-                        f"{self.api_url}/b2api/v2/b2_get_upload_part_url",
-                        headers={'Authorization': self.authorization_token},
-                        json={'fileId': file_id}
-                    ) as response:
-                        if response.status != 200:
-                            print(f"Failed to get upload part URL")
-                            return (False, None)
-                        
-                        upload_data = await response.json()
-                        part_upload_url = upload_data['uploadUrl']
-                        part_auth_token = upload_data['authorizationToken']
+                # Start upload task
+                task = self._upload_single_part(file_id, chunk, part_number)
+                pending_uploads.append((part_number, task))
+                part_number += 1
                 
-                # Calculate SHA1 for this part
-                sha1 = hashlib.sha1(chunk).hexdigest()
-                part_sha1_array.append(sha1)
-                
-                # Upload part
-                async with aiohttp.ClientSession() as session:
-                    async with session.post(
-                        part_upload_url,
-                        headers={
-                            'Authorization': part_auth_token,
-                            'X-Bz-Part-Number': str(part_number),
-                            'Content-Length': str(len(chunk)),
-                            'X-Bz-Content-Sha1': sha1
-                        },
-                        data=chunk,
-                        timeout=aiohttp.ClientTimeout(total=1800)
-                    ) as response:
-                        if response.status not in [200, 201]:
-                            error = await response.text()
-                            print(f"Failed to upload part {part_number}: {error}")
+                # When we have 5 pending, wait for them
+                if len(pending_uploads) >= 5:
+                    # Wait for all 5 to complete
+                    results = await asyncio.gather(*[t for _, t in pending_uploads], return_exceptions=True)
+                    
+                    # Check results
+                    for (pnum, _), result in zip(pending_uploads, results):
+                        if isinstance(result, Exception) or result is None:
+                            print(f"Upload failed for part {pnum}")
                             return (False, None)
-                        
-                        print(f"✅ Part {part_number} uploaded ({len(chunk)/(1024*1024):.1f}MB)")
-                        part_number += 1
+                        part_sha1_array.append(result)
+                    
+                    pending_uploads = []
+            
+            # Upload remaining parts
+            if pending_uploads:
+                results = await asyncio.gather(*[t for _, t in pending_uploads], return_exceptions=True)
+                
+                for (pnum, _), result in zip(pending_uploads, results):
+                    if isinstance(result, Exception) or result is None:
+                        print(f"Upload failed for part {pnum}")
+                        return (False, None)
+                    part_sha1_array.append(result)
             
             # Finish large file
-            print(f"\nFinishing upload...")
+            print(f"\n✅ All parts uploaded! Finishing...")
             async with aiohttp.ClientSession() as session:
                 async with session.post(
                     f"{self.api_url}/b2api/v2/b2_finish_large_file",
