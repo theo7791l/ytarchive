@@ -8,7 +8,7 @@ function getToken() {
     return localStorage.getItem('token');
 }
 
-// API call helper
+// API call helper (duplicated from app.js)
 async function apiCall(endpoint, options = {}) {
     const token = getToken();
     if (!token) {
@@ -39,6 +39,42 @@ async function apiCall(endpoint, options = {}) {
     }
     
     return response.json();
+}
+
+// Format functions (duplicated from app.js)
+function formatDuration(seconds) {
+    if (!seconds) return 'N/A';
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+function formatDate(dateStr) {
+    if (!dateStr) return 'Inconnue';
+    try {
+        const date = new Date(dateStr);
+        return date.toLocaleDateString('fr-FR', { year: 'numeric', month: 'short', day: 'numeric' });
+    } catch {
+        return dateStr;
+    }
+}
+
+function formatNumber(num) {
+    if (!num) return '0';
+    if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+    if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+    return num.toString();
+}
+
+function getThumbnailUrl(video) {
+    if (video.storage === 'b2' && video.thumbnail_url) {
+        return video.thumbnail_url;
+    } else if (video.thumbnail_file) {
+        return `/videos/${video.thumbnail_file}`;
+    }
+    return null;
 }
 
 // Toast notification
@@ -163,7 +199,7 @@ async function createChannelCard(channel, index) {
         .filter(v => v.channel_id === channel.id)
         .reduce((sum, v) => sum + (v.duration || 0), 0);
     
-    const formatDuration = (seconds) => {
+    const formatDurationShort = (seconds) => {
         const h = Math.floor(seconds / 3600);
         const m = Math.floor((seconds % 3600) / 60);
         if (h > 0) return `${h}h ${m}m`;
@@ -194,7 +230,7 @@ async function createChannelCard(channel, index) {
                 <span class="label">Vidéos</span>
             </div>
             <div class="stat-item-small">
-                <span class="value">${formatDuration(totalDuration)}</span>
+                <span class="value">${formatDurationShort(totalDuration)}</span>
                 <span class="label">Durée</span>
             </div>
         </div>
