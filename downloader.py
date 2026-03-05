@@ -20,15 +20,28 @@ async def download_video(url: str, quality: str = "best", progress_callback: Opt
     if not b2_creds:
         return (False, "Backblaze B2 not configured. Please configure B2 credentials in your profile.")
     
-    # QUALITY MAP - Force exact resolution or better
+    # Map quality to minimum height requirement
+    quality_min_height = {
+        "360p": 360,
+        "480p": 480,
+        "720p": 720,
+        "1080p": 1080,
+        "1440p": 1440,
+        "2160p": 2160,
+        "best": 0
+    }
+    
+    min_height = quality_min_height.get(quality, 0)
+    
+    # QUALITY MAP - More aggressive filtering to force minimum quality
     quality_map = {
         "best": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best",
-        "2160p": "bestvideo[height>=2160][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height>=2160]+bestaudio/bestvideo[height=2160][ext=mp4]+bestaudio[ext=m4a]/best",
-        "1440p": "bestvideo[height>=1440][height<=2160][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height>=1440][height<=2160]+bestaudio/bestvideo[height=1440][ext=mp4]+bestaudio[ext=m4a]/best",
-        "1080p": "bestvideo[height>=1080][height<=1440][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height>=1080][height<=1440]+bestaudio/bestvideo[height=1080][ext=mp4]+bestaudio[ext=m4a]/best",
-        "720p": "bestvideo[height>=720][height<=1080][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height>=720][height<=1080]+bestaudio/bestvideo[height=720][ext=mp4]+bestaudio[ext=m4a]/best",
-        "480p": "bestvideo[height>=480][height<=720][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height>=480][height<=720]+bestaudio/bestvideo[height=480][ext=mp4]+bestaudio[ext=m4a]/best",
-        "360p": "bestvideo[height>=360][height<=480][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height>=360][height<=480]+bestaudio/bestvideo[height=360][ext=mp4]+bestaudio[ext=m4a]/best"
+        "2160p": "bestvideo[height>=2160][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height>=2160]+bestaudio/best[height>=2160]",
+        "1440p": "bestvideo[height>=1440][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height>=1440]+bestaudio/best[height>=1440]",
+        "1080p": "bestvideo[height>=1080][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height>=1080]+bestaudio/best[height>=1080]",
+        "720p": "bestvideo[height>=720][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height>=720]+bestaudio/best[height>=720]",
+        "480p": "bestvideo[height>=480][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height>=480]+bestaudio/best[height>=480]",
+        "360p": "bestvideo[height>=360][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height>=360]+bestaudio/best[height>=360]"
     }
     
     def progress_hook(d):
@@ -60,8 +73,12 @@ async def download_video(url: str, quality: str = "best", progress_callback: Opt
     # Get format string for selected quality
     format_string = quality_map.get(quality, quality_map["best"])
     
-    print(f"Selected quality: {quality}")
-    print(f"Format string: {format_string}")
+    print("="*60)
+    print(f"QUALITY SELECTION:")
+    print(f"  Requested quality: {quality}")
+    print(f"  Minimum height required: {min_height}p")
+    print(f"  Format string: {format_string}")
+    print("="*60)
     
     ydl_opts = {
         'format': format_string,
@@ -118,14 +135,36 @@ async def download_video(url: str, quality: str = "best", progress_callback: Opt
         description = info.get('description', '')
         view_count = info.get('view_count', 0)
         
-        # Get actual format info
-        if 'format' in info:
-            actual_format = info.get('format', 'Unknown')
-            print(f"Actual format selected by yt-dlp: {actual_format}")
+        # Check available formats BEFORE downloading
+        formats = info.get('formats', [])
+        available_heights = [f.get('height', 0) for f in formats if f.get('height')]
+        max_available = max(available_heights) if available_heights else 0
         
-        if 'height' in info:
-            actual_height = info.get('height', 0)
-            print(f"Actual video height: {actual_height}p")
+        print(f"\nAVAILABLE FORMATS:")
+        print(f"  Maximum resolution available: {max_available}p")
+        print(f"  All available heights: {sorted(set(available_heights), reverse=True)}")
+        
+        # Check if requested quality is available
+        if min_height > 0 and max_available < min_height:
+            error_msg = f"Requested quality {quality} ({min_height}p) not available. Maximum available: {max_available}p"
+            print(f"\nERROR: {error_msg}")
+            return (False, error_msg)
+        
+        # Get format that will be selected
+        selected_format = info.get('format_id', 'unknown')
+        selected_height = info.get('height', 0)
+        
+        print(f"\nSELECTED FORMAT:")
+        print(f"  Format ID: {selected_format}")
+        print(f"  Selected height: {selected_height}p")
+        
+        # Verify selected format meets minimum requirement
+        if min_height > 0 and selected_height < min_height:
+            error_msg = f"yt-dlp selected {selected_height}p but you requested {quality} (min {min_height}p). This video doesn't have {quality} available."
+            print(f"\nERROR: {error_msg}")
+            return (False, error_msg)
+        
+        print(f"\n✅ Quality check passed! Proceeding with download...\n")
         
         if upload_date and len(upload_date) == 8:
             upload_date = f"{upload_date[:4]}-{upload_date[4:6]}-{upload_date[6:]}"
@@ -157,6 +196,8 @@ async def download_video(url: str, quality: str = "best", progress_callback: Opt
         if not video_file:
             cleanup_local_files()
             return (False, "Video file not found after download")
+        
+        print(f"\n✅ Download successful: {video_file}")
         
         # ========================================
         # UPLOAD TO BACKBLAZE B2
@@ -241,6 +282,7 @@ async def download_video(url: str, quality: str = "best", progress_callback: Opt
                 'b2_video_file_id': video_file_id,
                 'b2_thumbnail_file_id': thumbnail_file_id,
                 'quality': quality,
+                'actual_height': selected_height,  # Store actual resolution
                 'downloaded_at': datetime.now().isoformat(),
                 'url': url,
                 'storage': 'b2',
