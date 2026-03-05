@@ -14,9 +14,9 @@
             <h1>YTArchive</h1>
         </div>
         <div class="nav-menu">
-            <a href="#" class="nav-link active" data-view="library">Bibliothèque</a>
-            <a href="#" class="nav-link" data-view="download">Télécharger</a>
-            <a href="#" class="nav-link" data-view="channels">Chaînes</a>
+            <a href="#library" class="nav-link active" data-view="library">Bibliothèque</a>
+            <a href="#download" class="nav-link" data-view="download">Télécharger</a>
+            <a href="#channels" class="nav-link" data-view="channels">Chaînes</a>
         </div>
         <div class="nav-user">
             <div class="profile-dropdown">
@@ -155,21 +155,21 @@
             <!-- Stats Overview -->
             <div class="stats-overview" id="statsOverview">
                 <div class="stat-card">
-                    <div class="stat-icon">📺</div>
+                    <div class="stat-icon-badge">CH</div>
                     <div class="stat-content">
                         <span class="stat-value" id="totalChannels">0</span>
                         <span class="stat-label">Chaînes suivies</span>
                     </div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-icon">🎬</div>
+                    <div class="stat-icon-badge">VID</div>
                     <div class="stat-content">
                         <span class="stat-value" id="totalVideos">0</span>
                         <span class="stat-label">Vidéos téléchargées</span>
                     </div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-icon">⚡</div>
+                    <div class="stat-icon-badge">DL</div>
                     <div class="stat-content">
                         <span class="stat-value" id="activeChannels">0</span>
                         <span class="stat-label">Auto-download actif</span>
@@ -358,6 +358,37 @@
                 closeAddChannelModal();
             }
         });
+        
+        // Handle navigation with hash
+        function handleHashNavigation() {
+            const hash = window.location.hash.substring(1) || 'library';
+            const validViews = ['library', 'download', 'channels'];
+            
+            if (validViews.includes(hash)) {
+                // Remove active from all nav links and views
+                document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
+                document.querySelectorAll('.view').forEach(view => view.classList.remove('active'));
+                
+                // Activate correct nav link and view
+                const navLink = document.querySelector(`[data-view="${hash}"]`);
+                const viewEl = document.getElementById(`${hash}-view`);
+                
+                if (navLink) navLink.classList.add('active');
+                if (viewEl) viewEl.classList.add('active');
+                
+                // Show/hide FAB for channels view
+                const fab = document.getElementById('fab-add-channel');
+                if (fab) {
+                    fab.style.display = hash === 'channels' ? 'flex' : 'none';
+                }
+            }
+        }
+        
+        // Handle hash change
+        window.addEventListener('hashchange', handleHashNavigation);
+        
+        // Initial hash navigation
+        handleHashNavigation();
         
         // Check B2 on load
         checkB2Configuration();
