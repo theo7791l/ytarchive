@@ -37,27 +37,22 @@ async def download_video_pytubefix(url: str, quality: str = "best", progress_cal
     print(f"PYTUBEFIX DOWNLOADER")
     print(f"  Requested quality: {quality}")
     print(f"  Using pytubefix (alternative API)")
-    print(f"  ⚠️  Low disk mode: Upload video-only (no merge)")
+    print(f"  Strategy: Try adaptive streams for higher quality")
     print("="*60)
     
     video_file_path = None
+    audio_file_path = None
     thumbnail_file_path = None
     
     def cleanup_local_files():
         """Clean up local files"""
-        try:
-            if video_file_path and os.path.exists(video_file_path):
-                os.remove(video_file_path)
-                print(f"Cleaned up: {video_file_path}")
-        except Exception as e:
-            print(f"Failed to cleanup video file: {e}")
-        
-        try:
-            if thumbnail_file_path and os.path.exists(thumbnail_file_path):
-                os.remove(thumbnail_file_path)
-                print(f"Cleaned up: {thumbnail_file_path}")
-        except Exception as e:
-            print(f"Failed to cleanup thumbnail file: {e}")
+        for file_path in [video_file_path, audio_file_path, thumbnail_file_path]:
+            try:
+                if file_path and os.path.exists(file_path):
+                    os.remove(file_path)
+                    print(f"Cleaned up: {file_path}")
+            except Exception as e:
+                print(f"Failed to cleanup {file_path}: {e}")
     
     try:
         if progress_callback:
@@ -81,50 +76,92 @@ async def download_video_pytubefix(url: str, quality: str = "best", progress_cal
             print(f"Views: {yt.views:,}")
             print(f"Duration: {yt.length}s")
             
-            # Get available streams
-            streams = yt.streams.filter(progressive=True, file_extension='mp4')
+            # Try progressive streams first (video+audio together, easier but limited quality)
+            progressive_streams = yt.streams.filter(progressive=True, file_extension='mp4')
             
-            # Get available resolutions
-            available_resolutions = sorted(
-                set([s.resolution for s in streams if s.resolution]),
+            # Try adaptive streams (video only, higher quality)
+            adaptive_video_streams = yt.streams.filter(progressive=False, only_video=True, file_extension='mp4')
+            adaptive_audio_streams = yt.streams.filter(progressive=False, only_audio=True)
+            
+            progressive_resolutions = sorted(
+                set([s.resolution for s in progressive_streams if s.resolution]),
                 key=lambda x: int(x.replace('p', '')),
                 reverse=True
             )
             
-            print(f"\nAvailable resolutions (progressive): {available_resolutions}")
-            
-            # Select stream based on quality (progressive = video + audio in one file)
-            if quality == "best" or target_quality == "highest":
-                stream = streams.order_by('resolution').desc().first()
-            else:
-                # Try to get requested quality
-                stream = streams.filter(res=target_quality).first()
-                
-                # Fallback to highest if requested quality not available
-                if not stream:
-                    print(f"\n⚠️  {target_quality} not available, using highest quality")
-                    stream = streams.order_by('resolution').desc().first()
-            
-            if not stream:
-                # Fallback: try adaptive streams (higher quality but needs merge)
-                print("\n⚠️  No progressive streams, trying adaptive (video-only)...")
-                adaptive_streams = yt.streams.filter(progressive=False, file_extension='mp4', only_video=True)
-                stream = adaptive_streams.order_by('resolution').desc().first()
-                
-                if not stream:
-                    return None, "No suitable streams found"
-            
-            print(f"\nSelected stream: {stream.resolution} ({stream.mime_type})")
-            print(f"File size: ~{stream.filesize_mb:.1f}MB")
-            
-            # Download video
-            print(f"\nDownloading video...")
-            video_path = stream.download(
-                output_path=VIDEOS_DIR,
-                filename=f"{yt.video_id}.mp4"
+            adaptive_resolutions = sorted(
+                set([s.resolution for s in adaptive_video_streams if s.resolution]),
+                key=lambda x: int(x.replace('p', '')),
+                reverse=True
             )
             
-            print(f"✅ Downloaded: {video_path}")
+            print(f"\nAvailable progressive (video+audio): {progressive_resolutions}")
+            print(f"Available adaptive (video only): {adaptive_resolutions}")
+            
+            # Decide which to use
+            use_adaptive = False
+            video_stream = None
+            audio_stream = None
+            
+            # Check if requested quality is available in progressive
+            if quality == "best" or target_quality == "highest":
+                # Try adaptive first for best quality
+                if adaptive_resolutions:
+                    video_stream = adaptive_video_streams.order_by('resolution').desc().first()
+                    audio_stream = adaptive_audio_streams.order_by('abr').desc().first() if adaptive_audio_streams else None
+                    use_adaptive = True
+                else:
+                    video_stream = progressive_streams.order_by('resolution').desc().first()
+            else:
+                # Check if quality is in adaptive
+                if target_quality in adaptive_resolutions:
+                    video_stream = adaptive_video_streams.filter(res=target_quality).first()
+                    audio_stream = adaptive_audio_streams.order_by('abr').desc().first() if adaptive_audio_streams else None
+                    use_adaptive = True
+                    print(f"\n✅ Found {target_quality} in adaptive streams")
+                elif target_quality in progressive_resolutions:
+                    video_stream = progressive_streams.filter(res=target_quality).first()
+                    print(f"\n✅ Found {target_quality} in progressive streams")
+                else:
+                    # Fallback to highest available
+                    if adaptive_resolutions:
+                        video_stream = adaptive_video_streams.order_by('resolution').desc().first()
+                        audio_stream = adaptive_audio_streams.order_by('abr').desc().first() if adaptive_audio_streams else None
+                        use_adaptive = True
+                        print(f"\n⚠️  {target_quality} not available, using highest adaptive: {video_stream.resolution}")
+                    else:
+                        video_stream = progressive_streams.order_by('resolution').desc().first()
+                        print(f"\n⚠️  {target_quality} not available, using highest progressive: {video_stream.resolution}")
+            
+            if not video_stream:
+                return None, "No suitable streams found"
+            
+            if use_adaptive:
+                print(f"\nUsing ADAPTIVE streams:")
+                print(f"  Video: {video_stream.resolution} (~{video_stream.filesize_mb:.1f}MB)")
+                if audio_stream:
+                    print(f"  Audio: {audio_stream.abr} (~{audio_stream.filesize_mb:.1f}MB)")
+                print(f"  Total: ~{video_stream.filesize_mb + (audio_stream.filesize_mb if audio_stream else 0):.1f}MB")
+            else:
+                print(f"\nUsing PROGRESSIVE stream: {video_stream.resolution} (~{video_stream.filesize_mb:.1f}MB)")
+            
+            # Download video
+            print(f"\nDownloading video stream...")
+            video_path = video_stream.download(
+                output_path=VIDEOS_DIR,
+                filename=f"{yt.video_id}_video.mp4" if use_adaptive else f"{yt.video_id}.mp4"
+            )
+            print(f"✅ Video downloaded: {video_path}")
+            
+            # Download audio if using adaptive
+            audio_path = None
+            if use_adaptive and audio_stream:
+                print(f"Downloading audio stream...")
+                audio_path = audio_stream.download(
+                    output_path=VIDEOS_DIR,
+                    filename=f"{yt.video_id}_audio.m4a"
+                )
+                print(f"✅ Audio downloaded: {audio_path}")
             
             # Download thumbnail
             thumbnail_path = None
@@ -142,6 +179,7 @@ async def download_video_pytubefix(url: str, quality: str = "best", progress_cal
             
             return {
                 'video_path': video_path,
+                'audio_path': audio_path,
                 'thumbnail_path': thumbnail_path,
                 'video_id': yt.video_id,
                 'title': yt.title,
@@ -151,7 +189,8 @@ async def download_video_pytubefix(url: str, quality: str = "best", progress_cal
                 'views': yt.views,
                 'description': yt.description,
                 'publish_date': yt.publish_date.isoformat() if yt.publish_date else None,
-                'resolution': stream.resolution
+                'resolution': video_stream.resolution,
+                'use_adaptive': use_adaptive
             }, None
         
         # Execute download
@@ -164,6 +203,7 @@ async def download_video_pytubefix(url: str, quality: str = "best", progress_cal
             return (False, "Download failed")
         
         video_file_path = result['video_path']
+        audio_file_path = result['audio_path']
         thumbnail_file_path = result['thumbnail_path']
         
         # Upload to B2 IMMEDIATELY to save disk space
@@ -190,7 +230,7 @@ async def download_video_pytubefix(url: str, quality: str = "best", progress_cal
                 return (False, "Failed to get B2 upload URL")
             
             # Upload video
-            b2_video_filename = f"videos/{username}/{result['video_id']}.mp4"
+            b2_video_filename = f"videos/{username}/{result['video_id']}_video.mp4" if result['use_adaptive'] else f"videos/{username}/{result['video_id']}.mp4"
             print(f"Uploading video to B2: {b2_video_filename}")
             success, video_file_id = await b2.upload_file(video_file_path, b2_video_filename, progress_callback)
             
@@ -204,6 +244,24 @@ async def download_video_pytubefix(url: str, quality: str = "best", progress_cal
             if os.path.exists(video_file_path):
                 os.remove(video_file_path)
                 print(f"Freed disk space: removed {video_file_path}")
+                video_file_path = None
+            
+            # Upload audio if exists
+            b2_audio_filename = None
+            audio_file_id = None
+            if audio_file_path:
+                b2_audio_filename = f"videos/{username}/{result['video_id']}_audio.m4a"
+                await b2.get_upload_url()
+                print(f"Uploading audio to B2: {b2_audio_filename}")
+                success_audio, audio_file_id = await b2.upload_file(audio_file_path, b2_audio_filename, progress_callback)
+                
+                if success_audio:
+                    print(f"✅ Audio uploaded. File ID: {audio_file_id}")
+                    # Delete audio immediately
+                    if os.path.exists(audio_file_path):
+                        os.remove(audio_file_path)
+                        print(f"Freed disk space: removed {audio_file_path}")
+                        audio_file_path = None
             
             # Upload thumbnail
             thumbnail_file_id = None
@@ -225,6 +283,12 @@ async def download_video_pytubefix(url: str, quality: str = "best", progress_cal
             if progress_callback:
                 await progress_callback('completed', f"Upload complete: {result['title']}")
             
+            if result['use_adaptive']:
+                print("\n⚠️  Note: Video and audio uploaded as separate files")
+                print(f"   Video: {b2_video_filename}")
+                if b2_audio_filename:
+                    print(f"   Audio: {b2_audio_filename}")
+            
             # Return video entry
             video_entry = {
                 'id': result['video_id'],
@@ -236,9 +300,11 @@ async def download_video_pytubefix(url: str, quality: str = "best", progress_cal
                 'description': result['description'][:500] if result['description'] else '',
                 'view_count': result['views'],
                 'video_file': b2_video_filename,
+                'audio_file': b2_audio_filename if result['use_adaptive'] else None,
                 'thumbnail_file': b2_thumbnail_filename,
                 'thumbnail_url': thumbnail_url,
                 'b2_video_file_id': video_file_id,
+                'b2_audio_file_id': audio_file_id,
                 'b2_thumbnail_file_id': thumbnail_file_id,
                 'quality': quality,
                 'actual_height': int(result['resolution'].replace('p', '')) if result['resolution'] else 0,
@@ -246,7 +312,8 @@ async def download_video_pytubefix(url: str, quality: str = "best", progress_cal
                 'url': url,
                 'storage': 'b2',
                 'owner': username,
-                'downloader': 'pytubefix'
+                'downloader': 'pytubefix',
+                'format': 'separated' if result['use_adaptive'] else 'progressive'
             }
             
             return (True, video_entry)
