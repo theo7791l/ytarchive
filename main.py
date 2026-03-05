@@ -11,6 +11,7 @@ from typing import Optional, List
 import asyncio
 from collections import defaultdict
 import subprocess
+import re
 
 from downloader import download_video
 from scheduler import start_scheduler, check_channel_updates, get_channel_info
@@ -69,6 +70,7 @@ async def root():
 
 @app.get("/app")
 async def app_page():
+    """Fix: redirect /app# to /app (remove hash fragment)"""
     return FileResponse("static/app.html")
 
 @app.get("/channels")
@@ -77,7 +79,9 @@ async def channels_page():
 
 @app.get("/channel/{channel_id}")
 async def channel_page(channel_id: str):
-    """Individual channel page with dedicated URL"""
+    """Individual channel page with dedicated URL - Fix: handle # in URL"""
+    # Remove any # fragment from channel_id
+    clean_channel_id = channel_id.split('#')[0] if '#' in channel_id else channel_id
     return FileResponse("static/channel.html")
 
 @app.get("/profile")
@@ -101,6 +105,133 @@ async def health_check():
         "channels": len(load_json(CHANNELS_FILE)),
         "users": len(users)
     }
+
+@app.post("/api/b2/sync")
+async def sync_b2_library(user: dict = Depends(verify_token)):
+    """Auto-detect and sync videos from B2 bucket to library"""
+    try:
+        # Get B2 credentials
+        b2_creds = get_user_b2_credentials(user['username'])
+        if not b2_creds:
+            raise HTTPException(status_code=400, detail="B2 not configured")
+        
+        from b2_storage import B2Storage
+        b2 = B2Storage(
+            b2_creds["key_id"],
+            b2_creds["application_key"],
+            b2_creds["bucket_name"]
+        )
+        
+        if not await b2.authorize():
+            raise HTTPException(status_code=500, detail="Failed to authorize with B2")
+        
+        # List all files in B2
+        all_files = await b2.list_files()
+        
+        if not all_files:
+            return {"message": "No files found in B2", "added": 0, "skipped": 0}
+        
+        # Load current library
+        library = load_json(LIBRARY_FILE)
+        existing_video_files = {v.get('video_file') for v in library if v.get('owner') == user['username']}
+        
+        # Group files by video ID (extract from filename)
+        video_groups = defaultdict(list)
+        
+        for file_info in all_files:
+            filename = file_info['fileName']
+            
+            # Extract video ID from filename patterns:
+            # - {video_id}.mp4
+            # - {video_id}_video.mp4
+            # - {video_id}_audio.mp4
+            # - {video_id}.jpg
+            match = re.match(r'([A-Za-z0-9_-]{11})(?:_video|_audio)?\.(mp4|webm|mkv|jpg|jpeg)', filename)
+            
+            if match:
+                video_id = match.group(1)
+                video_groups[video_id].append(file_info)
+        
+        # Process each video group
+        added_count = 0
+        skipped_count = 0
+        
+        for video_id, files in video_groups.items():
+            # Find video file
+            video_file = None
+            audio_file = None
+            thumbnail_file = None
+            
+            for f in files:
+                fname = f['fileName']
+                if fname.endswith(('.mp4', '.webm', '.mkv')):
+                    if '_audio' in fname:
+                        audio_file = f
+                    else:
+                        video_file = f
+                elif fname.endswith(('.jpg', '.jpeg')):
+                    thumbnail_file = f
+            
+            # Skip if no video file or already in library
+            if not video_file:
+                skipped_count += 1
+                continue
+            
+            if video_file['fileName'] in existing_video_files:
+                skipped_count += 1
+                continue
+            
+            # Generate thumbnail URL
+            thumbnail_url = None
+            if thumbnail_file:
+                thumbnail_url = await b2.get_download_url(thumbnail_file['fileName'], duration_seconds=86400)
+            
+            # Create library entry
+            video_entry = {
+                "id": video_id,
+                "title": f"Video {video_id}",  # Will be updated if metadata available
+                "video_file": video_file['fileName'],
+                "thumbnail_file": thumbnail_file['fileName'] if thumbnail_file else None,
+                "thumbnail_url": thumbnail_url,
+                "storage": "b2",
+                "b2_video_file_id": video_file['fileId'],
+                "b2_thumbnail_file_id": thumbnail_file['fileId'] if thumbnail_file else None,
+                "size": video_file['contentLength'],
+                "downloaded_at": datetime.fromtimestamp(video_file['uploadTimestamp'] / 1000).isoformat(),
+                "owner": user['username'],
+                "duration": None,
+                "view_count": None,
+                "upload_date": None,
+                "channel_id": None,
+                "channel_name": None
+            }
+            
+            # Handle separate audio
+            if audio_file:
+                video_entry["is_separate"] = True
+                video_entry["audio_file"] = audio_file['fileName']
+                video_entry["b2_audio_file_id"] = audio_file['fileId']
+            
+            library.append(video_entry)
+            added_count += 1
+            print(f"✅ Added {video_id} from B2 to library")
+        
+        # Save updated library
+        if added_count > 0:
+            save_json(LIBRARY_FILE, library)
+        
+        return {
+            "message": f"Sync complete: {added_count} videos added, {skipped_count} skipped",
+            "added": added_count,
+            "skipped": skipped_count,
+            "total_b2_files": len(all_files)
+        }
+    
+    except Exception as e:
+        print(f"Error syncing B2: {e}")
+        import traceback
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Sync failed: {str(e)}")
 
 @app.get("/api/channel/{channel_id}/avatar")
 async def get_channel_avatar(channel_id: str, user: dict = Depends(verify_token)):
@@ -559,6 +690,7 @@ async def startup_event():
     print("   - 🎞️ Individual channel pages at /channel/{id}")
     print("   - ☁️  Backblaze B2 cloud storage")
     print("   - 🎬 Separate video+audio streaming (1080p films 3h+)")
+    print("   - 🔄 B2 auto-sync: POST /api/b2/sync")
     
     print("\n☁️  Backblaze B2:")
     print("   - Configure B2 in your profile")
@@ -566,6 +698,7 @@ async def startup_event():
     print("   - Automatic upload after download")
     print("   - Streaming directly from B2")
     print("   - Separate video+audio for large files")
+    print("   - Auto-detect existing B2 videos: /api/b2/sync")
     
     print("="*60 + "\n")
     
