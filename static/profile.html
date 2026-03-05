@@ -88,10 +88,13 @@
 
         .file-input-wrapper input[type="file"] {
             position: absolute;
+            left: 0;
+            top: 0;
             opacity: 0;
             width: 100%;
             height: 100%;
             cursor: pointer;
+            z-index: 2;
         }
 
         .btn-upload {
@@ -106,6 +109,8 @@
             font-weight: 600;
             cursor: pointer;
             transition: all 0.3s ease;
+            position: relative;
+            z-index: 1;
         }
 
         .btn-upload:hover {
@@ -314,15 +319,12 @@
     </nav>
 
     <main class="container">
-        <button class="btn-back" onclick="window.location.href='/app'">← Retour à la bibliothèque</button>
+        <button class="btn-back" onclick="window.location.href='/app'">Retour à la bibliothèque</button>
 
         <div class="profile-container">
             <!-- User Info Section -->
             <div class="profile-section">
-                <h3>
-                    <span class="section-icon">👤</span>
-                    Informations du profil
-                </h3>
+                <h3>Informations du profil</h3>
 
                 <!-- Avatar Upload -->
                 <div class="avatar-section">
@@ -332,14 +334,10 @@
                     <div class="avatar-controls">
                         <h4>Photo de profil</h4>
                         <div class="file-input-wrapper">
-                            <button class="btn-upload">
-                                📷 Choisir une image
-                            </button>
+                            <button type="button" class="btn-upload">Choisir une image</button>
                             <input type="file" id="avatar-input" accept="image/*">
                         </div>
-                        <button class="btn-remove-avatar" id="remove-avatar-btn" style="display: none;">
-                            ❌ Supprimer
-                        </button>
+                        <button type="button" class="btn-remove-avatar" id="remove-avatar-btn" style="display: none;">Supprimer</button>
                         <p class="avatar-hint">PNG, JPG, GIF ou WEBP - Max 5 MB</p>
                     </div>
                 </div>
@@ -366,15 +364,12 @@
             <!-- Backblaze B2 Configuration -->
             <div class="profile-section">
                 <h3>
-                    <span class="section-icon">☁️</span>
                     Stockage Backblaze B2
-                    <span id="b2-status" class="status-badge not-configured">
-                        <span>⚠️</span> Non configuré
-                    </span>
+                    <span id="b2-status" class="status-badge not-configured">Non configuré</span>
                 </h3>
 
                 <div class="info-box">
-                    <strong>💡 Pourquoi Backblaze B2 ?</strong>
+                    <strong>Pourquoi Backblaze B2 ?</strong>
                     En raison d'un espace disque local limité, toutes les vidéos sont stockées dans votre bucket B2 personnel. 
                     Vous devez configurer vos identifiants B2 pour télécharger et regarder des vidéos.
                     <br><br>
@@ -410,10 +405,7 @@
 
             <!-- Change Password Section -->
             <div class="profile-section">
-                <h3>
-                    <span class="section-icon">🔐</span>
-                    Changer le mot de passe
-                </h3>
+                <h3>Changer le mot de passe</h3>
                 <form id="password-form">
                     <div class="form-group">
                         <label>Mot de passe actuel</label>
@@ -492,7 +484,7 @@
                     // Update B2 status
                     if (user.has_b2_configured) {
                         document.getElementById('b2-status').className = 'status-badge configured';
-                        document.getElementById('b2-status').innerHTML = '<span>✔️</span> Configuré';
+                        document.getElementById('b2-status').textContent = 'Configuré';
                         document.getElementById('delete-b2-btn').style.display = 'inline-block';
                         document.getElementById('b2-bucket-name').value = user.b2_bucket_name || '';
                     }
@@ -505,15 +497,17 @@
             }
         }
 
-        // Avatar upload - FIX: Change 'avatar' to 'file' to match FastAPI parameter
+        // Avatar upload
         document.getElementById('avatar-input').addEventListener('change', async (e) => {
             const file = e.target.files[0];
             if (!file) return;
 
+            console.log('File selected:', file.name, file.size, file.type);
+
             // Check file size (5 MB max)
             if (file.size > 5 * 1024 * 1024) {
                 showToast('Image trop grande (max 5 MB)', 'error');
-                e.target.value = '';  // Reset input
+                e.target.value = '';
                 return;
             }
 
@@ -521,18 +515,18 @@
             const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
             if (!allowedTypes.includes(file.type)) {
                 showToast('Type de fichier non autorisé (JPG, PNG, GIF, WEBP seulement)', 'error');
-                e.target.value = '';  // Reset input
+                e.target.value = '';
                 return;
             }
 
             const formData = new FormData();
-            formData.append('file', file);  // FIX: Changed from 'avatar' to 'file'
+            formData.append('file', file);
 
             try {
                 showToast('Upload en cours...', 'info');
                 const response = await fetch(`${API_URL}/api/auth/me/avatar`, {
                     method: 'POST',
-                    headers: { 'Authorization': `Bearer ${token}` },  // Only auth header, no Content-Type for FormData
+                    headers: { 'Authorization': `Bearer ${token}` },
                     body: formData
                 });
 
@@ -541,19 +535,19 @@
                     showToast('Avatar mis à jour !', 'success');
                     console.log('Avatar uploaded:', data);
                     setTimeout(() => {
-                        e.target.value = '';  // Reset input
+                        e.target.value = '';
                         loadProfile();
                     }, 500);
                 } else {
                     const errorData = await response.json();
                     console.error('Upload error:', errorData);
                     showToast(errorData.detail || 'Échec de l\'upload', 'error');
-                    e.target.value = '';  // Reset input
+                    e.target.value = '';
                 }
             } catch (error) {
                 console.error('Upload exception:', error);
                 showToast('Erreur d\'upload: ' + error.message, 'error');
-                e.target.value = '';  // Reset input
+                e.target.value = '';
             }
         });
 
