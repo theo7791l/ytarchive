@@ -16,7 +16,7 @@
         <div class="nav-menu">
             <a href="#" class="nav-link active" data-view="library">Bibliothèque</a>
             <a href="#" class="nav-link" data-view="download">Télécharger</a>
-            <a href="#" class="nav-link" data-view="channels">Chaînes</a>
+            <a href="/channels" class="nav-link">Chaînes</a>
         </div>
         <div class="nav-user">
             <div class="profile-dropdown">
@@ -144,67 +144,10 @@
                 </ul>
             </div>
         </div>
-
-        <!-- Channels View -->
-        <div id="channels-view" class="view">
-            <div class="view-header">
-                <h2>Chaînes</h2>
-                <button id="add-channel-btn" class="btn-add-channel">+ Ajouter une chaîne</button>
-            </div>
-
-            <div id="channels-list" class="channels-grid"></div>
-        </div>
-    </div>
-
-    <!-- Add Channel Modal -->
-    <div id="add-channel-modal" class="modal" style="display: none;">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Ajouter une Chaîne YouTube</h3>
-                <button class="modal-close" onclick="closeAddChannelModal()">×</button>
-            </div>
-            <form id="add-channel-form">
-                <div class="form-group">
-                    <label>URL de la chaîne</label>
-                    <input type="url" id="channel-url" placeholder="https://www.youtube.com/@chaine" required>
-                </div>
-                <div class="form-group">
-                    <label>Qualité par défaut</label>
-                    <select id="channel-quality">
-                        <option value="best">Meilleure disponible</option>
-                        <option value="1080p">1080p</option>
-                        <option value="720p" selected>720p</option>
-                        <option value="480p">480p</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="auto-download" checked>
-                        <span>Télécharger automatiquement les nouvelles vidéos</span>
-                    </label>
-                </div>
-                <div class="modal-actions">
-                    <button type="button" class="btn-secondary" onclick="closeAddChannelModal()">Annuler</button>
-                    <button type="submit" class="btn-primary">Ajouter</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Channel Stats Modal -->
-    <div id="channel-stats-modal" class="modal" style="display: none;">
-        <div class="modal-content modal-large">
-            <div class="modal-header">
-                <h3>Statistiques de la Chaîne</h3>
-                <button class="modal-close" onclick="closeStatsModal()">×</button>
-            </div>
-            <div id="stats-content"></div>
-        </div>
     </div>
 
     <script src="/static/js/app.js"></script>
     <script src="/static/js/download.js"></script>
-    <script src="/static/js/channels.js"></script>
     <script src="/static/js/player.js"></script>
     <script>
         // Check B2 configuration on page load
