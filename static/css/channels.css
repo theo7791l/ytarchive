@@ -6,6 +6,7 @@
     padding: 40px;
     position: relative;
     z-index: 1;
+    padding-bottom: 120px; /* Space for FAB */
 }
 
 /* Header Section */
@@ -41,35 +42,41 @@
     line-height: 1.5;
 }
 
-/* FIX: Bouton ajouter une chaîne - positionné en bas à droite */
-.btn-add-channel {
-    display: inline-flex;
+/* FAB - Floating Action Button (bottom right) */
+.fab-add-channel {
+    position: fixed;
+    bottom: 40px;
+    right: 40px;
+    z-index: 9999;
+    display: flex;
     align-items: center;
     gap: 12px;
-    padding: 18px 36px;
+    padding: 20px 32px;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     border: none;
-    border-radius: 15px;
+    border-radius: 50px;
     color: white;
     font-size: 16px;
     font-weight: 700;
     cursor: pointer;
-    transition: all 0.3s ease;
-    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
-    white-space: nowrap;
-    flex-shrink: 0;
-    align-self: flex-start;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 8px 30px rgba(102, 126, 234, 0.5);
 }
 
-.btn-add-channel:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 12px 35px rgba(102, 126, 234, 0.6);
+.fab-add-channel:hover {
+    transform: translateY(-5px) scale(1.05);
+    box-shadow: 0 15px 40px rgba(102, 126, 234, 0.7);
 }
 
-.btn-icon {
-    font-size: 24px;
-    font-weight: 700;
+.fab-icon {
+    font-size: 28px;
+    font-weight: 800;
     line-height: 1;
+}
+
+.fab-text {
+    font-size: 16px;
+    font-weight: 700;
 }
 
 /* Stats Overview - SANS EMOJIS */
@@ -101,31 +108,37 @@
 }
 
 /* FIX: Stats icon sans émoji, design moderne */
-.stat-icon {
-    width: 60px;
-    height: 60px;
+.stat-icon,
+.stat-icon-badge {
+    width: 70px;
+    height: 70px;
     display: flex;
     align-items: center;
     justify-content: center;
     background: linear-gradient(135deg, rgba(102, 126, 234, 0.2), rgba(118, 75, 162, 0.2));
     border: 2px solid rgba(102, 126, 234, 0.4);
-    border-radius: 15px;
-    font-size: 24px;
-    font-weight: 800;
+    border-radius: 16px;
+    font-size: 22px;
+    font-weight: 900;
     color: #667eea;
     transition: all 0.3s ease;
+    flex-shrink: 0;
+    letter-spacing: -1px;
 }
 
-.stat-card:hover .stat-icon {
+.stat-card:hover .stat-icon,
+.stat-card:hover .stat-icon-badge {
     background: linear-gradient(135deg, rgba(102, 126, 234, 0.3), rgba(118, 75, 162, 0.3));
     border-color: #667eea;
-    transform: scale(1.1);
+    transform: scale(1.1) rotate(-5deg);
+    box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
 }
 
 .stat-content {
     display: flex;
     flex-direction: column;
     gap: 5px;
+    flex: 1;
 }
 
 .stat-value {
@@ -136,7 +149,7 @@
 }
 
 .stat-label {
-    font-size: 14px;
+    font-size: 13px;
     color: rgba(170, 170, 170, 0.9);
     font-weight: 600;
     text-transform: uppercase;
@@ -289,7 +302,7 @@
 /* FIX: Auto-download toggle avec texte complet visible */
 .auto-download-toggle {
     flex: 1;
-    min-width: 200px;
+    min-width: 180px;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -302,6 +315,7 @@
     color: white;
     transition: all 0.3s ease;
     gap: 12px;
+    cursor: pointer;
 }
 
 .auto-download-toggle.active {
@@ -355,7 +369,7 @@
     border: 2px solid rgba(255, 255, 255, 0.1);
     border-radius: 12px;
     color: white;
-    font-size: 13px;
+    font-size: 18px;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.3s ease;
@@ -372,6 +386,7 @@
     background: rgba(255, 68, 68, 0.1);
     border-color: rgba(255, 68, 68, 0.3);
     color: #ff4444;
+    font-size: 24px;
 }
 
 .btn-delete:hover {
@@ -681,6 +696,7 @@
 @media (max-width: 767px) {
     .channels-container {
         padding: 20px;
+        padding-bottom: 100px;
     }
     
     .channels-header {
@@ -697,9 +713,10 @@
         font-size: 32px;
     }
     
-    .btn-add-channel {
-        width: 100%;
-        justify-content: center;
+    .fab-add-channel {
+        bottom: 20px;
+        right: 20px;
+        padding: 18px 28px;
     }
     
     .stats-overview {
