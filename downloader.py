@@ -20,12 +20,15 @@ async def download_video(url: str, quality: str = "best", progress_callback: Opt
     if not b2_creds:
         return (False, "Backblaze B2 not configured. Please configure B2 credentials in your profile.")
     
-    # QUALITÉ FIXÉE - Format correct pour forcer la qualité demandée
+    # QUALITY MAP - Force exact resolution or better
     quality_map = {
-        "best": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
-        "1080p": "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]/best",
-        "720p": "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best",
-        "480p": "bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best[height<=480][ext=mp4]/best"
+        "best": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best",
+        "2160p": "bestvideo[height>=2160][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height>=2160]+bestaudio/bestvideo[height=2160][ext=mp4]+bestaudio[ext=m4a]/best",
+        "1440p": "bestvideo[height>=1440][height<=2160][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height>=1440][height<=2160]+bestaudio/bestvideo[height=1440][ext=mp4]+bestaudio[ext=m4a]/best",
+        "1080p": "bestvideo[height>=1080][height<=1440][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height>=1080][height<=1440]+bestaudio/bestvideo[height=1080][ext=mp4]+bestaudio[ext=m4a]/best",
+        "720p": "bestvideo[height>=720][height<=1080][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height>=720][height<=1080]+bestaudio/bestvideo[height=720][ext=mp4]+bestaudio[ext=m4a]/best",
+        "480p": "bestvideo[height>=480][height<=720][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height>=480][height<=720]+bestaudio/bestvideo[height=480][ext=mp4]+bestaudio[ext=m4a]/best",
+        "360p": "bestvideo[height>=360][height<=480][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height>=360][height<=480]+bestaudio/bestvideo[height=360][ext=mp4]+bestaudio[ext=m4a]/best"
     }
     
     def progress_hook(d):
@@ -54,15 +57,21 @@ async def download_video(url: str, quality: str = "best", progress_callback: Opt
         except Exception as e:
             print(f"Progress hook error: {e}")
     
+    # Get format string for selected quality
+    format_string = quality_map.get(quality, quality_map["best"])
+    
+    print(f"Selected quality: {quality}")
+    print(f"Format string: {format_string}")
+    
     ydl_opts = {
-        'format': quality_map.get(quality, "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best"),
+        'format': format_string,
         'outtmpl': os.path.join(VIDEOS_DIR, '%(id)s.%(ext)s'),
         'writethumbnail': True,
         'writesubtitles': False,
         'quiet': False,
         'no_warnings': False,
         'progress_hooks': [progress_hook],
-        'merge_output_format': 'mp4',  # Force MP4 output
+        'merge_output_format': 'mp4',
         'postprocessors': [{
             'key': 'FFmpegVideoConvertor',
             'preferedformat': 'mp4',
@@ -108,6 +117,15 @@ async def download_video(url: str, quality: str = "best", progress_callback: Opt
         upload_date = info.get('upload_date', '')
         description = info.get('description', '')
         view_count = info.get('view_count', 0)
+        
+        # Get actual format info
+        if 'format' in info:
+            actual_format = info.get('format', 'Unknown')
+            print(f"Actual format selected by yt-dlp: {actual_format}")
+        
+        if 'height' in info:
+            actual_height = info.get('height', 0)
+            print(f"Actual video height: {actual_height}p")
         
         if upload_date and len(upload_date) == 8:
             upload_date = f"{upload_date[:4]}-{upload_date[4:6]}-{upload_date[6:]}"
