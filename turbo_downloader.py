@@ -417,7 +417,8 @@ async def download_video_turbo(url: str, quality: str = "best",
             'storage': 'b2',
             'owner': username,
             'downloader': 'turbo',
-            'format': 'separated'
+            'format': 'separated',
+            'is_separate': True  # 🔊 CLÉ POUR LA SYNC AUDIO !
         }
         
         return (True, video_entry)
