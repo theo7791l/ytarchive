@@ -161,58 +161,79 @@ class B2Storage:
             print(f"Error getting upload URL: {e}")
             return False
     
-    async def _upload_single_part(self, file_id: str, chunk: bytes, part_number: int) -> Optional[str]:
-        """Upload a single part (used in parallel)"""
-        try:
-            # Get upload part URL
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    f"{self.api_url}/b2api/v2/b2_get_upload_part_url",
-                    headers={'Authorization': self.authorization_token},
-                    json={'fileId': file_id},
-                    timeout=aiohttp.ClientTimeout(total=120)
-                ) as response:
-                    if response.status != 200:
-                        print(f"Failed to get upload part URL for part {part_number}")
-                        return None
-                    
-                    upload_data = await response.json()
-                    part_upload_url = upload_data['uploadUrl']
-                    part_auth_token = upload_data['authorizationToken']
-            
-            # Calculate SHA1
-            sha1 = hashlib.sha1(chunk).hexdigest()
-            
-            # Upload part
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    part_upload_url,
-                    headers={
-                        'Authorization': part_auth_token,
-                        'X-Bz-Part-Number': str(part_number),
-                        'Content-Length': str(len(chunk)),
-                        'X-Bz-Content-Sha1': sha1
-                    },
-                    data=chunk,
-                    timeout=aiohttp.ClientTimeout(total=3600)
-                ) as response:
-                    if response.status not in [200, 201]:
-                        error = await response.text()
-                        print(f"Failed to upload part {part_number}: {error}")
-                        return None
-                    
-                    print(f"✅ Part {part_number} uploaded ({len(chunk)/(1024*1024):.1f}MB)")
-                    return sha1
+    async def _upload_single_part(self, file_id: str, chunk: bytes, part_number: int, max_retries: int = 3) -> Optional[str]:
+        """Upload a single part (used in parallel) with RETRY logic"""
         
-        except Exception as e:
-            print(f"Error uploading part {part_number}: {e}")
-            return None
+        for attempt in range(max_retries):
+            try:
+                # Get upload part URL
+                async with aiohttp.ClientSession() as session:
+                    async with session.post(
+                        f"{self.api_url}/b2api/v2/b2_get_upload_part_url",
+                        headers={'Authorization': self.authorization_token},
+                        json={'fileId': file_id},
+                        timeout=aiohttp.ClientTimeout(total=180)  # 3 minutes pour obtenir l'URL
+                    ) as response:
+                        if response.status != 200:
+                            if attempt < max_retries - 1:
+                                print(f"⚠️  Failed to get upload URL for part {part_number}, retrying...")
+                                await asyncio.sleep(2)
+                                continue
+                            print(f"Failed to get upload part URL for part {part_number}")
+                            return None
+                        
+                        upload_data = await response.json()
+                        part_upload_url = upload_data['uploadUrl']
+                        part_auth_token = upload_data['authorizationToken']
+                
+                # Calculate SHA1
+                sha1 = hashlib.sha1(chunk).hexdigest()
+                
+                # Upload part avec timeout généreux
+                async with aiohttp.ClientSession() as session:
+                    async with session.post(
+                        part_upload_url,
+                        headers={
+                            'Authorization': part_auth_token,
+                            'X-Bz-Part-Number': str(part_number),
+                            'Content-Length': str(len(chunk)),
+                            'X-Bz-Content-Sha1': sha1
+                        },
+                        data=chunk,
+                        timeout=aiohttp.ClientTimeout(
+                            total=7200,      # 2 heures max pour l'upload
+                            sock_connect=60, # 1 minute pour se connecter
+                            sock_read=600    # 10 minutes entre chaque lecture
+                        )
+                    ) as response:
+                        if response.status not in [200, 201]:
+                            error = await response.text()
+                            if attempt < max_retries - 1:
+                                print(f"⚠️  Failed to upload part {part_number} (attempt {attempt + 1}/{max_retries}), retrying...")
+                                await asyncio.sleep(2)
+                                continue
+                            print(f"Failed to upload part {part_number}: {error}")
+                            return None
+                        
+                        print(f"✅ Part {part_number} uploaded ({len(chunk)/(1024*1024):.1f}MB)")
+                        return sha1
+            
+            except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+                if attempt < max_retries - 1:
+                    print(f"⚠️  Error uploading part {part_number} (attempt {attempt + 1}/{max_retries}): {type(e).__name__}")
+                    print(f"   Retrying in 2s...")
+                    await asyncio.sleep(2)
+                    continue
+                print(f"Error uploading part {part_number} after {max_retries} attempts: {e}")
+                return None
+        
+        return None
     
     async def upload_large_file_streaming(self, chunk_iterator: AsyncIterator[bytes], b2_filename: str, content_type: str = 'video/mp4', progress_callback: Optional[Callable] = None) -> Tuple[bool, Optional[str]]:
-        """Upload large file with PARALLEL chunk uploads (5 simultaneous)"""
+        """Upload large file with PARALLEL chunk uploads (5 simultaneous) + AUTO RETRY per chunk"""
         try:
             print(f"\n🚀 Starting Large File upload: {b2_filename}")
-            print(f"⚡ Parallel mode: 5 chunks simultaneous")
+            print(f"⚡ Parallel mode: 5 chunks simultaneous (with auto-retry per chunk)")
             
             # Start large file
             async with aiohttp.ClientSession() as session:
@@ -240,7 +261,7 @@ class B2Storage:
             pending_uploads = []
             
             async for chunk in chunk_iterator:
-                # Start upload task
+                # Start upload task (with retry inside)
                 task = self._upload_single_part(file_id, chunk, part_number)
                 pending_uploads.append((part_number, task))
                 part_number += 1
@@ -253,7 +274,7 @@ class B2Storage:
                     # Check results
                     for (pnum, _), result in zip(pending_uploads, results):
                         if isinstance(result, Exception) or result is None:
-                            print(f"Upload failed for part {pnum}")
+                            print(f"❌ Upload failed for part {pnum} after all retries")
                             return (False, None)
                         part_sha1_array.append(result)
                     
@@ -265,7 +286,7 @@ class B2Storage:
                 
                 for (pnum, _), result in zip(pending_uploads, results):
                     if isinstance(result, Exception) or result is None:
-                        print(f"Upload failed for part {pnum}")
+                        print(f"❌ Upload failed for part {pnum} after all retries")
                         return (False, None)
                     part_sha1_array.append(result)
             
@@ -278,7 +299,8 @@ class B2Storage:
                     json={
                         'fileId': file_id,
                         'partSha1Array': part_sha1_array
-                    }
+                    },
+                    timeout=aiohttp.ClientTimeout(total=300)  # 5 minutes pour finish
                 ) as response:
                     if response.status != 200:
                         error = await response.text()
