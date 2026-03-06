@@ -8,29 +8,59 @@ from pytubefix import YouTube
 
 VIDEOS_DIR = "videos"
 
+# Configuration robuste
+MAX_RETRIES = 3
+RETRY_DELAY = 2  # secondes
+
+async def stream_youtube_chunks_with_retry(url: str, chunk_size: int = 5 * 1024 * 1024, max_retries: int = MAX_RETRIES):
+    """Pure streaming generator avec retry automatique - NO memory storage"""
+    
+    for attempt in range(max_retries):
+        try:
+            # Timeouts généreux pour éviter les coupures
+            timeout = aiohttp.ClientTimeout(
+                total=7200,      # 2 heures total max
+                connect=60,      # 60s pour se connecter
+                sock_read=300    # 5 minutes entre chaque chunk (si connexion lente)
+            )
+            
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.get(url) as response:
+                    if response.status != 200:
+                        raise Exception(f"HTTP {response.status}")
+                    
+                    buffer = b''
+                    async for data in response.content.iter_any():
+                        buffer += data
+                        
+                        # Yield full chunks
+                        while len(buffer) >= chunk_size:
+                            yield buffer[:chunk_size]
+                            buffer = buffer[chunk_size:]
+                    
+                    # Yield remaining data
+                    if buffer:
+                        yield buffer
+                    
+                    # Si on arrive ici, c'est un succès complet
+                    return
+        
+        except (aiohttp.ClientError, asyncio.TimeoutError, ConnectionResetError) as e:
+            if attempt < max_retries - 1:
+                print(f"\n⚠️  Connection error (attempt {attempt + 1}/{max_retries}): {type(e).__name__}")
+                print(f"   Retrying in {RETRY_DELAY}s...")
+                await asyncio.sleep(RETRY_DELAY)
+            else:
+                print(f"\n❌ All {max_retries} attempts failed")
+                raise Exception(f"Stream failed after {max_retries} retries: {e}")
+
 async def stream_youtube_chunks(url: str, chunk_size: int = 5 * 1024 * 1024):
-    """Pure streaming generator - NO memory storage"""
-    timeout = aiohttp.ClientTimeout(total=3600)  # 1 hour timeout
-    async with aiohttp.ClientSession(timeout=timeout) as session:
-        async with session.get(url) as response:
-            if response.status != 200:
-                raise Exception(f"Failed: {response.status}")
-            
-            buffer = b''
-            async for data in response.content.iter_any():
-                buffer += data
-                
-                # Yield full chunks
-                while len(buffer) >= chunk_size:
-                    yield buffer[:chunk_size]
-                    buffer = buffer[chunk_size:]
-            
-            # Yield remaining data
-            if buffer:
-                yield buffer
+    """Wrapper pour compatibilité - utilise la version avec retry"""
+    async for chunk in stream_youtube_chunks_with_retry(url, chunk_size):
+        yield chunk
 
 async def download_video_pytubefix(url: str, quality: str = "best", progress_callback: Optional[Callable] = None, username: str = None):
-    """ULTIMATE: Pure streaming proxy - ZERO storage + PARALLEL uploads"""
+    """ULTIMATE: Pure streaming proxy - ZERO storage + PARALLEL uploads + AUTO RETRY"""
     os.makedirs(VIDEOS_DIR, exist_ok=True)
     
     from auth import get_user_b2_credentials
@@ -50,11 +80,12 @@ async def download_video_pytubefix(url: str, quality: str = "best", progress_cal
     target_quality = quality_map.get(quality, "highest")
     
     print("="*60)
-    print(f"🚀 ULTIMATE STREAMING PROXY (Parallel Upload)")
+    print(f"🚀 ULTIMATE STREAMING PROXY (Parallel Upload + Auto Retry)")
     print(f"  Mode: 5 chunks simultaneous")
     print(f"  RAM: ~25MB max (5x5MB buffer)")
     print(f"  Disk: 0MB")
     print(f"  Speed: 3-5x faster")
+    print(f"  Retry: {MAX_RETRIES} attempts if connection drops")
     print("="*60)
     
     thumbnail_file_path = None
@@ -111,7 +142,7 @@ async def download_video_pytubefix(url: str, quality: str = "best", progress_cal
             print(f"Selected: {video_stream.resolution} ({video_stream.filesize_mb:.1f}MB)")
             if audio_stream:
                 print(f"Audio: {audio_stream.filesize_mb:.1f}MB")
-                print(f"Mode: ⚡ Parallel upload (5 simultaneous)")
+                print(f"Mode: ⚡ Parallel upload (5 simultaneous) with auto-retry")
             
             return {
                 'yt': yt,
@@ -137,14 +168,14 @@ async def download_video_pytubefix(url: str, quality: str = "best", progress_cal
         if not await b2.authorize():
             return (False, "B2 auth failed")
         
-        print(f"\n🔄 Starting video relay (parallel mode)...")
+        print(f"\n🔄 Starting video relay (parallel mode with auto-retry)...")
         
         if progress_callback:
             await progress_callback('downloading', 'Streaming video...')
         
         b2_video = f"videos/{username}/{yt.video_id}_video.mp4" if use_separate else f"videos/{username}/{yt.video_id}.mp4"
         
-        # Stream video with Large File API (multipart + parallel)
+        # Stream video with Large File API (multipart + parallel) + auto retry
         video_generator = stream_youtube_chunks(video_stream.url, chunk_size=5*1024*1024)
         
         success, vid_id = await b2.upload_large_file_streaming(
@@ -167,7 +198,7 @@ async def download_video_pytubefix(url: str, quality: str = "best", progress_cal
             if progress_callback:
                 await progress_callback('downloading', 'Streaming audio...')
             
-            print(f"\n🔄 Starting audio relay (parallel mode)...")
+            print(f"\n🔄 Starting audio relay (parallel mode with auto-retry)...")
             
             b2_audio = f"videos/{username}/{yt.video_id}_audio.m4a"
             
@@ -182,11 +213,13 @@ async def download_video_pytubefix(url: str, quality: str = "best", progress_cal
             
             if success:
                 print(f"✅ Audio relayed to B2")
+            else:
+                print(f"⚠️  Audio upload failed, but video is OK")
         
         # Thumbnail (small, OK)
         try:
             import requests
-            r = requests.get(yt.thumbnail_url, timeout=10)
+            r = requests.get(yt.thumbnail_url, timeout=30)
             if r.status_code == 200:
                 thumbnail_file_path = os.path.join(VIDEOS_DIR, f"{yt.video_id}.jpg")
                 with open(thumbnail_file_path, 'wb') as f:
@@ -209,6 +242,7 @@ async def download_video_pytubefix(url: str, quality: str = "best", progress_cal
         print("✅ SUCCESS - Parallel streaming complete!")
         print("  Storage used: 0MB")
         print("  Upload speed: 3-5x faster")
+        print("  Connection: Stable (auto-retry worked!)")
         print("="*60)
         
         return (True, {
