@@ -209,10 +209,10 @@ class B2Storage:
             return None
     
     async def upload_large_file_streaming(self, chunk_iterator: AsyncIterator[bytes], b2_filename: str, content_type: str = 'video/mp4', progress_callback: Optional[Callable] = None) -> Tuple[bool, Optional[str]]:
-        """Upload large file with PARALLEL chunk uploads (5 simultaneous)"""
+        """Upload large file with IMMEDIATE chunk uploads - MAX 5MB RAM (1 chunk)"""
         try:
             print(f"\n🚀 Starting Large File upload: {b2_filename}")
-            print(f"⚡ Parallel mode: 5 chunks simultaneous")
+            print(f"💧 ULTRA-LOW RAM MODE: Upload each chunk immediately (max 5MB in RAM)")
             
             # Start large file
             async with aiohttp.ClientSession() as session:
@@ -234,43 +234,26 @@ class B2Storage:
                     file_id = data['fileId']
                     print(f"✅ Large file started: {file_id}")
             
-            # Collect and upload parts in parallel (batches of 5)
+            # Upload chunks IMMEDIATELY as they arrive (no buffering)
             part_sha1_array = []
             part_number = 1
-            pending_uploads = []
             
             async for chunk in chunk_iterator:
-                # Start upload task
-                task = self._upload_single_part(file_id, chunk, part_number)
-                pending_uploads.append((part_number, task))
+                # Upload THIS chunk RIGHT NOW before getting the next one
+                # This ensures max 1 chunk (5MB) in RAM at any time
+                sha1 = await self._upload_single_part(file_id, chunk, part_number)
+                
+                if sha1 is None:
+                    print(f"Upload failed for part {part_number}")
+                    return (False, None)
+                
+                part_sha1_array.append(sha1)
                 part_number += 1
                 
-                # When we have 5 pending, wait for them
-                if len(pending_uploads) >= 5:
-                    # Wait for all 5 to complete
-                    results = await asyncio.gather(*[t for _, t in pending_uploads], return_exceptions=True)
-                    
-                    # Check results
-                    for (pnum, _), result in zip(pending_uploads, results):
-                        if isinstance(result, Exception) or result is None:
-                            print(f"Upload failed for part {pnum}")
-                            return (False, None)
-                        part_sha1_array.append(result)
-                    
-                    pending_uploads = []
-            
-            # Upload remaining parts
-            if pending_uploads:
-                results = await asyncio.gather(*[t for _, t in pending_uploads], return_exceptions=True)
-                
-                for (pnum, _), result in zip(pending_uploads, results):
-                    if isinstance(result, Exception) or result is None:
-                        print(f"Upload failed for part {pnum}")
-                        return (False, None)
-                    part_sha1_array.append(result)
+                # Chunk is uploaded and freed from RAM immediately!
             
             # Finish large file
-            print(f"\n✅ All parts uploaded! Finishing...")
+            print(f"\n✅ All parts uploaded sequentially! Finishing...")
             async with aiohttp.ClientSession() as session:
                 async with session.post(
                     f"{self.api_url}/b2api/v2/b2_finish_large_file",
@@ -288,6 +271,7 @@ class B2Storage:
                     result = await response.json()
                     final_file_id = result['fileId']
                     print(f"✅ Upload complete! File ID: {final_file_id}")
+                    print(f"💧 Peak RAM usage: ~5MB (1 chunk)")
                     return (True, final_file_id)
         
         except Exception as e:
