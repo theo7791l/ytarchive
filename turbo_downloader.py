@@ -293,6 +293,24 @@ async def download_video_turbo(url: str, quality: str = "best",
             if audio_stream:
                 print(f"Selected audio: {audio_stream.abr} (~{audio_stream.filesize_mb:.1f}MB)")
             
+            # Extract channel thumbnail URL
+            channel_url = None
+            try:
+                # pytubefix may have channel thumbnails
+                if hasattr(yt, 'channel_url'):
+                    channel_url = yt.channel_url
+                
+                # Try to get best thumbnail
+                if hasattr(yt, 'channel_thumbnails') and yt.channel_thumbnails:
+                    channel_url = yt.channel_thumbnails[-1]['url'] if yt.channel_thumbnails else None
+                elif hasattr(yt, 'uploader_avatar'):
+                    channel_url = yt.uploader_avatar
+                
+                if channel_url:
+                    print(f"Channel avatar: {channel_url[:60]}...")
+            except Exception as e:
+                print(f"Warning: Could not extract channel avatar: {e}")
+            
             return {
                 'yt': yt,
                 'video_stream': video_stream,
@@ -301,7 +319,8 @@ async def download_video_turbo(url: str, quality: str = "best",
                 'audio_url': audio_stream.url if audio_stream else None,
                 'video_size': video_stream.filesize,
                 'audio_size': audio_stream.filesize if audio_stream else 0,
-                'resolution': video_stream.resolution
+                'resolution': video_stream.resolution,
+                'channel_url': channel_url
             }, None
         
         info, error = await loop.run_in_executor(None, get_info)
@@ -399,6 +418,7 @@ async def download_video_turbo(url: str, quality: str = "best",
             'title': yt.title,
             'channel': yt.author,
             'channel_id': yt.channel_id,
+            'channel_url': info.get('channel_url'),  # 🖼️ Avatar URL !
             'duration': yt.length,
             'upload_date': yt.publish_date.isoformat() if yt.publish_date else None,
             'description': yt.description[:500] if yt.description else '',
@@ -418,7 +438,7 @@ async def download_video_turbo(url: str, quality: str = "best",
             'owner': username,
             'downloader': 'turbo',
             'format': 'separated',
-            'is_separate': True  # 🔊 CLÉ POUR LA SYNC AUDIO !
+            'is_separate': True
         }
         
         return (True, video_entry)
