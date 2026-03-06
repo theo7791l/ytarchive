@@ -1,21 +1,18 @@
 import os
 import asyncio
 import aiohttp
-import hashlib
 from datetime import datetime
 from typing import Optional, Callable
 import traceback
-from pytubefix import YouTube, Channel
+from pytubefix import YouTube
 import tempfile
 import time
 import re
 
-# Configuration pour streaming sans RAM
-MAX_PARALLEL_CHUNKS = 3  # 3 chunks en parallèle MAX
-CHUNK_SIZE = 10 * 1024 * 1024  # 10MB par chunk (pour B2 Large File)
-MIN_LARGE_FILE_SIZE = 20 * 1024 * 1024  # 20MB minimum for Large File API
-REQUEST_TIMEOUT = 30
-MAX_RETRIES = 3
+# Configuration pour streaming fiable
+CHUNK_SIZE = 5 * 1024 * 1024  # 5MB par chunk (comme pytubefix)
+MAX_PARALLEL_UPLOADS = 5  # 5 uploads en parallèle vers B2
+REQUEST_TIMEOUT = 3600  # 1 heure pour le streaming depuis YouTube
 
 
 async def get_channel_avatar_url(channel_url: str) -> str:
@@ -62,257 +59,38 @@ async def get_channel_avatar_url(channel_url: str) -> str:
         return None
 
 
-class TurboStreamingDownloader:
-    """Downloader avec streaming direct vers B2 - ZERO RAM buffering"""
-    
-    def __init__(self, video_url: str, audio_url: str, video_size: int, audio_size: int):
-        self.video_url = video_url
-        self.audio_url = audio_url
-        self.video_size = video_size
-        self.audio_size = audio_size
-        
-        self.download_semaphore = asyncio.Semaphore(MAX_PARALLEL_CHUNKS)
-        
-        # Statistiques
-        self.start_time = time.time()
-        self.bytes_uploaded = 0
-        self.chunks_uploaded = 0
-    
-    async def simple_upload_to_b2(self, url: str, size: int, stream_type: str,
-                                   b2, b2_filename: str, progress_callback: Optional[Callable]):
-        """Simple upload for small files (< 20MB) - NO Large File API"""
-        
-        print(f"\n📤 Simple upload {stream_type}: {size / 1024 / 1024:.1f}MB to B2")
-        
-        try:
-            # Download entire file to memory (it's small)
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, timeout=aiohttp.ClientTimeout(total=60)) as response:
-                    if response.status not in [200, 206]:
-                        raise Exception(f"Download failed: HTTP {response.status}")
-                    
-                    file_data = await response.read()
+async def stream_youtube_to_chunks(url: str, chunk_size: int = CHUNK_SIZE):
+    """Stream YouTube video séquentiellement - PAS de parallélisme ici (trop instable)"""
+    timeout = aiohttp.ClientTimeout(total=REQUEST_TIMEOUT)
+    async with aiohttp.ClientSession(timeout=timeout) as session:
+        async with session.get(url) as response:
+            if response.status != 200:
+                raise Exception(f"Failed: {response.status}")
             
-            print(f"  Downloaded {len(file_data) / 1024 / 1024:.1f}MB")
-            
-            # Upload to B2 using simple API
-            await b2.get_upload_url()
-            
-            sha1 = hashlib.sha1(file_data).hexdigest()
-            
-            upload_headers = {
-                'Authorization': b2.upload_auth_token,
-                'X-Bz-File-Name': b2_filename.replace('/', '%2F'),
-                'Content-Type': 'video/mp4' if stream_type == 'video' else 'audio/mp4',
-                'Content-Length': str(len(file_data)),
-                'X-Bz-Content-Sha1': sha1
-            }
-            
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    b2.upload_url,
-                    data=file_data,
-                    headers=upload_headers
-                ) as response:
-                    if response.status != 200:
-                        raise Exception(f"Upload failed: {await response.text()}")
-                    
-                    result = await response.json()
-                    file_id = result['fileId']
-            
-            self.bytes_uploaded += len(file_data)
-            
-            print(f"✅ {stream_type} uploaded: {file_id}")
-            return file_id
-        
-        except Exception as e:
-            print(f"❌ Simple upload failed: {e}")
-            raise
-    
-    async def download_and_upload_chunk(self, url: str, start: int, end: int, 
-                                       b2_session: aiohttp.ClientSession,
-                                       file_id: str, part_number: int,
-                                       b2_api_url: str, b2_auth_token: str):
-        """Download UN chunk et upload IMMÉDIATEMENT vers B2 - NO RAM STORAGE"""
-        
-        for attempt in range(MAX_RETRIES):
-            try:
-                async with self.download_semaphore:
-                    # 1. Download chunk
-                    headers = {
-                        'Range': f'bytes={start}-{end}',
-                        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36',
-                    }
-                    
-                    timeout = aiohttp.ClientTimeout(total=REQUEST_TIMEOUT)
-                    
-                    async with aiohttp.ClientSession() as dl_session:
-                        async with dl_session.get(url, headers=headers, timeout=timeout) as response:
-                            
-                            if response.status not in [200, 206]:
-                                if attempt < MAX_RETRIES - 1:
-                                    await asyncio.sleep(1 * (attempt + 1))
-                                    continue
-                                raise Exception(f"HTTP {response.status}")
-                            
-                            chunk_data = await response.read()
-                    
-                    # 2. Get B2 upload URL for this part
-                    part_url_endpoint = f"{b2_api_url}/b2api/v2/b2_get_upload_part_url"
-                    part_url_data = {"fileId": file_id}
-                    
-                    async with b2_session.post(
-                        part_url_endpoint, 
-                        json=part_url_data, 
-                        headers={"Authorization": b2_auth_token}
-                    ) as part_resp:
-                        if part_resp.status != 200:
-                            raise Exception(f"Failed to get upload URL: {await part_resp.text()}")
-                        
-                        part_result = await part_resp.json()
-                        part_upload_url = part_result['uploadUrl']
-                        part_auth_token = part_result['authorizationToken']
-                    
-                    # 3. Upload IMMÉDIATEMENT vers B2 (libère la RAM)
-                    sha1 = hashlib.sha1(chunk_data).hexdigest()
-                    
-                    part_headers = {
-                        'Authorization': part_auth_token,
-                        'X-Bz-Part-Number': str(part_number),
-                        'Content-Length': str(len(chunk_data)),
-                        'X-Bz-Content-Sha1': sha1
-                    }
-                    
-                    async with b2_session.post(
-                        part_upload_url, 
-                        data=chunk_data, 
-                        headers=part_headers
-                    ) as upload_resp:
-                        if upload_resp.status != 200:
-                            raise Exception(f"Upload failed: {await upload_resp.text()}")
-                    
-                    # Chunk uploadé, RAM libérée !
-                    self.bytes_uploaded += len(chunk_data)
-                    self.chunks_uploaded += 1
-                    
-                    return sha1
-            
-            except Exception as e:
-                if attempt < MAX_RETRIES - 1:
-                    await asyncio.sleep(1 * (attempt + 1))
-                    continue
-                print(f"❌ Part {part_number} failed: {e}")
-                return None
-        
-        return None
-    
-    async def stream_to_b2(self, url: str, size: int, stream_type: str,
-                          b2, b2_filename: str, progress_callback: Optional[Callable]):
-        """Stream complet vers B2 - Auto-detect simple vs large file upload"""
-        
-        # 🔧 FIX: Use simple upload for small files
-        if size < MIN_LARGE_FILE_SIZE:
-            print(f"  File too small for Large File API, using simple upload")
-            return await self.simple_upload_to_b2(url, size, stream_type, b2, b2_filename, progress_callback)
-        
-        print(f"\n📡 Streaming {stream_type}: {size / 1024 / 1024:.1f}MB directly to B2")
-        
-        # Start B2 Large File
-        start_url = f"{b2.api_url}/b2api/v2/b2_start_large_file"
-        start_data = {
-            "bucketId": b2.bucket_id,
-            "fileName": b2_filename,
-            "contentType": "video/mp4" if stream_type == "video" else "audio/mp4"
-        }
-        
-        async with aiohttp.ClientSession() as b2_session:
-            async with b2_session.post(
-                start_url, 
-                json=start_data, 
-                headers={"Authorization": b2.authorization_token}
-            ) as resp:
-                if resp.status != 200:
-                    raise Exception(f"Failed to start large file: {await resp.text()}")
+            buffer = b''
+            async for data in response.content.iter_any():
+                buffer += data
                 
-                result = await resp.json()
-                file_id = result['fileId']
-                print(f"  Large file started: {file_id}")
+                # Yield full chunks
+                while len(buffer) >= chunk_size:
+                    yield buffer[:chunk_size]
+                    buffer = buffer[chunk_size:]
             
-            # Download et upload en streaming chunk par chunk
-            num_chunks = (size + CHUNK_SIZE - 1) // CHUNK_SIZE
-            part_sha1_array = []
-            
-            tasks = []
-            for i in range(num_chunks):
-                start = i * CHUNK_SIZE
-                end = min(start + CHUNK_SIZE - 1, size - 1)
-                part_number = i + 1
-                
-                task = self.download_and_upload_chunk(
-                    url, start, end, b2_session, file_id, part_number,
-                    b2.api_url, b2.authorization_token
-                )
-                tasks.append((part_number, task))
-            
-            # Execute avec limite de parallélisme
-            for i in range(0, len(tasks), MAX_PARALLEL_CHUNKS):
-                batch = tasks[i:i + MAX_PARALLEL_CHUNKS]
-                batch_tasks = [t[1] for t in batch]
-                batch_results = await asyncio.gather(*batch_tasks)
-                
-                # Ajoute les SHA1 dans l'ordre
-                for (part_num, _), sha1 in zip(batch, batch_results):
-                    if sha1:
-                        part_sha1_array.append(sha1)
-                
-                # Progress
-                completed = i + len(batch)
-                percent = (completed / num_chunks) * 100
-                elapsed = time.time() - self.start_time
-                speed = (self.bytes_uploaded / 1024 / 1024) / elapsed if elapsed > 0 else 0
-                
-                print(f"  {stream_type}: {completed}/{num_chunks} parts ({percent:.1f}%) - {speed:.1f} MB/s")
-                
-                if progress_callback:
-                    await progress_callback(
-                        'uploading',
-                        f'{stream_type}: {percent:.1f}%',
-                        percent=f"{percent:.1f}%",
-                        speed=f"{speed:.1f} MB/s"
-                    )
-            
-            # Finish Large File
-            finish_url = f"{b2.api_url}/b2api/v2/b2_finish_large_file"
-            finish_data = {
-                "fileId": file_id,
-                "partSha1Array": part_sha1_array
-            }
-            
-            async with b2_session.post(
-                finish_url, 
-                json=finish_data, 
-                headers={"Authorization": b2.authorization_token}
-            ) as resp:
-                if resp.status != 200:
-                    raise Exception(f"Failed to finish: {await resp.text()}")
-                
-                result = await resp.json()
-                file_id = result['fileId']
-            
-            print(f"✅ {stream_type} streaming complete: {file_id}")
-            return file_id
+            # Yield remaining data
+            if buffer:
+                yield buffer
 
 
 async def download_video_turbo(url: str, quality: str = "best", 
                                progress_callback: Optional[Callable] = None, 
                                username: str = None):
-    """Download avec TRUE STREAMING - Jamais plus de 10MB en RAM"""
+    """Download avec streaming séquentiel + upload parallèle vers B2 (comme pytubefix qui marche)"""
     
     print("="*60)
-    print("🚀 TURBO DOWNLOADER - TRUE STREAMING (ZERO RAM)")
-    print(f"  Mode: Direct streaming to B2 (no buffering)")
-    print(f"  Max RAM usage: {CHUNK_SIZE / (1024*1024):.0f}MB per chunk")
-    print(f"  Parallel chunks: {MAX_PARALLEL_CHUNKS}")
+    print("🚀 TURBO DOWNLOADER - SEQUENTIAL STREAMING + PARALLEL UPLOAD")
+    print(f"  Download: Sequential from YouTube (stable)")
+    print(f"  Upload: {MAX_PARALLEL_UPLOADS} parallel uploads to B2 (fast)")
+    print(f"  Chunk size: {CHUNK_SIZE / (1024*1024):.0f}MB")
     print(f"  Requested quality: {quality}")
     print("="*60)
     
@@ -425,28 +203,45 @@ async def download_video_turbo(url: str, quality: str = "best",
         video_filename = f"videos/{username}/{yt.video_id}_video.mp4"
         audio_filename = f"videos/{username}/{yt.video_id}_audio.m4a" if info['audio_url'] else None
         
-        print(f"\n🚀 Starting TRUE STREAMING (download → upload immediately)...")
+        print(f"\n🚀 Starting streaming upload (sequential download + parallel upload)...")
         
-        downloader = TurboStreamingDownloader(
-            info['video_url'],
-            info['audio_url'],
-            info['video_size'],
-            info['audio_size']
+        start_time = time.time()
+        
+        # Stream video to B2 avec upload parallèle
+        if progress_callback:
+            await progress_callback('downloading', 'Streaming video to B2...')
+        
+        video_generator = stream_youtube_to_chunks(info['video_url'], chunk_size=CHUNK_SIZE)
+        
+        success, video_file_id = await b2.upload_large_file_streaming(
+            video_generator,
+            video_filename,
+            'video/mp4',
+            progress_callback
         )
         
-        # Stream video to B2
-        video_file_id = await downloader.stream_to_b2(
-            info['video_url'], info['video_size'], 'video',
-            b2, video_filename, progress_callback
-        )
+        if not success:
+            return (False, "Video upload failed")
+        
+        print(f"✅ Video streaming complete")
         
         # Stream audio to B2
         audio_file_id = None
         if info['audio_url']:
-            audio_file_id = await downloader.stream_to_b2(
-                info['audio_url'], info['audio_size'], 'audio',
-                b2, audio_filename, progress_callback
+            if progress_callback:
+                await progress_callback('downloading', 'Streaming audio to B2...')
+            
+            audio_generator = stream_youtube_to_chunks(info['audio_url'], chunk_size=CHUNK_SIZE)
+            
+            success, audio_file_id = await b2.upload_large_file_streaming(
+                audio_generator,
+                audio_filename,
+                'audio/mp4',
+                None
             )
+            
+            if success:
+                print(f"✅ Audio streaming complete")
         
         # Download thumbnail
         thumbnail_url = None
@@ -469,17 +264,16 @@ async def download_video_turbo(url: str, quality: str = "best",
         except Exception as e:
             print(f"Thumbnail error: {e}")
         
-        total_time = time.time() - downloader.start_time
-        avg_speed = (downloader.bytes_uploaded / 1024 / 1024) / total_time
+        total_time = time.time() - start_time
+        total_size = (info['video_size'] + info['audio_size']) / (1024 * 1024)
+        avg_speed = total_size / total_time if total_time > 0 else 0
         
         print(f"\n{'='*60}")
         print(f"🎉 TURBO STREAMING COMPLETE")
         print(f"{'='*60}")
-        print(f"  Chunks: {downloader.chunks_uploaded}")
-        print(f"  Uploaded: {downloader.bytes_uploaded / 1024 / 1024:.1f} MB")
+        print(f"  Total: {total_size:.1f} MB")
         print(f"  Duration: {total_time:.1f}s")
         print(f"  Avg Speed: {avg_speed:.1f} MB/s")
-        print(f"  Max RAM: ~{CHUNK_SIZE / (1024*1024):.0f}MB")
         print(f"{'='*60}\n")
         
         if progress_callback:
@@ -495,7 +289,7 @@ async def download_video_turbo(url: str, quality: str = "best",
             'title': yt.title,
             'channel': yt.author,
             'channel_id': yt.channel_id,
-            'channel_avatar_url': channel_avatar_url,  # 🔧 FIXED: Correct key name!
+            'channel_avatar_url': channel_avatar_url,
             'duration': yt.length,
             'upload_date': yt.publish_date.isoformat() if yt.publish_date else None,
             'description': yt.description[:500] if yt.description else '',
