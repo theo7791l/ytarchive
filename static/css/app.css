@@ -1148,9 +1148,10 @@ body::before {
 /* ============================================ */
 
 .fab-add-channel {
-    position: fixed;
-    bottom: 45px;
-    right: 45px;
+    position: fixed !important;
+    bottom: 45px !important;
+    right: 45px !important;
+    left: auto !important;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
     border: none;
@@ -1169,7 +1170,7 @@ body::before {
     text-transform: uppercase;
     letter-spacing: 1px;
     animation: bounceIn 0.8s ease, pulse 3s ease-in-out infinite;
-    position: relative;
+    margin: 0 !important;
     overflow: hidden;
 }
 
@@ -1192,13 +1193,13 @@ body::before {
 }
 
 .fab-add-channel:hover {
-    transform: translateY(-8px) scale(1.12) rotate(2deg);
+    transform: translateY(-8px) scale(1.12) rotate(2deg) !important;
     box-shadow: 0 20px 60px rgba(102, 126, 234, 0.8),
                 0 0 100px rgba(102, 126, 234, 0.5);
 }
 
 .fab-add-channel:active {
-    transform: translateY(-5px) scale(1.08);
+    transform: translateY(-5px) scale(1.08) !important;
 }
 
 .fab-icon {
@@ -2227,8 +2228,8 @@ body::before {
     }
     
     .fab-add-channel {
-        bottom: 20px;
-        right: 20px;
+        bottom: 20px !important;
+        right: 20px !important;
         padding: 16px 24px;
         font-size: 14px;
     }
