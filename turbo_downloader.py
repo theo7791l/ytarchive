@@ -1,12 +1,12 @@
 """
-Turbo Downloader - Ultra-Fast Parallel Micro-Chunking System
+Turbo Downloader - Ultra-Fast Parallel Range-Based Streaming
 =============================================================
 
-Architecture: Pipeline parallèle massif avec micro-chunks
-- 20-30 téléchargements de fragments simultanés
-- Chunks de 10MB uploadés immédiatement
-- RAM optimisée: 60-80MB max
-- Vitesse: 3-5x plus rapide que séquentiel
+Architecture: Pipeline parallèle avec HTTP Range requests
+- 5-10 chunks téléchargés en parallèle
+- Range requests de 5-10MB par chunk
+- Upload immédiat vers B2
+- RAM optimisée: 50-100MB max
 """
 
 import os
@@ -14,23 +14,21 @@ import asyncio
 import aiohttp
 import hashlib
 from datetime import datetime
-from typing import Optional, Callable, List, Dict
+from typing import Optional, Callable
 import traceback
 from pytubefix import YouTube
 import tempfile
-from collections import defaultdict
 import time
 
-# Configuration agressive pour vitesse max
-MAX_PARALLEL_DOWNLOADS = 20  # 20 fragments en parallèle
-MAX_PARALLEL_UPLOADS = 2      # 2 uploads B2 simultanés
-CHUNK_TARGET_SIZE = 10 * 1024 * 1024  # 10MB par chunk
-FRAGMENT_TIMEOUT = 5  # 5 secondes timeout par fragment
-MAX_RETRIES = 3  # Nombre de retry par fragment
+# Configuration pour HTTP Range requests
+MAX_PARALLEL_CHUNKS = 5  # 5 chunks en parallèle
+CHUNK_SIZE = 5 * 1024 * 1024  # 5MB par chunk
+REQUEST_TIMEOUT = 30  # 30 secondes timeout
+MAX_RETRIES = 3
 
 
-class TurboDownloader:
-    """Downloader ultra-rapide avec micro-chunking parallèle"""
+class TurboRangeDownloader:
+    """Downloader ultra-rapide avec HTTP Range requests parallèles"""
     
     def __init__(self, video_url: str, audio_url: str, video_size: int, audio_size: int):
         self.video_url = video_url
@@ -38,273 +36,208 @@ class TurboDownloader:
         self.video_size = video_size
         self.audio_size = audio_size
         
-        self.current_seq = 0
-        self.max_seq = -1
-        self.download_semaphore = asyncio.Semaphore(MAX_PARALLEL_DOWNLOADS)
-        self.upload_semaphore = asyncio.Semaphore(MAX_PARALLEL_UPLOADS)
+        self.download_semaphore = asyncio.Semaphore(MAX_PARALLEL_CHUNKS)
         
         # Statistiques
         self.start_time = time.time()
         self.bytes_downloaded = 0
-        self.bytes_uploaded = 0
-        self.fragments_downloaded = 0
-        self.chunks_uploaded = 0
+        self.chunks_downloaded = 0
     
-    async def download_fragment(self, url: str, seq: int, stream_type: str, session: aiohttp.ClientSession):
-        """Télécharge un fragment avec retry automatique"""
-        
-        fragment_url = url.replace('%d', str(seq))
+    async def download_chunk(self, url: str, start: int, end: int, stream_type: str, 
+                            session: aiohttp.ClientSession):
+        """Télécharge un chunk avec HTTP Range request"""
         
         for attempt in range(MAX_RETRIES):
             try:
                 async with self.download_semaphore:
-                    timeout = aiohttp.ClientTimeout(total=FRAGMENT_TIMEOUT)
+                    headers = {
+                        'Range': f'bytes={start}-{end}',
+                        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36',
+                    }
                     
-                    async with session.get(
-                        fragment_url,
-                        timeout=timeout,
-                        headers={
-                            'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36',
-                            'Origin': 'https://www.youtube.com',
-                        }
-                    ) as response:
+                    timeout = aiohttp.ClientTimeout(total=REQUEST_TIMEOUT)
+                    
+                    async with session.get(url, headers=headers, timeout=timeout) as response:
                         
-                        if response.status == 404:
-                            return None  # Stream terminé
-                        
-                        if response.status != 200:
+                        if response.status not in [200, 206]:
                             if attempt < MAX_RETRIES - 1:
-                                await asyncio.sleep(0.5 * (attempt + 1))
+                                await asyncio.sleep(1 * (attempt + 1))
                                 continue
                             raise Exception(f"HTTP {response.status}")
-                        
-                        # Récupère X-Head-Seqnum pour connaître le max
-                        head_seq = response.headers.get('X-Head-Seqnum')
-                        if head_seq and int(head_seq) > self.max_seq:
-                            self.max_seq = int(head_seq)
                         
                         data = await response.read()
                         
                         self.bytes_downloaded += len(data)
-                        self.fragments_downloaded += 1
+                        self.chunks_downloaded += 1
                         
                         return {
-                            'seq': seq,
                             'type': stream_type,
+                            'start': start,
+                            'end': end,
                             'data': data,
                             'size': len(data)
                         }
             
             except asyncio.TimeoutError:
                 if attempt < MAX_RETRIES - 1:
-                    print(f"⚠️  Fragment {seq} timeout, retry {attempt + 1}/{MAX_RETRIES}")
-                    await asyncio.sleep(0.5 * (attempt + 1))
+                    print(f"⚠️  {stream_type} chunk {start}-{end} timeout, retry {attempt + 1}/{MAX_RETRIES}")
+                    await asyncio.sleep(1 * (attempt + 1))
                     continue
+                print(f"❌ {stream_type} chunk {start}-{end} failed after {MAX_RETRIES} attempts")
                 return None
             
             except Exception as e:
                 if attempt < MAX_RETRIES - 1:
-                    await asyncio.sleep(0.5 * (attempt + 1))
+                    await asyncio.sleep(1 * (attempt + 1))
                     continue
-                print(f"❌ Fragment {seq} failed: {e}")
+                print(f"❌ {stream_type} chunk {start}-{end} error: {e}")
                 return None
         
         return None
     
-    async def download_batch(self, start_seq: int, batch_size: int, session: aiohttp.ClientSession):
-        """Télécharge un batch de fragments en parallèle massif"""
+    async def download_stream(self, url: str, size: int, stream_type: str, 
+                             session: aiohttp.ClientSession, progress_callback: Optional[Callable]):
+        """Télécharge un stream complet en chunks parallèles"""
         
+        chunks_data = []
+        num_chunks = (size + CHUNK_SIZE - 1) // CHUNK_SIZE
+        
+        print(f"\n📥 Downloading {stream_type}: {size / 1024 / 1024:.1f}MB in {num_chunks} chunks")
+        
+        # Créer les tâches de download
         tasks = []
-        
-        # Télécharge vidéo et audio en parallèle pour chaque seq
-        for i in range(batch_size):
-            seq = start_seq + i
+        for i in range(num_chunks):
+            start = i * CHUNK_SIZE
+            end = min(start + CHUNK_SIZE - 1, size - 1)
             
-            # Task vidéo
-            tasks.append(
-                self.download_fragment(self.video_url, seq, 'video', session)
-            )
+            task = self.download_chunk(url, start, end, stream_type, session)
+            tasks.append(task)
+        
+        # Download tous les chunks en parallèle (avec limite de MAX_PARALLEL_CHUNKS)
+        results = []
+        for i in range(0, len(tasks), MAX_PARALLEL_CHUNKS):
+            batch = tasks[i:i + MAX_PARALLEL_CHUNKS]
+            batch_results = await asyncio.gather(*batch)
+            results.extend(batch_results)
             
-            # Task audio
-            tasks.append(
-                self.download_fragment(self.audio_url, seq, 'audio', session)
-            )
+            # Progress
+            downloaded_chunks = i + len(batch)
+            percent = (downloaded_chunks / num_chunks) * 100
+            elapsed = time.time() - self.start_time
+            speed = (self.bytes_downloaded / 1024 / 1024) / elapsed if elapsed > 0 else 0
+            
+            print(f"  {stream_type}: {downloaded_chunks}/{num_chunks} chunks ({percent:.1f}%) - {speed:.1f} MB/s")
+            
+            if progress_callback:
+                await progress_callback(
+                    'downloading',
+                    f'{stream_type}: {percent:.1f}%',
+                    percent=f"{percent:.1f}%",
+                    speed=f"{speed:.1f} MB/s"
+                )
         
-        # Attend tous les downloads du batch
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+        # Filtrer les None et trier par position
+        valid_results = [r for r in results if r is not None]
+        valid_results.sort(key=lambda x: x['start'])
         
-        # Groupe par seq
-        fragments = defaultdict(dict)
-        for result in results:
-            if result and not isinstance(result, Exception):
-                fragments[result['seq']][result['type']] = result['data']
+        if len(valid_results) != num_chunks:
+            print(f"⚠️  Only {len(valid_results)}/{num_chunks} chunks downloaded for {stream_type}")
         
-        return fragments
+        # Concaténer tous les chunks
+        complete_data = b''.join([chunk['data'] for chunk in valid_results])
+        
+        print(f"✅ {stream_type} download complete: {len(complete_data) / 1024 / 1024:.1f}MB")
+        
+        return complete_data
     
-    async def upload_chunk_to_b2(self, b2, chunk_data: Dict, chunk_index: int, 
-                                 b2_filename: str, progress_callback: Optional[Callable]):
-        """Upload un chunk vers B2 avec API Large File"""
-        
-        async with self.upload_semaphore:
-            try:
-                # Mux rapide: concaténation simple
-                video_buffers = [chunk_data['fragments'][seq].get('video', b'') 
-                                for seq in sorted(chunk_data['fragments'].keys())]
-                audio_buffers = [chunk_data['fragments'][seq].get('audio', b'') 
-                                for seq in sorted(chunk_data['fragments'].keys())]
-                
-                video_data = b''.join(video_buffers)
-                audio_data = b''.join(audio_buffers)
-                
-                chunk_size = len(video_data) + len(audio_data)
-                
-                # Upload vers B2 (simplifié pour l'exemple)
-                # En production, utiliser b2_storage.py
-                
-                self.bytes_uploaded += chunk_size
-                self.chunks_uploaded += 1
-                
-                elapsed = time.time() - self.start_time
-                speed_mbps = (self.bytes_uploaded / 1024 / 1024) / elapsed if elapsed > 0 else 0
-                
-                print(f"✅ Chunk {chunk_index} uploaded: {chunk_size / 1024 / 1024:.1f}MB "
-                      f"({speed_mbps:.1f} MB/s avg)")
-                
-                if progress_callback:
-                    await progress_callback(
-                        'uploading',
-                        f'Uploading chunk {chunk_index}...',
-                        percent=f"{(self.bytes_uploaded / (self.video_size + self.audio_size)) * 100:.1f}%",
-                        speed=f"{speed_mbps:.1f} MB/s"
-                    )
-                
-                return True
-            
-            except Exception as e:
-                print(f"❌ Chunk {chunk_index} upload failed: {e}")
-                return False
-    
-    async def turbo_stream(self, b2, b2_filename: str, progress_callback: Optional[Callable]):
-        """Stream ultra-rapide avec micro-chunks parallèles"""
-        
-        BATCH_SIZE = 15  # 15 fragments = ~75 sec de vidéo
-        
-        current_chunk_fragments = {}
-        current_chunk_size = 0
-        chunk_index = 0
-        
-        upload_tasks = []
+    async def download_and_upload(self, b2, b2_video_filename: str, b2_audio_filename: str, 
+                                  progress_callback: Optional[Callable]):
+        """Download et upload vers B2"""
         
         async with aiohttp.ClientSession() as session:
             
-            while True:
-                batch_start = time.time()
-                
-                # Download batch massivement en parallèle
-                batch = await self.download_batch(self.current_seq, BATCH_SIZE, session)
-                
-                if not batch:
-                    print("🏁 Stream terminé")
-                    break
-                
-                batch_duration = time.time() - batch_start
-                batch_seqs = sorted(batch.keys())
-                
-                print(f"⚡ Downloaded {len(batch_seqs)} fragments in {batch_duration:.2f}s "
-                      f"({len(batch_seqs) / batch_duration:.1f} frag/s)")
-                
-                # Accumule dans le chunk actuel
-                for seq in batch_seqs:
-                    frag = batch[seq]
-                    frag_size = len(frag.get('video', b'')) + len(frag.get('audio', b''))
-                    
-                    current_chunk_fragments[seq] = frag
-                    current_chunk_size += frag_size
-                    
-                    # Si on atteint 10MB, upload le chunk EN PARALLÈLE
-                    if current_chunk_size >= CHUNK_TARGET_SIZE:
-                        chunk_data = {
-                            'index': chunk_index,
-                            'fragments': current_chunk_fragments.copy(),
-                            'size': current_chunk_size,
-                            'seqs': list(current_chunk_fragments.keys())
-                        }
-                        
-                        # Lance l'upload en arrière-plan (ne bloque pas le download)
-                        upload_task = asyncio.create_task(
-                            self.upload_chunk_to_b2(
-                                b2, chunk_data, chunk_index, b2_filename, progress_callback
-                            )
-                        )
-                        upload_tasks.append(upload_task)
-                        
-                        # Reset pour le prochain chunk
-                        chunk_index += 1
-                        current_chunk_fragments = {}
-                        current_chunk_size = 0
-                        
-                        # Limite le nombre d'uploads en attente (gestion RAM)
-                        if len(upload_tasks) > 3:
-                            # Attend qu'au moins un upload se termine
-                            done, upload_tasks = await asyncio.wait(
-                                upload_tasks, 
-                                return_when=asyncio.FIRST_COMPLETED
-                            )
-                            upload_tasks = list(upload_tasks)
-                
-                self.current_seq = max(batch_seqs) + 1
-                
-                # Check si on a atteint le max
-                if self.max_seq > 0 and self.current_seq > self.max_seq:
-                    # Upload le dernier chunk s'il reste des données
-                    if current_chunk_fragments:
-                        chunk_data = {
-                            'index': chunk_index,
-                            'fragments': current_chunk_fragments,
-                            'size': current_chunk_size,
-                            'seqs': list(current_chunk_fragments.keys())
-                        }
-                        upload_task = asyncio.create_task(
-                            self.upload_chunk_to_b2(
-                                b2, chunk_data, chunk_index, b2_filename, progress_callback
-                            )
-                        )
-                        upload_tasks.append(upload_task)
-                    break
+            # Download vidéo et audio en parallèle
+            print("\n🚀 Starting parallel download (video + audio)...")
             
-            # Attend que tous les uploads se terminent
-            if upload_tasks:
-                print(f"⏳ Waiting for {len(upload_tasks)} uploads to complete...")
-                await asyncio.gather(*upload_tasks)
-        
-        total_time = time.time() - self.start_time
-        avg_speed = (self.bytes_downloaded / 1024 / 1024) / total_time
-        
-        print(f"\n{'='*60}")
-        print(f"🎉 TURBO DOWNLOAD COMPLETE")
-        print(f"{'='*60}")
-        print(f"  Fragments: {self.fragments_downloaded}")
-        print(f"  Chunks: {self.chunks_uploaded}")
-        print(f"  Downloaded: {self.bytes_downloaded / 1024 / 1024:.1f} MB")
-        print(f"  Uploaded: {self.bytes_uploaded / 1024 / 1024:.1f} MB")
-        print(f"  Duration: {total_time:.1f}s")
-        print(f"  Avg Speed: {avg_speed:.1f} MB/s")
-        print(f"  Performance: {self.fragments_downloaded / total_time:.1f} fragments/s")
-        print(f"{'='*60}\n")
-        
-        return True
+            video_task = self.download_stream(
+                self.video_url, self.video_size, 'video', session, progress_callback
+            )
+            audio_task = self.download_stream(
+                self.audio_url, self.audio_size, 'audio', session, progress_callback
+            )
+            
+            video_data, audio_data = await asyncio.gather(video_task, audio_task)
+            
+            if not video_data:
+                return False, "Video download failed"
+            
+            if not audio_data:
+                print("⚠️  Audio download failed, continuing with video only")
+            
+            # Upload vers B2
+            print("\n📤 Uploading to B2...")
+            
+            if progress_callback:
+                await progress_callback('uploading', 'Uploading video to B2...')
+            
+            # Upload vidéo
+            video_file = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
+            video_file.write(video_data)
+            video_file.close()
+            
+            await b2.get_upload_url()
+            video_success, video_file_id = await b2.upload_file(
+                video_file.name, b2_video_filename, progress_callback
+            )
+            os.unlink(video_file.name)
+            
+            if not video_success:
+                return False, "Video upload to B2 failed"
+            
+            # Upload audio
+            audio_file_id = None
+            if audio_data:
+                if progress_callback:
+                    await progress_callback('uploading', 'Uploading audio to B2...')
+                
+                audio_file = tempfile.NamedTemporaryFile(delete=False, suffix='.m4a')
+                audio_file.write(audio_data)
+                audio_file.close()
+                
+                await b2.get_upload_url()
+                audio_success, audio_file_id = await b2.upload_file(
+                    audio_file.name, b2_audio_filename, progress_callback
+                )
+                os.unlink(audio_file.name)
+                
+                if not audio_success:
+                    print("⚠️  Audio upload failed")
+            
+            total_time = time.time() - self.start_time
+            avg_speed = (self.bytes_downloaded / 1024 / 1024) / total_time
+            
+            print(f"\n{'='*60}")
+            print(f"🎉 TURBO DOWNLOAD COMPLETE")
+            print(f"{'='*60}")
+            print(f"  Chunks: {self.chunks_downloaded}")
+            print(f"  Downloaded: {self.bytes_downloaded / 1024 / 1024:.1f} MB")
+            print(f"  Duration: {total_time:.1f}s")
+            print(f"  Avg Speed: {avg_speed:.1f} MB/s")
+            print(f"{'='*60}\n")
+            
+            return True, (video_file_id, audio_file_id)
 
 
 async def download_video_turbo(url: str, quality: str = "best", 
                                progress_callback: Optional[Callable] = None, 
                                username: str = None):
-    """Download ultra-rapide avec système de micro-chunking parallèle"""
+    """Download ultra-rapide avec HTTP Range requests parallèles"""
     
     print("="*60)
-    print("🚀 TURBO DOWNLOADER - PARALLEL MICRO-CHUNKING")
-    print(f"  Mode: Ultra-fast parallel streaming")
-    print(f"  Parallel downloads: {MAX_PARALLEL_DOWNLOADS}")
-    print(f"  Chunk size: {CHUNK_TARGET_SIZE / (1024*1024):.0f}MB")
+    print("🚀 TURBO DOWNLOADER - PARALLEL RANGE REQUESTS")
+    print(f"  Mode: Ultra-fast parallel HTTP ranges")
+    print(f"  Parallel chunks: {MAX_PARALLEL_CHUNKS}")
+    print(f"  Chunk size: {CHUNK_SIZE / (1024*1024):.0f}MB")
     print(f"  Requested quality: {quality}")
     print("="*60)
     
@@ -345,7 +278,7 @@ async def download_video_turbo(url: str, quality: str = "best",
             print(f"Channel: {yt.author}")
             print(f"Duration: {yt.length}s")
             
-            # Get adaptive streams (meilleure qualité)
+            # Get adaptive streams
             video_streams = yt.streams.filter(progressive=False, only_video=True, file_extension='mp4')
             audio_streams = yt.streams.filter(progressive=False, only_audio=True)
             
@@ -378,19 +311,12 @@ async def download_video_turbo(url: str, quality: str = "best",
             if audio_stream:
                 print(f"Selected audio: {audio_stream.abr} (~{audio_stream.filesize_mb:.1f}MB)")
             
-            # Check if URLs support fragments (%d pattern)
-            video_url = video_stream.url
-            audio_url = audio_stream.url if audio_stream else None
-            
-            # Les URLs adaptives de YouTube contiennent souvent des paramètres de range
-            # On va utiliser l'approche fragments si disponible
-            
             return {
                 'yt': yt,
                 'video_stream': video_stream,
                 'audio_stream': audio_stream,
-                'video_url': video_url,
-                'audio_url': audio_url,
+                'video_url': video_stream.url,
+                'audio_url': audio_stream.url if audio_stream else None,
                 'video_size': video_stream.filesize,
                 'audio_size': audio_stream.filesize if audio_stream else 0,
                 'resolution': video_stream.resolution
@@ -422,20 +348,24 @@ async def download_video_turbo(url: str, quality: str = "best",
         audio_filename = f"videos/{username}/{yt.video_id}_audio.m4a" if info['audio_url'] else None
         
         # Create turbo downloader
-        print(f"\n🚀 Starting TURBO download...")
+        print(f"\n🚀 Starting TURBO download with Range requests...")
         
-        downloader = TurboDownloader(
+        downloader = TurboRangeDownloader(
             info['video_url'],
             info['audio_url'],
             info['video_size'],
             info['audio_size']
         )
         
-        # Start turbo streaming
-        success = await downloader.turbo_stream(b2, video_filename, progress_callback)
+        # Start turbo download and upload
+        success, result = await downloader.download_and_upload(
+            b2, video_filename, audio_filename, progress_callback
+        )
         
         if not success:
-            return (False, "Turbo download failed")
+            return (False, result)
+        
+        video_file_id, audio_file_id = result
         
         # Download thumbnail
         thumbnail_url = None
@@ -461,7 +391,7 @@ async def download_video_turbo(url: str, quality: str = "best",
         if progress_callback:
             await progress_callback('completed', f'TURBO upload complete: {yt.title}')
         
-        print(f"\n✅ TURBO streaming complete!")
+        print(f"\n✅ TURBO download complete!")
         print(f"   Video: {video_filename}")
         if audio_filename:
             print(f"   Audio: {audio_filename}")
@@ -480,7 +410,8 @@ async def download_video_turbo(url: str, quality: str = "best",
             'audio_file': audio_filename,
             'thumbnail_file': f"thumbnails/{username}/{yt.video_id}.jpg" if thumbnail_url else None,
             'thumbnail_url': thumbnail_url,
-            'b2_video_file_id': None,
+            'b2_video_file_id': video_file_id,
+            'b2_audio_file_id': audio_file_id,
             'b2_thumbnail_file_id': None,
             'quality': quality,
             'actual_height': int(info['resolution'].replace('p', '')) if info['resolution'] else 0,
@@ -488,7 +419,7 @@ async def download_video_turbo(url: str, quality: str = "best",
             'url': url,
             'storage': 'b2',
             'owner': username,
-            'downloader': 'turbo',  # Nouveau type
+            'downloader': 'turbo',
             'format': 'separated'
         }
         
