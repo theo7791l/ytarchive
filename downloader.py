@@ -8,47 +8,47 @@ import traceback
 VIDEOS_DIR = "videos"
 
 async def download_video(url: str, quality: str = "best", progress_callback: Optional[Callable] = None, username: str = None):
-    """Download a video using 3-tier strategy: pytubefix -> turbo -> yt-dlp"""
+    """Download a video using 3-tier strategy: TURBO (ultra-fast) -> pytubefix -> yt-dlp"""
     
     print("="*60)
     print("🚀 TRI-DOWNLOADER SYSTEM - ULTRA-FAST")
-    print(f"  1. PYTUBEFIX (ultra-fast parallel upload)")
-    print(f"  2. TURBO (parallel micro-chunking fallback)")
+    print(f"  1. TURBO (parallel download + parallel upload) 🔥")
+    print(f"  2. PYTUBEFIX (streaming fallback)")
     print(f"  3. yt-dlp (final fallback)")
     print(f"  Requested quality: {quality}")
     print("="*60)
     
-    # Strategy 1: Try PYTUBEFIX downloader with parallel upload (FASTEST)
-    print("\n➡️  Attempt 1: Using PYTUBEFIX downloader (parallel upload)")
-    try:
-        from downloader_pytubefix import download_video_pytubefix
-        success, result = await download_video_pytubefix(url, quality, progress_callback, username)
-        
-        if success:
-            print("\n✅ SUCCESS with PYTUBEFIX downloader! (3-5x faster)")
-            return (True, result)
-        else:
-            print(f"\n⚠️  PYTUBEFIX downloader failed: {result}")
-            print("\n➡️  Attempt 2: Falling back to TURBO...")
-    except Exception as e:
-        print(f"\n⚠️  PYTUBEFIX downloader error: {e}")
-        print(traceback.format_exc())
-        print("\n➡️  Attempt 2: Falling back to TURBO...")
-    
-    # Strategy 2: Try TURBO downloader (RELIABLE)
-    print("\n➡️  Attempt 2: Using TURBO downloader (parallel micro-chunking)")
+    # Strategy 1: Try TURBO downloader FIRST (ULTRA-FAST, 20-30 parallel fragments)
+    print("\n➡️  Attempt 1: Using TURBO downloader (parallel micro-chunking) 🔥")
     try:
         from turbo_downloader import download_video_turbo
         success, result = await download_video_turbo(url, quality, progress_callback, username)
         
         if success:
-            print("\n✅ SUCCESS with TURBO downloader!")
+            print("\n✅ SUCCESS with TURBO downloader! (3-5x faster)")
             return (True, result)
         else:
             print(f"\n⚠️  TURBO downloader failed: {result}")
-            print("\n➡️  Attempt 3: Final fallback to yt-dlp...")
+            print("\n➡️  Attempt 2: Falling back to PYTUBEFIX...")
     except Exception as e:
         print(f"\n⚠️  TURBO downloader error: {e}")
+        print(traceback.format_exc())
+        print("\n➡️  Attempt 2: Falling back to PYTUBEFIX...")
+    
+    # Strategy 2: Try PYTUBEFIX downloader as fallback (STABLE)
+    print("\n➡️  Attempt 2: Using PYTUBEFIX downloader (streaming)")
+    try:
+        from downloader_pytubefix import download_video_pytubefix
+        success, result = await download_video_pytubefix(url, quality, progress_callback, username)
+        
+        if success:
+            print("\n✅ SUCCESS with PYTUBEFIX downloader!")
+            return (True, result)
+        else:
+            print(f"\n⚠️  PYTUBEFIX downloader failed: {result}")
+            print("\n➡️  Attempt 3: Final fallback to yt-dlp...")
+    except Exception as e:
+        print(f"\n⚠️  PYTUBEFIX downloader error: {e}")
         print(traceback.format_exc())
         print("\n➡️  Attempt 3: Final fallback to yt-dlp...")
     
