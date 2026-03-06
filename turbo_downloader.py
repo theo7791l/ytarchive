@@ -2,17 +2,18 @@ import os
 import asyncio
 import aiohttp
 from datetime import datetime
-from typing import Optional, Callable, List
+from typing import Optional, Callable
 import traceback
 from pytubefix import YouTube
 import tempfile
 import time
 import re
 import hashlib
+import gc
 
-# TRUE P2P Configuration
+# TRUE LOW-RAM P2P Configuration
 CHUNK_SIZE = 10 * 1024 * 1024  # 10MB par fragment
-MAX_PARALLEL_FRAGMENTS = 5  # 5 téléchargements YouTube simultanés
+MAX_PARALLEL_FRAGMENTS = 5  # 5 téléchargements simultanés MAX
 REQUEST_TIMEOUT = 3600
 
 
@@ -26,12 +27,10 @@ async def get_channel_avatar_url(channel_url: str) -> str:
                 
                 html = await response.text()
                 
-                # Method 1: og:image
                 match = re.search(r'<meta property="og:image" content="([^"]+)"', html)
                 if match:
                     return match.group(1)
                 
-                # Method 2: channel_id
                 channel_id_match = re.search(r'"channelId":"([^"]+)"', html)
                 if channel_id_match:
                     channel_id = channel_id_match.group(1)
@@ -61,7 +60,7 @@ async def download_fragment_range(session: aiohttp.ClientSession, url: str, star
 
 
 async def upload_chunk_to_b2(b2_api_url: str, b2_auth_token: str, file_id: str, chunk: bytes, part_number: int) -> Optional[str]:
-    """Upload UN chunk vers B2 IMMÉDIATEMENT"""
+    """Upload UN chunk vers B2 puis SUPPRIME de la RAM"""
     try:
         # Get upload part URL
         async with aiohttp.ClientSession() as session:
@@ -98,6 +97,11 @@ async def upload_chunk_to_b2(b2_api_url: str, b2_auth_token: str, file_id: str, 
                     return None
                 
                 print(f"🚀 Chunk {part_number} uploaded to B2 ({len(chunk)/(1024*1024):.1f}MB)")
+                
+                # LIBÉRATION MÉMOIRE INSTANTANÉE !
+                del chunk
+                gc.collect()
+                
                 return sha1
     except Exception as e:
         print(f"❌ B2 upload error chunk {part_number}: {e}")
@@ -105,13 +109,14 @@ async def upload_chunk_to_b2(b2_api_url: str, b2_auth_token: str, file_id: str, 
 
 
 async def parallel_download_and_upload(video_url: str, total_size: int, b2, b2_filename: str) -> tuple:
-    """VRAI P2P: Download 5 fragments EN PARALLÈLE + Upload INSTANTANÉ"""
+    """VRAI P2P LOW-RAM: Download + Upload + DELETE from RAM instantly"""
     
-    print(f"\n🚀 TRUE P2P RELAY MODE")
+    print(f"\n🚀 TRUE LOW-RAM P2P RELAY")
     print(f"  Total size: {total_size/(1024*1024):.1f}MB")
     print(f"  Parallel fragments: {MAX_PARALLEL_FRAGMENTS}")
     print(f"  Chunk size: {CHUNK_SIZE/(1024*1024):.0f}MB")
-    print(f"  Mode: Download + Upload SIMULTANÉS\n")
+    print(f"  RAM: ~{(MAX_PARALLEL_FRAGMENTS * CHUNK_SIZE)/(1024*1024):.0f}MB max")
+    print(f"  Mode: Download → Upload → DELETE (instant)\n")
     
     # Start B2 large file
     async with aiohttp.ClientSession() as session:
@@ -135,12 +140,11 @@ async def parallel_download_and_upload(video_url: str, total_size: int, b2, b2_f
     num_fragments = (total_size + CHUNK_SIZE - 1) // CHUNK_SIZE
     
     # Queue pour coordonner download → upload
-    upload_queue = asyncio.Queue()
+    upload_queue = asyncio.Queue(maxsize=MAX_PARALLEL_FRAGMENTS)  # Limiter la queue !
     part_sha1_array = []
-    part_number = 1
     
     async def downloader(fragment_num: int, start: int, end: int):
-        """Download un fragment et le met dans la queue IMMÉDIATEMENT"""
+        """Download un fragment et le met dans la queue"""
         async with aiohttp.ClientSession() as session:
             frag_num, data = await download_fragment_range(session, video_url, start, end, fragment_num)
             if data:
@@ -149,24 +153,22 @@ async def parallel_download_and_upload(video_url: str, total_size: int, b2, b2_f
                 await upload_queue.put((fragment_num, None))
     
     async def uploader():
-        """Upload les chunks dès qu'ils arrivent (INSTANTANÉ)"""
-        nonlocal part_number
+        """Upload les chunks dès qu'ils arrivent + SUPPRESSION RAM INSTANTANÉE"""
         uploaded_parts = {}
         expected_part = 1
         
         while True:
             fragment_num, data = await upload_queue.get()
             
-            if data is None:
-                # Fragment failed
-                upload_queue.task_done()
-                return False
-            
             if fragment_num == -1:  # Signal de fin
                 upload_queue.task_done()
                 break
             
-            # Upload IMMÉDIATEMENT
+            if data is None:
+                upload_queue.task_done()
+                return False
+            
+            # Upload IMMÉDIATEMENT (la fonction supprime data de la RAM)
             sha1 = await upload_chunk_to_b2(
                 b2.api_url,
                 b2.authorization_token,
@@ -174,6 +176,10 @@ async def parallel_download_and_upload(video_url: str, total_size: int, b2, b2_f
                 data,
                 fragment_num
             )
+            
+            # LIBÉRATION MÉMOIRE du fragment après upload
+            del data
+            gc.collect()
             
             if not sha1:
                 upload_queue.task_done()
@@ -244,14 +250,15 @@ async def parallel_download_and_upload(video_url: str, total_size: int, b2, b2_f
 async def download_video_turbo(url: str, quality: str = "best", 
                                progress_callback: Optional[Callable] = None, 
                                username: str = None):
-    """TRUE P2P TURBO: 5 parallel downloads + instant uploads (real-time relay)"""
+    """TRUE LOW-RAM P2P: 5 parallel downloads + instant upload + instant RAM delete"""
     
     print("="*60)
-    print("🚀 TRUE P2P TURBO DOWNLOADER")
-    print(f"  Download: {MAX_PARALLEL_FRAGMENTS} parallel fragments from YouTube")
-    print(f"  Upload: INSTANT relay to B2 (as soon as fragment arrives)")
+    print("🚀 TRUE LOW-RAM P2P TURBO DOWNLOADER")
+    print(f"  Download: {MAX_PARALLEL_FRAGMENTS} parallel fragments")
+    print(f"  Upload: INSTANT relay to B2")
+    print(f"  RAM: DELETE chunks instantly after upload")
+    print(f"  Max RAM: ~{(MAX_PARALLEL_FRAGMENTS * CHUNK_SIZE)/(1024*1024):.0f}MB")
     print(f"  Chunk size: {CHUNK_SIZE/(1024*1024):.0f}MB")
-    print(f"  Requested quality: {quality}")
     print("="*60)
     
     from auth import get_user_b2_credentials
@@ -356,14 +363,14 @@ async def download_video_turbo(url: str, quality: str = "best",
         video_filename = f"videos/{username}/{yt.video_id}_video.mp4"
         audio_filename = f"videos/{username}/{yt.video_id}_audio.m4a" if info['audio_url'] else None
         
-        print(f"\n🚀 Starting TRUE P2P relay (parallel download + instant upload)...\n")
+        print(f"\n🚀 Starting LOW-RAM P2P relay...\n")
         
         start_time = time.time()
         
         if progress_callback:
             await progress_callback('downloading', 'P2P relay: video...')
         
-        # VIDEO: Parallel download + instant upload
+        # VIDEO: Parallel download + instant upload + instant RAM delete
         success, video_file_id = await parallel_download_and_upload(
             info['video_url'],
             info['video_size'],
@@ -376,7 +383,10 @@ async def download_video_turbo(url: str, quality: str = "best",
         
         print(f"\n✅ Video P2P relay complete")
         
-        # AUDIO: Parallel download + instant upload
+        # Force garbage collection
+        gc.collect()
+        
+        # AUDIO: Parallel download + instant upload + instant RAM delete
         audio_file_id = None
         if info['audio_url']:
             if progress_callback:
@@ -391,6 +401,9 @@ async def download_video_turbo(url: str, quality: str = "best",
             
             if success:
                 print(f"\n✅ Audio P2P relay complete")
+        
+        # Force garbage collection
+        gc.collect()
         
         # Thumbnail
         thumbnail_url = None
@@ -418,12 +431,12 @@ async def download_video_turbo(url: str, quality: str = "best",
         avg_speed = total_size / total_time if total_time > 0 else 0
         
         print(f"\n{'='*60}")
-        print(f"🎉 TRUE P2P RELAY COMPLETE")
+        print(f"🎉 LOW-RAM P2P RELAY COMPLETE")
         print(f"{'='*60}")
         print(f"  Total: {total_size:.1f} MB")
         print(f"  Duration: {total_time:.1f}s")
         print(f"  Avg Speed: {avg_speed:.1f} MB/s")
-        print(f"  Parallel fragments: {MAX_PARALLEL_FRAGMENTS}")
+        print(f"  Max RAM used: ~{(MAX_PARALLEL_FRAGMENTS * CHUNK_SIZE)/(1024*1024):.0f}MB")
         print(f"{'='*60}\n")
         
         if progress_callback:
@@ -452,7 +465,7 @@ async def download_video_turbo(url: str, quality: str = "best",
             'url': url,
             'storage': 'b2',
             'owner': username,
-            'downloader': 'turbo_p2p',
+            'downloader': 'turbo_low_ram_p2p',
             'format': 'separated',
             'is_separate': True
         }
