@@ -1,14 +1,3 @@
-"""
-Turbo Downloader - True Streaming Without RAM Buffering
-=======================================================
-
-Architecture: Zero-RAM streaming direct vers B2
-- Download chunk → Upload immédiatement → Libère RAM
-- Jamais plus de 10MB en RAM
-- B2 Large File API pour streaming
-- Pas de fichier temporaire
-"""
-
 import os
 import asyncio
 import aiohttp
@@ -16,15 +5,61 @@ import hashlib
 from datetime import datetime
 from typing import Optional, Callable
 import traceback
-from pytubefix import YouTube
+from pytubefix import YouTube, Channel
 import tempfile
 import time
+import re
 
 # Configuration pour streaming sans RAM
 MAX_PARALLEL_CHUNKS = 3  # 3 chunks en parallèle MAX
 CHUNK_SIZE = 10 * 1024 * 1024  # 10MB par chunk (pour B2 Large File)
+MIN_LARGE_FILE_SIZE = 20 * 1024 * 1024  # 20MB minimum for Large File API
 REQUEST_TIMEOUT = 30
 MAX_RETRIES = 3
+
+
+async def get_channel_avatar_url(channel_url: str) -> str:
+    """Extract REAL avatar image URL from YouTube channel"""
+    try:
+        print(f"🖼️  Fetching avatar from: {channel_url}")
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.get(channel_url, timeout=aiohttp.ClientTimeout(total=10)) as response:
+                if response.status != 200:
+                    return None
+                
+                html = await response.text()
+                
+                # Extract avatar from HTML meta tags or JSON data
+                # Method 1: Look for og:image meta tag
+                match = re.search(r'<meta property="og:image" content="([^"]+)"', html)
+                if match:
+                    avatar_url = match.group(1)
+                    print(f"✅ Avatar found (og:image): {avatar_url[:80]}...")
+                    return avatar_url
+                
+                # Method 2: Look for channelId and construct googleusercontent URL
+                channel_id_match = re.search(r'"channelId":"([^"]+)"', html)
+                if channel_id_match:
+                    channel_id = channel_id_match.group(1)
+                    # YouTube avatar CDN format
+                    avatar_url = f"https://yt3.googleusercontent.com/ytc/{channel_id}=s176-c-k-c0x00ffffff-no-rj"
+                    print(f"✅ Avatar constructed from channel_id: {avatar_url}")
+                    return avatar_url
+                
+                # Method 3: Search for avatar in var ytInitialData
+                avatar_match = re.search(r'"avatar":{"thumbnails":\[{"url":"([^"]+)"', html)
+                if avatar_match:
+                    avatar_url = avatar_match.group(1)
+                    print(f"✅ Avatar found (ytInitialData): {avatar_url[:80]}...")
+                    return avatar_url
+        
+        print("⚠️  Could not extract avatar from channel page")
+        return None
+    
+    except Exception as e:
+        print(f"❌ Error fetching channel avatar: {e}")
+        return None
 
 
 class TurboStreamingDownloader:
@@ -42,6 +77,57 @@ class TurboStreamingDownloader:
         self.start_time = time.time()
         self.bytes_uploaded = 0
         self.chunks_uploaded = 0
+    
+    async def simple_upload_to_b2(self, url: str, size: int, stream_type: str,
+                                   b2, b2_filename: str, progress_callback: Optional[Callable]):
+        """Simple upload for small files (< 20MB) - NO Large File API"""
+        
+        print(f"\n📤 Simple upload {stream_type}: {size / 1024 / 1024:.1f}MB to B2")
+        
+        try:
+            # Download entire file to memory (it's small)
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, timeout=aiohttp.ClientTimeout(total=60)) as response:
+                    if response.status not in [200, 206]:
+                        raise Exception(f"Download failed: HTTP {response.status}")
+                    
+                    file_data = await response.read()
+            
+            print(f"  Downloaded {len(file_data) / 1024 / 1024:.1f}MB")
+            
+            # Upload to B2 using simple API
+            await b2.get_upload_url()
+            
+            sha1 = hashlib.sha1(file_data).hexdigest()
+            
+            upload_headers = {
+                'Authorization': b2.upload_auth_token,
+                'X-Bz-File-Name': b2_filename.replace('/', '%2F'),
+                'Content-Type': 'video/mp4' if stream_type == 'video' else 'audio/mp4',
+                'Content-Length': str(len(file_data)),
+                'X-Bz-Content-Sha1': sha1
+            }
+            
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    b2.upload_url,
+                    data=file_data,
+                    headers=upload_headers
+                ) as response:
+                    if response.status != 200:
+                        raise Exception(f"Upload failed: {await response.text()}")
+                    
+                    result = await response.json()
+                    file_id = result['fileId']
+            
+            self.bytes_uploaded += len(file_data)
+            
+            print(f"✅ {stream_type} uploaded: {file_id}")
+            return file_id
+        
+        except Exception as e:
+            print(f"❌ Simple upload failed: {e}")
+            raise
     
     async def download_and_upload_chunk(self, url: str, start: int, end: int, 
                                        b2_session: aiohttp.ClientSession,
@@ -122,7 +208,12 @@ class TurboStreamingDownloader:
     
     async def stream_to_b2(self, url: str, size: int, stream_type: str,
                           b2, b2_filename: str, progress_callback: Optional[Callable]):
-        """Stream complet vers B2 sans jamais stocker en RAM"""
+        """Stream complet vers B2 - Auto-detect simple vs large file upload"""
+        
+        # 🔧 FIX: Use simple upload for small files
+        if size < MIN_LARGE_FILE_SIZE:
+            print(f"  File too small for Large File API, using simple upload")
+            return await self.simple_upload_to_b2(url, size, stream_type, b2, b2_filename, progress_callback)
         
         print(f"\n📡 Streaming {stream_type}: {size / 1024 / 1024:.1f}MB directly to B2")
         
@@ -293,24 +384,6 @@ async def download_video_turbo(url: str, quality: str = "best",
             if audio_stream:
                 print(f"Selected audio: {audio_stream.abr} (~{audio_stream.filesize_mb:.1f}MB)")
             
-            # Extract channel thumbnail URL
-            channel_url = None
-            try:
-                # pytubefix may have channel thumbnails
-                if hasattr(yt, 'channel_url'):
-                    channel_url = yt.channel_url
-                
-                # Try to get best thumbnail
-                if hasattr(yt, 'channel_thumbnails') and yt.channel_thumbnails:
-                    channel_url = yt.channel_thumbnails[-1]['url'] if yt.channel_thumbnails else None
-                elif hasattr(yt, 'uploader_avatar'):
-                    channel_url = yt.uploader_avatar
-                
-                if channel_url:
-                    print(f"Channel avatar: {channel_url[:60]}...")
-            except Exception as e:
-                print(f"Warning: Could not extract channel avatar: {e}")
-            
             return {
                 'yt': yt,
                 'video_stream': video_stream,
@@ -319,8 +392,7 @@ async def download_video_turbo(url: str, quality: str = "best",
                 'audio_url': audio_stream.url if audio_stream else None,
                 'video_size': video_stream.filesize,
                 'audio_size': audio_stream.filesize if audio_stream else 0,
-                'resolution': video_stream.resolution,
-                'channel_url': channel_url
+                'resolution': video_stream.resolution
             }, None
         
         info, error = await loop.run_in_executor(None, get_info)
@@ -329,6 +401,11 @@ async def download_video_turbo(url: str, quality: str = "best",
             return (False, error)
         
         yt = info['yt']
+        
+        # 🖼️ Get REAL channel avatar URL
+        channel_avatar_url = None
+        if yt.channel_url:
+            channel_avatar_url = await get_channel_avatar_url(yt.channel_url)
         
         # Initialize B2
         from b2_storage import B2Storage
@@ -418,7 +495,7 @@ async def download_video_turbo(url: str, quality: str = "best",
             'title': yt.title,
             'channel': yt.author,
             'channel_id': yt.channel_id,
-            'channel_url': info.get('channel_url'),  # 🖼️ Avatar URL !
+            'channel_url': channel_avatar_url,  # 🖼️ REAL Avatar URL !
             'duration': yt.length,
             'upload_date': yt.publish_date.isoformat() if yt.publish_date else None,
             'description': yt.description[:500] if yt.description else '',
