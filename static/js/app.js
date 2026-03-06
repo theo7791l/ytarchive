@@ -148,6 +148,9 @@ let currentFilter = 'all';
 let currentSort = 'date-desc';
 let currentSearch = '';
 
+// 🖼️ Avatar cache to avoid duplicate API calls
+const avatarCache = {};
+
 // Toast notifications
 function showToast(message, type = 'info') {
     const toast = document.createElement('div');
@@ -166,11 +169,31 @@ function openChannelPage(channelId, channelName) {
     window.location.href = `/channel/${channelId}`;
 }
 
-// 🖼️ Get channel avatar from video metadata
-function getChannelAvatarFromVideos(channelId) {
-    // Find any video from this channel with channel_url
-    const video = libraryCache.find(v => v.channel_id === channelId && v.channel_url);
-    return video ? video.channel_url : null;
+// 🖼️ Fetch channel avatar from backend API with caching
+async function fetchChannelAvatar(channelId) {
+    // Check cache first
+    if (avatarCache[channelId] !== undefined) {
+        return avatarCache[channelId];
+    }
+    
+    // Check video metadata first (faster)
+    const videoWithAvatar = libraryCache.find(v => v.channel_id === channelId && v.channel_url);
+    if (videoWithAvatar) {
+        avatarCache[channelId] = videoWithAvatar.channel_url;
+        return videoWithAvatar.channel_url;
+    }
+    
+    // Fallback: call API
+    try {
+        const response = await apiCall(`/api/channel/${channelId}/avatar`);
+        const avatarUrl = response.avatar_url || null;
+        avatarCache[channelId] = avatarUrl;
+        return avatarUrl;
+    } catch (error) {
+        console.error(`Error fetching avatar for ${channelId}:`, error);
+        avatarCache[channelId] = null;
+        return null;
+    }
 }
 
 // Load Channels (for channels-view tab)
@@ -193,7 +216,7 @@ async function loadChannels() {
         updateChannelsStats();
         
         // Render channels
-        renderChannelsList();
+        await renderChannelsList();
         
         // Show FAB button after render
         setTimeout(() => showFAB(), 100);
@@ -222,7 +245,7 @@ function updateChannelsStats() {
 }
 
 // Render channels list in channels-view
-function renderChannelsList() {
+async function renderChannelsList() {
     const grid = document.getElementById('channels-list');
     const emptyState = document.getElementById('emptyStateChannels');
     const statsOverview = document.getElementById('statsOverview');
@@ -242,24 +265,32 @@ function renderChannelsList() {
     grid.style.display = 'grid';
     if (statsOverview) statsOverview.style.display = 'grid';
     if (emptyState) emptyState.style.display = 'none';
+    grid.innerHTML = '<div class="channels-loading">Chargement des chaînes...</div>';
+    
+    // 🖼️ Fetch all avatars in parallel
+    const channelsWithData = await Promise.all(
+        channelsCache.map(async (channel) => {
+            const avatarUrl = await fetchChannelAvatar(channel.id);
+            const videoCount = libraryCache.filter(v => v.channel_id === channel.id).length;
+            const totalDuration = libraryCache
+                .filter(v => v.channel_id === channel.id)
+                .reduce((sum, v) => sum + (v.duration || 0), 0);
+            
+            return { ...channel, avatarUrl, videoCount, totalDuration };
+        })
+    );
+    
     grid.innerHTML = '';
     
-    channelsCache.forEach((channel, index) => {
-        // 🖼️ Get avatar from video metadata
-        const avatarUrl = getChannelAvatarFromVideos(channel.id);
-        const videoCount = libraryCache.filter(v => v.channel_id === channel.id).length;
-        const totalDuration = libraryCache
-            .filter(v => v.channel_id === channel.id)
-            .reduce((sum, v) => sum + (v.duration || 0), 0);
-        
+    channelsWithData.forEach((channel, index) => {
         const card = document.createElement('div');
         card.className = 'channel-card';
         card.style.setProperty('--i', index);
         
         // Build avatar HTML with proper error handling
         let avatarHtml;
-        if (avatarUrl) {
-            avatarHtml = `<img src="${avatarUrl}" alt="${channel.name}" 
+        if (channel.avatarUrl) {
+            avatarHtml = `<img src="${channel.avatarUrl}" alt="${channel.name}" 
                 style="width: 100%; height: 100%; object-fit: cover; display: block;" 
                 onerror="this.style.display='none'; this.parentElement.innerHTML='<div class=\'channel-avatar-fallback\'>${channel.name.substring(0, 2).toUpperCase()}</div>';">`;
         } else {
@@ -281,7 +312,7 @@ function renderChannelsList() {
                 <div class="channel-info">
                     <h3 class="channel-name">${channel.name}</h3>
                     <div class="channel-meta">
-                        <span><strong>${videoCount}</strong> vidéo${videoCount > 1 ? 's' : ''}</span>
+                        <span><strong>${channel.videoCount}</strong> vidéo${channel.videoCount > 1 ? 's' : ''}</span>
                         <span>•</span>
                         <span>Qualité: <strong>${channel.quality}</strong></span>
                     </div>
@@ -290,11 +321,11 @@ function renderChannelsList() {
             
             <div class="channel-stats">
                 <div class="stat-item-small">
-                    <span class="value">${videoCount}</span>
+                    <span class="value">${channel.videoCount}</span>
                     <span class="label">Vidéos</span>
                 </div>
                 <div class="stat-item-small">
-                    <span class="value">${formatDurationShort(totalDuration)}</span>
+                    <span class="value">${formatDurationShort(channel.totalDuration)}</span>
                     <span class="label">Durée</span>
                 </div>
             </div>
@@ -336,7 +367,7 @@ async function toggleAutoDownload(channelId, event) {
         
         channel.auto_download = newValue;
         updateChannelsStats();
-        renderChannelsList();
+        await renderChannelsList();
         
         showToast(
             newValue ? 'Téléchargement automatique activé' : 'Téléchargement automatique désactivé',
@@ -380,7 +411,7 @@ async function deleteChannel(channelId, event) {
         
         channelsCache = channelsCache.filter(c => c.id !== channelId);
         updateChannelsStats();
-        renderChannelsList();
+        await renderChannelsList();
         
         showToast('Chaîne supprimée', 'success');
     } catch (error) {
@@ -454,17 +485,11 @@ function getChannelsWithStats() {
             channelsMap[video.channel_id] = {
                 id: video.channel_id,
                 name: video.channel,
-                videos: [],
-                avatarUrl: video.channel_url || null  // 🖼️ Use channel_url from video
+                videos: []
             };
         }
         
         channelsMap[video.channel_id].videos.push(video);
-        
-        // Update avatar if this video has one and we don't have one yet
-        if (video.channel_url && !channelsMap[video.channel_id].avatarUrl) {
-            channelsMap[video.channel_id].avatarUrl = video.channel_url;
-        }
     });
     
     return Object.values(channelsMap).map(channel => ({
@@ -530,7 +555,7 @@ if (addChannelForm) {
             
             channelsCache.push(newChannel);
             updateChannelsStats();
-            renderChannelsList();
+            await renderChannelsList();
             
             closeAddChannelModal();
             showToast('Chaîne ajoutée avec succès !', 'success');
@@ -544,8 +569,8 @@ if (addChannelForm) {
     });
 }
 
-// Render Channels View with avatars from video metadata
-function renderChannelsView() {
+// Render Channels View with avatars
+async function renderChannelsView() {
     const channels = getChannelsWithStats();
     const grid = document.getElementById('library-grid');
     
@@ -566,15 +591,25 @@ function renderChannelsView() {
     
     filteredChannels.sort((a, b) => b.videoCount - a.videoCount);
     
+    grid.innerHTML = '<div class="channels-loading">Chargement des chaînes...</div>';
+    
+    // 🖼️ Fetch all avatars in parallel
+    const channelsWithAvatars = await Promise.all(
+        filteredChannels.map(async (channel) => {
+            const avatarUrl = await fetchChannelAvatar(channel.id);
+            return { ...channel, avatarUrl };
+        })
+    );
+    
     grid.innerHTML = '';
     
-    filteredChannels.forEach((channel, index) => {
+    channelsWithAvatars.forEach((channel, index) => {
         const card = document.createElement('div');
         card.className = 'channel-overview-card';
         card.style.setProperty('--i', index);
         card.onclick = () => openChannelPage(channel.id, channel.name);
         
-        // 🖼️ Use avatar from video metadata
+        // Use avatar or fallback to first letters
         const avatarHtml = channel.avatarUrl 
             ? `<img src="${channel.avatarUrl}" alt="${channel.name}" onerror="this.style.display='none'; this.parentElement.innerHTML='<div class=\'channel-avatar-fallback\'>${channel.name.substring(0, 2).toUpperCase()}</div>';">`
             : `<div class="channel-avatar-fallback">${channel.name.substring(0, 2).toUpperCase()}</div>`;
