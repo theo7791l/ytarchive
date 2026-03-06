@@ -162,7 +162,7 @@ class B2Storage:
             return False
     
     async def _upload_single_part(self, file_id: str, chunk: bytes, part_number: int) -> Optional[str]:
-        """Upload a single part"""
+        """Upload a single part (used in parallel)"""
         try:
             # Get upload part URL
             async with aiohttp.ClientSession() as session:
@@ -209,10 +209,10 @@ class B2Storage:
             return None
     
     async def upload_large_file_streaming(self, chunk_iterator: AsyncIterator[bytes], b2_filename: str, content_type: str = 'video/mp4', progress_callback: Optional[Callable] = None) -> Tuple[bool, Optional[str]]:
-        """Upload large file with PIPELINE parallel uploads (3 simultaneous max) - FAST + LOW RAM"""
+        """Upload large file with PARALLEL chunk uploads (5 simultaneous)"""
         try:
             print(f"\n🚀 Starting Large File upload: {b2_filename}")
-            print(f"⚡ PIPELINE MODE: 3 parallel uploads (max 15MB RAM = 3x5MB)")
+            print(f"⚡ Parallel mode: 5 chunks simultaneous")
             
             # Start large file
             async with aiohttp.ClientSession() as session:
@@ -234,62 +234,50 @@ class B2Storage:
                     file_id = data['fileId']
                     print(f"✅ Large file started: {file_id}")
             
-            # Pipeline: Keep max 3 uploads running simultaneously
-            MAX_PARALLEL = 3
+            # Collect and upload parts in parallel (batches of 5)
             part_sha1_array = []
             part_number = 1
-            pending_tasks = []  # List of (part_number, task, chunk_for_retry)
+            pending_uploads = []
             
             async for chunk in chunk_iterator:
-                # Start upload task for this chunk
-                task = asyncio.create_task(self._upload_single_part(file_id, chunk, part_number))
-                pending_tasks.append((part_number, task))
+                # Start upload task
+                task = self._upload_single_part(file_id, chunk, part_number)
+                pending_uploads.append((part_number, task))
                 part_number += 1
                 
-                # If we have 3 pending uploads, wait for at least one to complete
-                while len(pending_tasks) >= MAX_PARALLEL:
-                    # Wait for the oldest task to complete
-                    pnum, oldest_task = pending_tasks[0]
-                    result = await oldest_task
+                # When we have 5 pending, wait for them
+                if len(pending_uploads) >= 5:
+                    # Wait for all 5 to complete
+                    results = await asyncio.gather(*[t for _, t in pending_uploads], return_exceptions=True)
                     
-                    if result is None:
-                        print(f"❌ Upload failed for part {pnum}, aborting...")
-                        # Cancel all pending tasks
-                        for _, t in pending_tasks[1:]:
-                            t.cancel()
+                    # Check results
+                    for (pnum, _), result in zip(pending_uploads, results):
+                        if isinstance(result, Exception) or result is None:
+                            print(f"Upload failed for part {pnum}")
+                            return (False, None)
+                        part_sha1_array.append(result)
+                    
+                    pending_uploads = []
+            
+            # Upload remaining parts
+            if pending_uploads:
+                results = await asyncio.gather(*[t for _, t in pending_uploads], return_exceptions=True)
+                
+                for (pnum, _), result in zip(pending_uploads, results):
+                    if isinstance(result, Exception) or result is None:
+                        print(f"Upload failed for part {pnum}")
                         return (False, None)
-                    
-                    part_sha1_array.append((pnum, result))
-                    pending_tasks.pop(0)
-                    
-                    # Progress every 10 parts
-                    if len(part_sha1_array) % 10 == 0:
-                        print(f"📦 Progress: {len(part_sha1_array)} parts uploaded...")
-            
-            # Wait for all remaining uploads to complete
-            print(f"\n⏳ Waiting for final {len(pending_tasks)} uploads...")
-            for pnum, task in pending_tasks:
-                result = await task
-                
-                if result is None:
-                    print(f"❌ Upload failed for part {pnum}")
-                    return (False, None)
-                
-                part_sha1_array.append((pnum, result))
-            
-            # Sort by part number and extract SHA1s
-            part_sha1_array.sort(key=lambda x: x[0])
-            sorted_sha1s = [sha1 for _, sha1 in part_sha1_array]
+                    part_sha1_array.append(result)
             
             # Finish large file
-            print(f"\n✅ All {len(sorted_sha1s)} parts uploaded! Finishing...")
+            print(f"\n✅ All parts uploaded! Finishing...")
             async with aiohttp.ClientSession() as session:
                 async with session.post(
                     f"{self.api_url}/b2api/v2/b2_finish_large_file",
                     headers={'Authorization': self.authorization_token},
                     json={
                         'fileId': file_id,
-                        'partSha1Array': sorted_sha1s
+                        'partSha1Array': part_sha1_array
                     }
                 ) as response:
                     if response.status != 200:
@@ -300,7 +288,6 @@ class B2Storage:
                     result = await response.json()
                     final_file_id = result['fileId']
                     print(f"✅ Upload complete! File ID: {final_file_id}")
-                    print(f"⚡ Pipeline mode: 3x faster with only 15MB RAM")
                     return (True, final_file_id)
         
         except Exception as e:
