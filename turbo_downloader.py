@@ -495,7 +495,7 @@ async def download_video_turbo(url: str, quality: str = "best",
             'title': yt.title,
             'channel': yt.author,
             'channel_id': yt.channel_id,
-            'channel_url': channel_avatar_url,  # 🖼️ REAL Avatar URL !
+            'channel_avatar_url': channel_avatar_url,  # 🔧 FIXED: Correct key name!
             'duration': yt.length,
             'upload_date': yt.publish_date.isoformat() if yt.publish_date else None,
             'description': yt.description[:500] if yt.description else '',
