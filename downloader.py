@@ -8,17 +8,34 @@ import traceback
 VIDEOS_DIR = "videos"
 
 async def download_video(url: str, quality: str = "best", progress_callback: Optional[Callable] = None, username: str = None):
-    """Download a video trying pytubefix first, then yt-dlp as fallback"""
+    """Download a video using 3-tier strategy: turbo -> pytubefix -> yt-dlp"""
     
     print("="*60)
-    print(f"DUAL-DOWNLOADER SYSTEM")
-    print(f"  1. Pytubefix (reliable, supports 1080p+)")
-    print(f"  2. yt-dlp (fallback)")
+    print("🚀 TRI-DOWNLOADER SYSTEM - ULTRA-FAST")
+    print(f"  1. TURBO (ultra-fast parallel micro-chunking)")
+    print(f"  2. Pytubefix (reliable, supports 1080p+)")
+    print(f"  3. yt-dlp (final fallback)")
     print(f"  Requested quality: {quality}")
     print("="*60)
     
-    # Strategy 1: Try pytubefix (BEST for most cases)
-    print("\n➡️  Attempt 1: Using pytubefix")
+    # Strategy 1: Try TURBO downloader (FASTEST)
+    print("\n➡️  Attempt 1: Using TURBO downloader (parallel micro-chunking)")
+    try:
+        from turbo_downloader import download_video_turbo
+        success, result = await download_video_turbo(url, quality, progress_callback, username)
+        
+        if success:
+            print("\n✅ SUCCESS with TURBO downloader! (3-5x faster)")
+            return (True, result)
+        else:
+            print(f"\n⚠️  TURBO downloader failed: {result}")
+            print("\n➡️  Attempt 2: Falling back to pytubefix...")
+    except Exception as e:
+        print(f"\n⚠️  TURBO downloader error: {e}")
+        print(traceback.format_exc())
+        print("\n➡️  Attempt 2: Falling back to pytubefix...")
+    
+    # Strategy 2: Try pytubefix (RELIABLE)
     try:
         from downloader_pytubefix import download_video_pytubefix
         success, result = await download_video_pytubefix(url, quality, progress_callback, username)
@@ -28,12 +45,12 @@ async def download_video(url: str, quality: str = "best", progress_callback: Opt
             return (True, result)
         else:
             print(f"\n⚠️  pytubefix failed: {result}")
-            print("\n➡️  Attempt 2: Falling back to yt-dlp...")
+            print("\n➡️  Attempt 3: Final fallback to yt-dlp...")
     except Exception as e:
         print(f"\n⚠️  pytubefix error: {e}")
-        print("\n➡️  Attempt 2: Falling back to yt-dlp...")
+        print("\n➡️  Attempt 3: Final fallback to yt-dlp...")
     
-    # Strategy 2: Fallback to yt-dlp
+    # Strategy 3: Final fallback to yt-dlp
     return await download_video_ytdlp(url, quality, progress_callback, username)
 
 async def download_video_ytdlp(url: str, quality: str = "best", progress_callback: Optional[Callable] = None, username: str = None):
