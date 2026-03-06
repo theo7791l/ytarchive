@@ -367,15 +367,16 @@
     }
     
     .sidebar-videos {
-        flex-direction: row;
-        overflow-x: auto;
-        overflow-y: hidden;
-        max-height: none;
+        flex-direction: column;
+        max-height: 600px;
+        overflow-y: auto;
+        overflow-x: hidden;
         padding-bottom: 10px;
     }
     
     .sidebar-video {
-        min-width: 300px;
+        min-width: 100%;
+        width: 100%;
     }
 }
 
@@ -403,6 +404,10 @@
     }
     
     .sidebar-video {
-        min-width: 250px;
+        width: 100%;
+    }
+    
+    .sidebar-videos {
+        max-height: 400px;
     }
 }
