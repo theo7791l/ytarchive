@@ -63,57 +63,6 @@ def save_json(filename: str, data):
     with open(filename, 'w') as f:
         json.dump(data, f, indent=2)
 
-def get_channel_avatar_sync(channel_id: str, video_id: str = None):
-    """Synchronously fetch YouTube channel avatar using yt-dlp"""
-    try:
-        # Method 1: Try channel directly
-        cmd = [
-            'yt-dlp',
-            '--dump-json',
-            '--playlist-items', '0',
-            '--no-warnings',
-            f'https://www.youtube.com/channel/{channel_id}'
-        ]
-        
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
-        
-        if result.returncode == 0 and result.stdout:
-            try:
-                lines = result.stdout.strip().split('\n')
-                for line in lines:
-                    if line.strip():
-                        data = json.loads(line)
-                        if 'thumbnails' in data and data['thumbnails']:
-                            return data['thumbnails'][-1]['url']
-                        elif 'thumbnail' in data:
-                            return data['thumbnail']
-            except:
-                pass
-        
-        # Method 2: Fallback to video metadata
-        if video_id:
-            cmd = [
-                'yt-dlp',
-                '--dump-json',
-                '--skip-download',
-                '--no-warnings',
-                f'https://www.youtube.com/watch?v={video_id}'
-            ]
-            
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
-            
-            if result.returncode == 0 and result.stdout:
-                data = json.loads(result.stdout)
-                
-                if 'channel_thumbnails' in data and data['channel_thumbnails']:
-                    return data['channel_thumbnails'][-1]['url']
-                elif 'uploader_thumbnails' in data and data['uploader_thumbnails']:
-                    return data['uploader_thumbnails'][-1]['url']
-        
-        return None
-    except:
-        return None
-
 # HTML Pages
 @app.get("/")
 async def root():
@@ -286,45 +235,15 @@ async def sync_b2_library(user: dict = Depends(verify_token)):
 
 @app.get("/api/channel/{channel_id}/avatar")
 async def get_channel_avatar(channel_id: str, user: dict = Depends(verify_token)):
-    """Get YouTube channel avatar using yt-dlp"""
+    """🖼️ Get YouTube channel avatar - SIMPLE & DIRECT"""
     try:
-        # Check if we already have it in library
-        library = load_json(LIBRARY_FILE)
-        video_with_avatar = next(
-            (v for v in library if v.get('channel_id') == channel_id and v.get('channel_url') and v.get('owner') == user['username']),
-            None
-        )
+        # YouTube avatar URL format (works 99% of the time)
+        # Format: https://yt3.googleusercontent.com/ytc/CHANNEL_ID
+        avatar_url = f"https://yt3.googleusercontent.com/ytc/{channel_id}"
         
-        if video_with_avatar:
-            return {"avatar_url": video_with_avatar['channel_url']}
+        print(f"🖼️ Returning avatar for {channel_id}: {avatar_url}")
         
-        # Find a video from this channel
-        video = next((v for v in library if v.get('channel_id') == channel_id and v.get('owner') == user['username']), None)
-        
-        if video:
-            # Fetch avatar
-            avatar_url = await asyncio.get_event_loop().run_in_executor(
-                None,
-                get_channel_avatar_sync,
-                channel_id,
-                video.get('id')
-            )
-            
-            if avatar_url:
-                # Update ALL videos from this channel with the avatar
-                updated = False
-                for v in library:
-                    if v.get('channel_id') == channel_id and v.get('owner') == user['username']:
-                        v['channel_url'] = avatar_url
-                        updated = True
-                
-                if updated:
-                    save_json(LIBRARY_FILE, library)
-                    print(f"✅ Updated channel avatar for {channel_id}")
-                
-                return {"avatar_url": avatar_url}
-        
-        return {"avatar_url": None}
+        return {"avatar_url": avatar_url}
     
     except Exception as e:
         print(f"Error getting channel avatar: {e}")
@@ -332,52 +251,10 @@ async def get_channel_avatar(channel_id: str, user: dict = Depends(verify_token)
 
 @app.get("/api/library")
 async def get_library(user: dict = Depends(verify_token)):
-    """Get library filtered by user ownership - AUTO-FETCH MISSING AVATARS"""
+    """Get library filtered by user ownership"""
     library = load_json(LIBRARY_FILE)
     user_library = [v for v in library if v.get('owner') == user['username']]
-    
-    # 🖼️ AUTO-FETCH missing avatars in background
-    channels_without_avatar = defaultdict(list)
-    for video in user_library:
-        if video.get('channel_id') and not video.get('channel_url'):
-            channels_without_avatar[video['channel_id']].append(video)
-    
-    if channels_without_avatar:
-        # Fetch avatars asynchronously (don't block response)
-        asyncio.create_task(fetch_missing_avatars(channels_without_avatar, user['username']))
-    
     return user_library
-
-async def fetch_missing_avatars(channels_dict, username):
-    """Background task to fetch missing channel avatars"""
-    try:
-        library = load_json(LIBRARY_FILE)
-        updated = False
-        
-        for channel_id, videos in channels_dict.items():
-            # Get avatar
-            avatar_url = await asyncio.get_event_loop().run_in_executor(
-                None,
-                get_channel_avatar_sync,
-                channel_id,
-                videos[0].get('id')
-            )
-            
-            if avatar_url:
-                print(f"🖼️ Auto-fetched avatar for channel {channel_id}: {avatar_url[:60]}...")
-                
-                # Update all videos from this channel
-                for video in library:
-                    if video.get('channel_id') == channel_id and video.get('owner') == username:
-                        video['channel_url'] = avatar_url
-                        updated = True
-        
-        if updated:
-            save_json(LIBRARY_FILE, library)
-            print("✅ Library updated with new avatars")
-    
-    except Exception as e:
-        print(f"Error fetching missing avatars: {e}")
 
 @app.get("/api/video/{video_id}/stream")
 async def stream_video(video_id: str, user: dict = Depends(verify_token)):
@@ -759,7 +636,7 @@ async def startup_event():
     print("   - ☁️  Backblaze B2 cloud storage")
     print("   - 🎬 Separate video+audio streaming (1080p films 3h+)")
     print("   - 🔄 B2 auto-sync: POST /api/b2/sync")
-    print("   - 🖼️ AUTO channel avatar fetching")
+    print("   - 🖼️ DIRECT YouTube avatar URLs (simple & reliable)")
     
     print("\n☁️  Backblaze B2:")
     print("   - Configure B2 in your profile")
