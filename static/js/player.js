@@ -14,6 +14,13 @@ function getVideoUrl(video) {
     return null;
 }
 
+// Escape HTML to prevent injection
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
 async function playVideo(videoId) {
     const video = libraryCache.find(v => v.id === videoId);
     if (!video) return;
@@ -54,6 +61,29 @@ async function playVideo(videoId) {
     
     const modal = document.createElement('div');
     modal.className = 'video-player-modal';
+    
+    // Build sidebar videos HTML with proper escaping
+    const sidebarVideosHtml = otherVideos.slice(0, 20).map(v => {
+        const sidebarThumbUrl = getThumbnailUrl(v);
+        const sidebarThumbHtml = sidebarThumbUrl 
+            ? `<img src="${escapeHtml(sidebarThumbUrl)}" alt="${escapeHtml(v.title)}" onerror="this.style.display='none';this.parentElement.innerHTML='<div class=\\'sidebar-no-thumb\\'>VID</div>'">` 
+            : `<div class="sidebar-no-thumb">VID</div>`;
+        
+        return `
+            <div class="sidebar-video" onclick="playVideo('${escapeHtml(v.id)}')">
+                <div class="sidebar-thumbnail">
+                    ${sidebarThumbHtml}
+                    <span class="sidebar-duration">${formatDuration(v.duration)}</span>
+                </div>
+                <div class="sidebar-info">
+                    <h4 class="sidebar-video-title">${escapeHtml(v.title)}</h4>
+                    <p class="sidebar-channel">${escapeHtml(v.channel)}</p>
+                    <p class="sidebar-views">${formatNumber(v.view_count)} vues</p>
+                </div>
+            </div>
+        `;
+    }).join('');
+    
     modal.innerHTML = `
         <button class="player-close-btn" onclick="closePlayer()">×</button>
         
@@ -75,9 +105,9 @@ async function playVideo(videoId) {
                 </div>
                 
                 <div class="player-info">
-                    <h1 class="player-video-title">${video.title}</h1>
+                    <h1 class="player-video-title">${escapeHtml(video.title)}</h1>
                     <div class="player-video-meta">
-                        <span class="player-channel clickable-channel" onclick="closePlayer(); openChannelPage('${video.channel_id}', '${video.channel.replace(/'/g, "\\'")}')">@${video.channel}</span>
+                        <span class="player-channel clickable-channel" onclick="closePlayer(); openChannelPage('${escapeHtml(video.channel_id)}', '${escapeHtml(video.channel)}')">@${escapeHtml(video.channel)}</span>
                         <span>•</span>
                         <span>${formatNumber(video.view_count)} vues</span>
                         <span>•</span>
@@ -114,7 +144,7 @@ async function playVideo(videoId) {
                     ${video.description ? `
                     <div class="player-description">
                         <strong>Description:</strong>
-                        <p>${video.description}</p>
+                        <p>${escapeHtml(video.description)}</p>
                     </div>
                     ` : ''}
                 </div>
@@ -123,26 +153,7 @@ async function playVideo(videoId) {
             <div class="player-sidebar">
                 <h3 class="sidebar-title">Autres vidéos</h3>
                 <div class="sidebar-videos">
-                    ${otherVideos.slice(0, 20).map(v => {
-                        const sidebarThumbUrl = getThumbnailUrl(v);
-                        const sidebarThumbHtml = sidebarThumbUrl 
-                            ? `<img src="${sidebarThumbUrl}" alt="${v.title}" onerror="this.style.display='none';this.parentElement.innerHTML='<div class=\\"sidebar-no-thumb\\">VID</div>'">` 
-                            : `<div class="sidebar-no-thumb">VID</div>`;
-                        
-                        return `
-                            <div class="sidebar-video" onclick="playVideo('${v.id}')">
-                                <div class="sidebar-thumbnail">
-                                    ${sidebarThumbHtml}
-                                    <span class="sidebar-duration">${formatDuration(v.duration)}</span>
-                                </div>
-                                <div class="sidebar-info">
-                                    <h4 class="sidebar-video-title">${v.title}</h4>
-                                    <p class="sidebar-channel">${v.channel}</p>
-                                    <p class="sidebar-views">${formatNumber(v.view_count)} vues</p>
-                                </div>
-                            </div>
-                        `;
-                    }).join('')}
+                    ${sidebarVideosHtml}
                 </div>
             </div>
         </div>
