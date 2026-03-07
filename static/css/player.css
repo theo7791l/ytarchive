@@ -39,13 +39,14 @@
     box-shadow: 0 8px 30px rgba(255, 68, 68, 0.7);
 }
 
-/* Player Container - RESPONSIVE CORRIGÉ */
+/* Player Container - TOUJOURS EN FLEX ROW */
 .player-container {
     display: flex;
-    gap: clamp(15px, 2vw, 30px);
+    flex-direction: row;
+    gap: clamp(10px, 2vw, 30px);
     max-width: min(1800px, calc(100vw - 40px));
     margin: 80px auto 40px;
-    padding: 0 clamp(15px, 3vw, 40px);
+    padding: 0 clamp(10px, 3vw, 40px);
     box-sizing: border-box;
 }
 
@@ -85,7 +86,7 @@
 }
 
 .player-video-title {
-    font-size: 24px;
+    font-size: clamp(18px, 3vw, 24px);
     font-weight: 700;
     color: white;
     margin-bottom: 15px;
@@ -230,10 +231,10 @@
     overflow-y: auto;
 }
 
-/* Player Sidebar - FLEX + WIDTH RESPONSIVE */
+/* Player Sidebar - TOUJOURS 300PX MIN */
 .player-sidebar {
-    flex: 0 1 400px;
-    min-width: 280px;
+    flex: 0 0 clamp(250px, 25vw, 400px);
+    min-width: 250px;
     max-width: 400px;
     width: 100%;
 }
@@ -299,8 +300,8 @@
 
 .sidebar-thumbnail {
     position: relative;
-    width: 120px;
-    height: 68px;
+    width: clamp(80px, 15vw, 120px);
+    height: clamp(45px, 8vw, 68px);
     flex-shrink: 0;
     border-radius: 8px;
     overflow: hidden;
@@ -325,7 +326,7 @@
     align-items: center;
     justify-content: center;
     background: linear-gradient(135deg, rgba(102, 126, 234, 0.3), rgba(118, 75, 162, 0.3));
-    font-size: 16px;
+    font-size: 14px;
     font-weight: 700;
     color: rgba(255, 255, 255, 0.6);
 }
@@ -351,7 +352,7 @@
 }
 
 .sidebar-video-title {
-    font-size: 13px;
+    font-size: clamp(11px, 1.5vw, 13px);
     font-weight: 600;
     color: rgba(255, 255, 255, 0.95);
     margin: 0;
@@ -369,78 +370,49 @@
 
 .sidebar-channel,
 .sidebar-views {
-    font-size: 11px;
+    font-size: clamp(10px, 1.2vw, 11px);
     color: rgba(170, 170, 170, 0.8);
     margin: 0;
 }
 
-/* RESPONSIVE BREAKPOINTS PROGRESSIFS */
-@media (max-width: 1500px) {
+/* RESPONSIVE - Adaptation tailles uniquement */
+@media (max-width: 1400px) {
     .player-sidebar {
-        flex-basis: 350px;
-        max-width: 350px;
-    }
-}
-
-@media (max-width: 1350px) {
-    .player-sidebar {
-        flex-basis: 300px;
+        flex: 0 0 300px;
         max-width: 300px;
     }
-    
-    .sidebar-thumbnail {
-        width: 100px;
-        height: 56px;
+}
+
+@media (max-width: 1200px) {
+    .player-sidebar {
+        flex: 0 0 280px;
+        max-width: 280px;
     }
     
-    .sidebar-video-title {
-        font-size: 12px;
+    .player-info {
+        padding: 20px;
     }
 }
 
-/* BREAKPOINT PRINCIPAL RÉDUIT À 1000px */
-@media (max-width: 1000px) {
+/* Mobile uniquement - sidebar en dessous */
+@media (max-width: 768px) {
     .player-container {
         flex-direction: column;
-        gap: 25px;
+        padding: 0 10px;
+        margin-top: 60px;
     }
     
     .player-sidebar {
         width: 100%;
         max-width: 100%;
-        flex-basis: auto;
+        flex: 1 1 auto;
     }
     
-    /* Garde la colonne simple entre 1000px et 700px */
-    .sidebar-videos {
-        display: flex;
-        flex-direction: column;
-        gap: 15px;
-        max-height: 600px;
-        overflow-y: auto;
-        overflow-x: hidden;
-    }
-    
-    .sidebar-video {
-        width: 100%;
-    }
-}
-
-/* Grille 2 colonnes sur petites tablettes */
-@media (max-width: 700px) {
     .sidebar-videos {
         display: grid;
         grid-template-columns: repeat(2, 1fr);
-        gap: 15px;
-        max-height: 500px;
-    }
-}
-
-/* 1 colonne sur mobile */
-@media (max-width: 600px) {
-    .player-container {
-        padding: 0 10px;
-        margin-top: 60px;
+        gap: 10px;
+        max-height: 400px;
     }
     
     .player-close-btn {
@@ -451,25 +423,19 @@
         right: 15px;
     }
     
-    .player-video-title {
-        font-size: 18px;
-    }
-    
     .player-info {
-        padding: 20px;
+        padding: 15px;
     }
     
     .speed-controls,
     .action-controls {
         justify-content: center;
     }
-    
+}
+
+/* Très petits mobiles */
+@media (max-width: 500px) {
     .sidebar-videos {
         grid-template-columns: 1fr;
-        max-height: 400px;
-    }
-    
-    .sidebar-video {
-        width: 100%;
     }
 }
