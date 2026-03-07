@@ -7,33 +7,9 @@ import traceback
 from pytubefix import YouTube
 import tempfile
 import time
-import re
 import hashlib
 import gc
-
-
-async def get_channel_avatar_url(channel_url: str) -> str:
-    """Extract REAL avatar image URL from YouTube channel"""
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(channel_url, timeout=aiohttp.ClientTimeout(total=10)) as response:
-                if response.status != 200:
-                    return None
-                
-                html = await response.text()
-                
-                match = re.search(r'<meta property="og:image" content="([^"]+)"', html)
-                if match:
-                    return match.group(1)
-                
-                channel_id_match = re.search(r'"channelId":"([^"]+)"', html)
-                if channel_id_match:
-                    channel_id = channel_id_match.group(1)
-                    return f"https://yt3.googleusercontent.com/ytc/{channel_id}=s176-c-k-c0x00ffffff-no-rj"
-        
-        return None
-    except:
-        return None
+from channel_utils import get_channel_avatar_url  # Import de la fonction commune
 
 
 async def download_fragment_range(session: aiohttp.ClientSession, url: str, start: int, end: int, fragment_num: int) -> tuple:
@@ -316,11 +292,10 @@ async def download_video_turbo(url: str, quality: str = "best",
         
         yt = info['yt']
         
-        # FIX: Récupérer l'avatar automatiquement
+        # FIX: Récupérer l'avatar automatiquement avec la fonction commune
         channel_avatar_url = None
         if yt.channel_url:
             channel_avatar_url = await get_channel_avatar_url(yt.channel_url)
-            print(f"🖼️  Channel avatar: {channel_avatar_url[:60] if channel_avatar_url else 'Not found'}...")
         
         from b2_storage import B2Storage
         
@@ -411,13 +386,13 @@ async def download_video_turbo(url: str, quality: str = "best",
         if progress_callback:
             await progress_callback('completed', f'✅ {yt.title}')
         
-        # FIX: Ajouter channel_url pour le frontend
+        # FIX: channel_url ajouté pour affichage frontend
         video_entry = {
             'id': yt.video_id,
             'title': yt.title,
             'channel': yt.author,
             'channel_id': yt.channel_id,
-            'channel_url': channel_avatar_url,  # FIX: Ajouté pour affichage frontend
+            'channel_url': channel_avatar_url,  # FIX
             'duration': yt.length,
             'upload_date': yt.publish_date.isoformat() if yt.publish_date else None,
             'description': yt.description[:500] if yt.description else '',
