@@ -1,4 +1,5 @@
-/* VIDEO PLAYER MODAL - Style YouTube */
+/* VIDEO PLAYER - ULTRA MODERN YouTube-style */
+
 .video-player-modal {
     position: fixed;
     top: 0;
@@ -6,302 +7,325 @@
     width: 100%;
     height: 100%;
     background: rgba(0, 0, 0, 0.98);
-    backdrop-filter: blur(10px);
-    z-index: 10000;
-    overflow-y: auto;
-    animation: slideInUp 0.3s ease;
+    backdrop-filter: blur(20px) saturate(180%);
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    animation: fadeIn 0.3s ease;
 }
 
 .player-close-btn {
-    position: fixed;
+    position: absolute;
     top: 20px;
     right: 20px;
+    background: rgba(255, 68, 68, 0.3);
+    border: 2px solid rgba(255, 68, 68, 0.6);
+    color: #ff4444;
+    font-size: 32px;
+    font-weight: bold;
     width: 50px;
     height: 50px;
-    background: rgba(255, 68, 68, 0.95);
-    border: 2px solid #ff4444;
     border-radius: 50%;
-    color: white;
-    font-size: 32px;
-    font-weight: 700;
     cursor: pointer;
-    z-index: 10001;
     display: flex;
     align-items: center;
     justify-content: center;
     transition: all 0.3s ease;
-    box-shadow: 0 5px 20px rgba(255, 68, 68, 0.5);
+    z-index: 10001;
 }
 
 .player-close-btn:hover {
-    transform: rotate(90deg) scale(1.15);
-    background: #ff4444;
-    box-shadow: 0 8px 30px rgba(255, 68, 68, 0.7);
+    background: rgba(255, 68, 68, 0.5);
+    transform: rotate(90deg) scale(1.1);
+    box-shadow: 0 0 30px rgba(255, 68, 68, 0.6);
 }
 
-/* Player Container - TOUJOURS EN FLEX ROW */
+/* ========================================== */
+/* PLAYER CONTAINER - FIX LAYOUT */
+/* ========================================== */
+
 .player-container {
     display: flex;
-    flex-direction: row;
-    gap: clamp(10px, 2vw, 30px);
-    max-width: min(1800px, calc(100vw - 40px));
-    margin: 80px auto 40px;
-    padding: 0 clamp(10px, 3vw, 40px);
-    box-sizing: border-box;
+    flex-direction: row; /* Vidéo à GAUCHE, suggestions à DROITE */
+    gap: 20px;
+    padding: 20px;
+    height: 100%;
+    max-width: 1800px;
+    margin: 0 auto;
+    overflow: hidden;
 }
 
-/* Player Main - FLEX INTELLIGENT */
+/* ========================================== */
+/* PLAYER MAIN - Zone vidéo principale */
+/* ========================================== */
+
 .player-main {
-    flex: 1 1 auto;
-    min-width: 0;
-    max-width: 100%;
+    flex: 1; /* Prend tout l'espace disponible */
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    overflow-y: auto;
+    min-width: 0; /* Permet le shrink correct */
 }
 
 .player-video-wrapper {
     position: relative;
     width: 100%;
     background: #000;
-    border-radius: 15px;
+    border-radius: 12px;
     overflow: hidden;
     box-shadow: 0 10px 50px rgba(0, 0, 0, 0.8);
-    margin-bottom: 20px;
 }
 
 .player-video-wrapper video {
     width: 100%;
     height: auto;
     display: block;
-    max-height: min(75vh, 800px);
-    max-width: 100%;
+    max-height: 70vh;
 }
 
-/* Player Info */
+/* ========================================== */
+/* PLAYER INFO - Métadonnées sous la vidéo */
+/* ========================================== */
+
 .player-info {
-    background: rgba(26, 26, 46, 0.95);
+    background: rgba(26, 26, 46, 0.8);
     backdrop-filter: blur(20px);
     padding: 25px;
     border-radius: 15px;
     border: 2px solid rgba(102, 126, 234, 0.3);
-    box-shadow: 0 5px 25px rgba(0, 0, 0, 0.5);
 }
 
 .player-video-title {
-    font-size: clamp(18px, 3vw, 24px);
+    font-size: 22px;
     font-weight: 700;
     color: white;
-    margin-bottom: 15px;
-    line-height: 1.4;
+    margin: 0 0 12px 0;
+    line-height: 1.3;
 }
 
 .player-video-meta {
     display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
+    gap: 10px;
     align-items: center;
     font-size: 14px;
     color: rgba(170, 170, 170, 0.9);
     margin-bottom: 20px;
-    padding-bottom: 20px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    flex-wrap: wrap;
 }
 
 .player-channel {
     font-weight: 600;
-    color: rgba(255, 255, 255, 0.9);
+    color: #667eea;
+    transition: color 0.3s ease;
+}
+
+.player-channel.clickable-channel {
+    cursor: pointer;
+}
+
+.player-channel:hover {
+    color: #764ba2;
+    text-decoration: underline;
 }
 
 .sync-badge {
-    background: rgba(102, 234, 171, 0.95);
+    background: linear-gradient(135deg, #66eaab, #10b981);
     color: #0f0f1e;
     padding: 4px 10px;
     border-radius: 6px;
     font-size: 11px;
     font-weight: 800;
     letter-spacing: 0.5px;
-    margin-left: 10px;
+    text-transform: uppercase;
 }
 
-.b2-streaming-badge {
-    background: rgba(102, 234, 171, 0.95);
-    color: #0f0f1e;
-    padding: 4px 10px;
-    border-radius: 6px;
-    font-size: 11px;
-    font-weight: 800;
-    letter-spacing: 0.5px;
-    margin-left: 10px;
-}
+/* ========================================== */
+/* PLAYER CONTROLS - Contrôles de vitesse */
+/* ========================================== */
 
-/* Player Controls */
 .player-controls {
     display: flex;
     flex-direction: column;
     gap: 15px;
-    margin-bottom: 20px;
-    padding-bottom: 20px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 20px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 12px;
+    border: 1px solid rgba(102, 126, 234, 0.2);
+    margin-bottom: 15px;
 }
 
-.speed-controls,
-.action-controls {
+.speed-controls {
     display: flex;
+    align-items: center;
     gap: 10px;
     flex-wrap: wrap;
-    align-items: center;
 }
 
 .control-label {
     font-weight: 600;
-    color: #aaa;
-    margin-right: 5px;
+    color: rgba(170, 170, 170, 0.9);
+    font-size: 14px;
 }
 
-.speed-btn,
-.control-btn {
-    padding: 10px 18px;
+.speed-btn {
+    padding: 8px 16px;
     background: rgba(255, 255, 255, 0.05);
-    border: 2px solid rgba(102, 126, 234, 0.3);
-    border-radius: 10px;
+    border: 2px solid rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
     color: white;
-    font-weight: 600;
     font-size: 13px;
+    font-weight: 600;
     cursor: pointer;
     transition: all 0.3s ease;
 }
 
-.speed-btn:hover,
+.speed-btn:hover {
+    background: rgba(102, 126, 234, 0.2);
+    border-color: #667eea;
+    transform: translateY(-2px);
+}
+
+.speed-btn.active {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    border-color: #667eea;
+    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+}
+
+.action-controls {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.control-btn {
+    padding: 10px 18px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    border-radius: 10px;
+    color: white;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
 .control-btn:hover {
-    background: rgba(102, 126, 234, 0.15);
+    background: rgba(102, 126, 234, 0.2);
     border-color: #667eea;
     transform: translateY(-2px);
     box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
 }
 
-.speed-btn.active {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    border-color: #667eea;
-    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
-}
+/* ========================================== */
+/* PLAYER SHORTCUTS - Raccourcis clavier */
+/* ========================================== */
 
-/* Player Shortcuts */
 .player-shortcuts {
     display: flex;
     flex-wrap: wrap;
     gap: 12px;
+    font-size: 12px;
+    color: rgba(170, 170, 170, 0.8);
     padding: 15px;
-    background: rgba(102, 126, 234, 0.1);
+    background: rgba(0, 0, 0, 0.2);
     border-radius: 10px;
-    font-size: 13px;
-    margin-bottom: 20px;
+    margin-bottom: 15px;
 }
 
 .player-shortcuts strong {
-    width: 100%;
     color: #667eea;
-    margin-bottom: 5px;
+    margin-right: 10px;
 }
 
 .player-shortcuts span {
-    padding: 5px 12px;
+    padding: 4px 8px;
     background: rgba(255, 255, 255, 0.05);
     border-radius: 6px;
-    color: rgba(255, 255, 255, 0.8);
-    font-weight: 500;
+    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-/* Player Description */
+/* ========================================== */
+/* PLAYER DESCRIPTION */
+/* ========================================== */
+
 .player-description {
-    margin-top: 20px;
-    padding-top: 20px;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 15px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 10px;
+    border: 1px solid rgba(102, 126, 234, 0.2);
 }
 
 .player-description strong {
     display: block;
-    margin-bottom: 10px;
     color: #667eea;
-    font-size: 16px;
+    margin-bottom: 10px;
+    font-size: 14px;
 }
 
 .player-description p {
-    color: rgba(255, 255, 255, 0.8);
+    font-size: 13px;
     line-height: 1.6;
+    color: rgba(255, 255, 255, 0.8);
     white-space: pre-wrap;
-    max-height: 300px;
-    overflow-y: auto;
+    word-wrap: break-word;
 }
 
-/* Player Sidebar - TOUJOURS 300PX MIN */
+/* ========================================== */
+/* PLAYER SIDEBAR - Suggestions à DROITE UNIQUEMENT */
+/* ========================================== */
+
 .player-sidebar {
-    flex: 0 0 clamp(250px, 25vw, 400px);
-    min-width: 250px;
-    max-width: 400px;
-    width: 100%;
+    width: 400px; /* Largeur fixe pour la sidebar */
+    flex-shrink: 0; /* Ne rétrécit JAMAIS */
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    overflow-y: auto;
+    background: rgba(26, 26, 46, 0.6);
+    backdrop-filter: blur(20px);
+    padding: 20px;
+    border-radius: 15px;
+    border: 2px solid rgba(102, 126, 234, 0.3);
+    max-height: 100%;
 }
 
 .sidebar-title {
     font-size: 18px;
     font-weight: 700;
     color: white;
-    margin-bottom: 20px;
-    padding-bottom: 15px;
+    margin: 0 0 15px 0;
+    padding-bottom: 10px;
     border-bottom: 2px solid rgba(102, 126, 234, 0.3);
 }
 
-/* Sidebar Videos - SCROLL OPTIMISÉ */
 .sidebar-videos {
     display: flex;
     flex-direction: column;
-    gap: 15px;
-    max-height: calc(100vh - 220px);
-    overflow-y: auto;
-    overflow-x: hidden;
-    padding-right: 10px;
+    gap: 12px;
 }
 
-/* Scrollbar Styling */
-.sidebar-videos::-webkit-scrollbar {
-    width: 8px;
-}
-
-.sidebar-videos::-webkit-scrollbar-track {
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: 10px;
-}
-
-.sidebar-videos::-webkit-scrollbar-thumb {
-    background: rgba(102, 126, 234, 0.5);
-    border-radius: 10px;
-}
-
-.sidebar-videos::-webkit-scrollbar-thumb:hover {
-    background: rgba(102, 126, 234, 0.7);
-}
-
-/* Sidebar Video Item */
 .sidebar-video {
     display: flex;
     gap: 12px;
-    background: rgba(26, 26, 46, 0.8);
-    backdrop-filter: blur(10px);
     padding: 10px;
+    background: rgba(0, 0, 0, 0.3);
     border-radius: 10px;
-    border: 2px solid rgba(102, 126, 234, 0.2);
+    border: 2px solid rgba(255, 255, 255, 0.08);
     cursor: pointer;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.3s ease;
 }
 
 .sidebar-video:hover {
-    background: rgba(26, 26, 46, 0.95);
+    background: rgba(102, 126, 234, 0.15);
     border-color: rgba(102, 126, 234, 0.5);
     transform: translateX(5px);
-    box-shadow: 0 5px 20px rgba(102, 126, 234, 0.3);
 }
 
 .sidebar-thumbnail {
     position: relative;
-    width: clamp(80px, 15vw, 120px);
-    height: clamp(45px, 8vw, 68px);
+    width: 120px;
+    height: 68px;
     flex-shrink: 0;
     border-radius: 8px;
     overflow: hidden;
@@ -312,11 +336,7 @@
     width: 100%;
     height: 100%;
     object-fit: cover;
-    transition: transform 0.3s ease;
-}
-
-.sidebar-video:hover .sidebar-thumbnail img {
-    transform: scale(1.1);
+    display: block;
 }
 
 .sidebar-no-thumb {
@@ -335,10 +355,10 @@
     position: absolute;
     bottom: 4px;
     right: 4px;
-    background: rgba(0, 0, 0, 0.92);
-    padding: 2px 5px;
+    background: rgba(0, 0, 0, 0.9);
+    padding: 2px 6px;
     border-radius: 4px;
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 700;
     color: white;
 }
@@ -347,14 +367,14 @@
     flex: 1;
     display: flex;
     flex-direction: column;
-    gap: 5px;
+    gap: 4px;
     min-width: 0;
 }
 
 .sidebar-video-title {
-    font-size: clamp(11px, 1.5vw, 13px);
+    font-size: 13px;
     font-weight: 600;
-    color: rgba(255, 255, 255, 0.95);
+    color: white;
     margin: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -364,77 +384,130 @@
     line-height: 1.3;
 }
 
-.sidebar-video:hover .sidebar-video-title {
-    color: #667eea;
-}
-
-.sidebar-channel,
-.sidebar-views {
-    font-size: clamp(10px, 1.2vw, 11px);
-    color: rgba(170, 170, 170, 0.8);
+.sidebar-channel {
+    font-size: 12px;
+    color: rgba(170, 170, 170, 0.9);
     margin: 0;
 }
 
-/* RESPONSIVE - Adaptation tailles uniquement */
-@media (max-width: 1400px) {
-    .player-sidebar {
-        flex: 0 0 300px;
-        max-width: 300px;
-    }
+.sidebar-views {
+    font-size: 11px;
+    color: rgba(136, 136, 136, 0.8);
+    margin: 0;
 }
+
+/* ========================================== */
+/* SCROLLBAR STYLING */
+/* ========================================== */
+
+.player-main::-webkit-scrollbar,
+.player-sidebar::-webkit-scrollbar {
+    width: 8px;
+}
+
+.player-main::-webkit-scrollbar-track,
+.player-sidebar::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 10px;
+}
+
+.player-main::-webkit-scrollbar-thumb,
+.player-sidebar::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    border-radius: 10px;
+}
+
+.player-main::-webkit-scrollbar-thumb:hover,
+.player-sidebar::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(135deg, #764ba2, #667eea);
+}
+
+/* ========================================== */
+/* ANIMATIONS */
+/* ========================================== */
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* ========================================== */
+/* RESPONSIVE */
+/* ========================================== */
 
 @media (max-width: 1200px) {
     .player-sidebar {
-        flex: 0 0 280px;
-        max-width: 280px;
+        width: 320px;
     }
     
-    .player-info {
-        padding: 20px;
+    .sidebar-thumbnail {
+        width: 100px;
+        height: 56px;
     }
 }
 
-/* Mobile uniquement - sidebar en dessous */
-@media (max-width: 768px) {
+@media (max-width: 900px) {
     .player-container {
         flex-direction: column;
-        padding: 0 10px;
-        margin-top: 60px;
     }
     
     .player-sidebar {
         width: 100%;
-        max-width: 100%;
-        flex: 1 1 auto;
+        max-height: 400px;
     }
     
     .sidebar-videos {
         display: grid;
-        grid-template-columns: repeat(2, 1fr);
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
         gap: 10px;
-        max-height: 400px;
     }
     
+    .sidebar-video {
+        flex-direction: column;
+    }
+    
+    .sidebar-thumbnail {
+        width: 100%;
+        height: 112px;
+    }
+}
+
+@media (max-width: 600px) {
     .player-close-btn {
+        top: 10px;
+        right: 10px;
         width: 40px;
         height: 40px;
         font-size: 24px;
-        top: 15px;
-        right: 15px;
+    }
+    
+    .player-container {
+        padding: 10px;
     }
     
     .player-info {
         padding: 15px;
     }
     
+    .player-video-title {
+        font-size: 18px;
+    }
+    
+    .player-controls {
+        padding: 15px;
+    }
+    
     .speed-controls,
     .action-controls {
-        justify-content: center;
+        width: 100%;
     }
-}
-
-/* Très petits mobiles */
-@media (max-width: 500px) {
+    
+    .speed-btn,
+    .control-btn {
+        flex: 1;
+        min-width: 60px;
+    }
+    
     .sidebar-videos {
         grid-template-columns: 1fr;
     }
