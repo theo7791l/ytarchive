@@ -116,24 +116,17 @@ async function playVideo(videoId) {
                     </div>
                     
                     <div class="player-controls">
-                        <div class="speed-controls">
-                            <span class="control-label">Vitesse:</span>
-                            <button class="speed-btn" data-speed="0.5">0.5x</button>
-                            <button class="speed-btn" data-speed="0.75">0.75x</button>
-                            <button class="speed-btn active" data-speed="1">1x</button>
-                            <button class="speed-btn" data-speed="1.25">1.25x</button>
-                            <button class="speed-btn" data-speed="1.5">1.5x</button>
-                            <button class="speed-btn" data-speed="2">2x</button>
-                        </div>
-                        <div class="action-controls">
-                            <button class="control-btn" onclick="skipTime(-10)">-10s</button>
-                            <button class="control-btn" onclick="skipTime(10)">+10s</button>
-                            <button class="control-btn" onclick="toggleFullscreen()">Plein écran</button>
-                        </div>
+                        <span class="control-label">Vitesse de lecture:</span>
+                        <button class="speed-btn" data-speed="0.5">0.5x</button>
+                        <button class="speed-btn" data-speed="0.75">0.75x</button>
+                        <button class="speed-btn active" data-speed="1">1x</button>
+                        <button class="speed-btn" data-speed="1.25">1.25x</button>
+                        <button class="speed-btn" data-speed="1.5">1.5x</button>
+                        <button class="speed-btn" data-speed="2">2x</button>
                     </div>
                     
                     <div class="player-shortcuts">
-                        <strong>Raccourcis:</strong>
+                        <strong>Raccourcis clavier:</strong>
                         <span>Espace = Lecture/Pause</span>
                         <span>← → = ±5s</span>
                         <span>↑ ↓ = Volume</span>
