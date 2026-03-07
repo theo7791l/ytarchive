@@ -316,9 +316,11 @@ async def download_video_turbo(url: str, quality: str = "best",
         
         yt = info['yt']
         
+        # FIX: Récupérer l'avatar automatiquement
         channel_avatar_url = None
         if yt.channel_url:
             channel_avatar_url = await get_channel_avatar_url(yt.channel_url)
+            print(f"🖼️  Channel avatar: {channel_avatar_url[:60] if channel_avatar_url else 'Not found'}...")
         
         from b2_storage import B2Storage
         
@@ -409,12 +411,13 @@ async def download_video_turbo(url: str, quality: str = "best",
         if progress_callback:
             await progress_callback('completed', f'✅ {yt.title}')
         
+        # FIX: Ajouter channel_url pour le frontend
         video_entry = {
             'id': yt.video_id,
             'title': yt.title,
             'channel': yt.author,
             'channel_id': yt.channel_id,
-            'channel_avatar_url': channel_avatar_url,
+            'channel_url': channel_avatar_url,  # FIX: Ajouté pour affichage frontend
             'duration': yt.length,
             'upload_date': yt.publish_date.isoformat() if yt.publish_date else None,
             'description': yt.description[:500] if yt.description else '',
