@@ -410,17 +410,28 @@
         flex-basis: auto;
     }
     
+    /* Garde la colonne simple entre 1200px et 900px */
     .sidebar-videos {
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
+        display: flex;
+        flex-direction: column;
         gap: 15px;
-        max-height: 500px;
+        max-height: 600px;
         overflow-y: auto;
         overflow-x: hidden;
     }
     
     .sidebar-video {
         width: 100%;
+    }
+}
+
+/* Grille 2 colonnes seulement sur tablettes plus petites */
+@media (max-width: 900px) {
+    .sidebar-videos {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 15px;
+        max-height: 500px;
     }
 }
 
@@ -451,6 +462,7 @@
         justify-content: center;
     }
     
+    /* 1 colonne sur mobile */
     .sidebar-videos {
         grid-template-columns: 1fr;
         max-height: 400px;
