@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Optional, Callable
 import traceback
 from pytubefix import YouTube
+from channel_utils import get_channel_avatar_url  # Import de la fonction commune
 
 VIDEOS_DIR = "videos"
 
@@ -161,6 +162,11 @@ async def download_video_pytubefix(url: str, quality: str = "best", progress_cal
         audio_stream = info['audio_stream']
         use_separate = info['use_separate']
         
+        # FIX: Récupérer l'avatar automatiquement
+        channel_avatar_url = None
+        if yt.channel_url:
+            channel_avatar_url = await get_channel_avatar_url(yt.channel_url)
+        
         from b2_storage import B2Storage
         
         b2 = B2Storage(b2_creds["key_id"], b2_creds["application_key"], b2_creds["bucket_name"])
@@ -245,11 +251,13 @@ async def download_video_pytubefix(url: str, quality: str = "best", progress_cal
         print("  Connection: Stable (auto-retry worked!)")
         print("="*60)
         
+        # FIX: Ajout de channel_url dans le retour
         return (True, {
             'id': yt.video_id,
             'title': yt.title,
             'channel': yt.author,
             'channel_id': yt.channel_id,
+            'channel_url': channel_avatar_url,  # FIX: Ajouté
             'duration': yt.length,
             'upload_date': yt.publish_date.isoformat() if yt.publish_date else None,
             'description': yt.description[:500] if yt.description else '',
